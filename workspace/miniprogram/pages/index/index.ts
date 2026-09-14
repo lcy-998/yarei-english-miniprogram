@@ -9,7 +9,7 @@ Component({
       const menuRect = wx.getMenuButtonBoundingClientRect()
       const topInset = Math.max(64, Math.ceil(menuRect.bottom + 10))
       const today = new Date()
-      this.setData({ topInset, heroHeight: topInset + 184, dateLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
+      this.setData({ topInset, heroHeight: topInset + 160, dateLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
       this.loadHome()
     },
   },

@@ -2,7 +2,7 @@ import { login } from '../../../services/app-service'
 import { saveSession } from '../../../session/session'
 
 Component({
-  data: { mobile: '13800000001', password: '123456', showPassword: false, loading: false, error: '', topInset: 72 },
+  data: { mobile: '', password: '', showPassword: false, loading: false, error: '', topInset: 72 },
   lifetimes: {
     attached() {
       const menuRect = wx.getMenuButtonBoundingClientRect()
@@ -10,7 +10,6 @@ Component({
     },
   },
   methods: {
-    chooseDemo(event: WechatMiniprogram.TouchEvent) { this.setData({ mobile: event.currentTarget.dataset.mobile as string, error: '' }) },
     onMobile(event: WechatMiniprogram.Input) { this.setData({ mobile: event.detail.value }) },
     onPassword(event: WechatMiniprogram.Input) { this.setData({ password: event.detail.value }) },
     togglePassword() { this.setData({ showPassword: !this.data.showPassword }) },
