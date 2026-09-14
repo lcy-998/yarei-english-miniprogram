@@ -6,7 +6,7 @@
 >
 > 视觉方向：自然高饱和卡通 1.0
 >
-> 交付状态：待用户审批；候选稿仅保存在 `04-pages/history/`，未复制到 `current/`
+> 交付状态：2026-09-14 用户整批批准；五张关键页面均已复制到 `04-pages/current/`
 
 ## 共用约束
 
@@ -25,7 +25,7 @@
 ```
 
 - 视觉参考：`04-pages/current/S-02.png`、`04-pages/current/S-04.png`
-- 当前候选：`04-pages/history/S-07/v001.png`
+- 正式主稿：`04-pages/current/S-07.png`
 
 ## S-11 班级打卡排行榜
 
@@ -34,7 +34,7 @@
 ```
 
 - 视觉参考：`04-pages/current/S-01.png`、`04-pages/current/S-08.png`
-- 当前候选：`04-pages/history/S-11/v001.png`
+- 正式主稿：`04-pages/current/S-11.png`
 - 定向修订：初次生成后只补充“三年级 2 班”归属，再保存为本页首个仓库候选版本。
 
 ## T-09 打卡活动
@@ -44,7 +44,7 @@
 ```
 
 - 视觉参考：`04-pages/current/T-05.png`、`04-pages/current/T-06.png`
-- 当前候选：`04-pages/history/T-09/v001.png`
+- 正式主稿：`04-pages/current/T-09.png`
 
 ## T-13 班级课本详情
 
@@ -53,7 +53,7 @@
 ```
 
 - 视觉参考：`04-pages/current/T-02.png`、`04-pages/current/T-06.png`
-- 当前候选：`04-pages/history/T-13/v001.png`
+- 正式主稿：`04-pages/current/T-13.png`
 
 ## T-15 学校习题库
 
@@ -62,7 +62,7 @@
 ```
 
 - 视觉参考：`04-pages/current/T-02.png`、`04-pages/current/T-05.png`
-- 当前候选：`04-pages/history/T-15/v002.png`
+- 正式主稿：`04-pages/current/T-15.png`
 - 版本说明：v001 保留初次生成稿；v002 仅修正解析行中文冒号，为当前待审批候选。
 
 ## 生成后检查
