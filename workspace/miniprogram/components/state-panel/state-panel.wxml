@@ -1,0 +1,5 @@
+<view class="state-panel">
+  <view class="state-symbol state-symbol--{{state}}" aria-hidden="true"><view class="state-shape"></view></view>
+  <text>{{message || (state === 'loading' ? '正在加载' : state === 'empty' ? '暂无数据' : state === 'permission' ? '暂无访问权限' : state === 'disabled' ? '当前功能不可用' : state === 'success' ? '操作成功' : '加载失败')}}</text>
+  <button wx:if="{{state === 'error'}}" class="state-retry" bindtap="onRetry">重试</button>
+</view>

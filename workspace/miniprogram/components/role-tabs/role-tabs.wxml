@@ -1,0 +1,6 @@
+<view class="role-tabs role-tabs--{{role}}">
+  <view wx:for="{{tabs}}" wx:key="key" class="role-tab {{active === item.key ? 'active' : ''}}" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onTap" aria-role="button">
+    <view class="role-tab__icon role-tab__icon--{{item.key}}" aria-hidden="true"></view>
+    <text class="role-tab__label">{{item.label}}</text>
+  </view>
+</view>

@@ -1,0 +1,51 @@
+{
+  "resourceId": "book-unknown-3a",
+  "resourceType": "textbook",
+  "title": "三年级英语上册（版本待确认）",
+  "publisher": null,
+  "series": null,
+  "grade": 3,
+  "term": "upper",
+  "language": "en-CN",
+  "roles": [
+    "textbook"
+  ],
+  "sourceRelativePath": "1.三年级上册英语课本电子版（最新正式版）.pdf",
+  "sourceSha256": "3597F5EF1E540F54B1CA51F3769DCFCB42658DC5930E70BA78B8961BD9C304EF",
+  "sourceSizeBytes": 67721427,
+  "sourceModifiedAt": "2026-09-11T07:07:20.625208+00:00",
+  "version": 1,
+  "processingStatus": "needs_ocr",
+  "rightsStatus": "user_confirmed_cleared",
+  "visibility": "unassigned",
+  "needsMetadata": [
+    "publisher",
+    "series",
+    "edition",
+    "isbn"
+  ],
+  "manifestRelativePath": "library/books/book-unknown-3a/v1/manifest.json",
+  "processedAt": "2026-09-11T08:19:27.748710+00:00",
+  "details": {
+    "pageCount": 91,
+    "pagesWithText": 0,
+    "textCoverageRatio": 0.0,
+    "pdfClassification": "needs_ocr",
+    "unitCandidates": [],
+    "coordinatePages": [],
+    "renderedPages": [
+      1
+    ],
+    "processingErrors": [],
+    "missingComponents": [
+      "ocr_text",
+      "chapter_structure",
+      "chapter_audio",
+      "sentence_timeline",
+      "follow_read_text",
+      "structured_vocabulary",
+      "structured_questions"
+    ],
+    "processingStatus": "needs_ocr"
+  }
+}

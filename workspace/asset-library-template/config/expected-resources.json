@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "items": [
+    { "role": "textbook", "label": "教材 PDF", "required": true },
+    { "role": "chapter_audio", "label": "章节/课文完整音频", "required": true },
+    { "role": "sentence_audio", "label": "句子点读音频或句子时间轴", "required": true },
+    { "role": "follow_read_text", "label": "跟读标准文本", "required": true },
+    { "role": "word_audio", "label": "单词标准发音", "required": true },
+    { "role": "structured_vocabulary", "label": "结构化单词库与音节", "required": true },
+    { "role": "listening_audio", "label": "教材配套听力音频", "required": true },
+    { "role": "listening_transcript", "label": "听力原文", "required": true },
+    { "role": "structured_questions", "label": "结构化题目、选项、答案和解析", "required": true },
+    { "role": "question_audio_mapping", "label": "逐题音频起止毫秒", "required": true },
+    { "role": "video_dubbing", "label": "视频配音素材、字幕与台词时间轴", "required": true },
+    { "role": "picture_book", "label": "绘本阅读内容", "required": true },
+    { "role": "current_affairs", "label": "英语时文内容", "required": true },
+    { "role": "chapter_book", "label": "英语章节阅读内容", "required": true }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "resourceId": "book-pep-4a",
+  "resourceType": "textbook",
+  "title": "人教版英语四年级上册",
+  "publisher": "人民教育出版社",
+  "series": "PEP",
+  "grade": 4,
+  "term": "upper",
+  "language": "en-CN",
+  "roles": [
+    "textbook"
+  ],
+  "sourceRelativePath": "人教版英语·电子课本·四上.pdf",
+  "sourceSha256": "6FCDF2B10F7B90F3FDDCE969FC85B57F9FCF595256ED4748B5BF9DB1A076602A",
+  "sourceSizeBytes": 16055498,
+  "sourceModifiedAt": "2026-09-11T07:07:22.206899+00:00",
+  "version": 1,
+  "processingStatus": "needs_review",
+  "rightsStatus": "user_confirmed_cleared",
+  "visibility": "unassigned",
+  "needsMetadata": [],
+  "manifestRelativePath": "library/books/book-pep-4a/v1/manifest.json",
+  "processedAt": "2026-09-11T08:21:22.028697+00:00",
+  "details": {
+    "pageCount": 93,
+    "pagesWithText": 93,
+    "textCoverageRatio": 1.0,
+    "pdfClassification": "embedded_text",
+    "unitCandidates": [
+      {
+        "pageNumber": 4,
+        "preview": "Contents Unit 1 Helping at home 2 Unit 2 My friends 14 Unit 3 Places we live in 26 Unit 4 Helping in the community 38 Unit 5 The weather and us 50 Unit 6 Changing for the seasons 62 Revision Let's help! 74 Appendix 1 Songs 78 Appendix 2 Wor"
+      },
+      {
+        "pageNumber": 6,
+        "preview": "Helping at home What do family do together? Unit 1 Helping at home Big Question What do family do together? Unit 1 2"
+      },
+      {
+        "pageNumber": 18,
+        "preview": "My friends Big Question What makes your friends special? Unit 2 My friends What makes your friends different? Unit 2 14"
+      },
+      {
+        "pageNumber": 30,
+        "preview": "Places we live Big Question What makes a community? Unit 3 Places we live in What makes a community? Unit 3 26"
+      },
+      {
+        "pageNumber": 42,
+        "preview": "Unit Helping in the community How can we help our community? 4 My learning Communication Talking about jobs and volunteering in a community Vocabulary Jobs; volunteering activities Phonics ph Unit Helping in the community Big Question How d"
+      },
+      {
+        "pageNumber": 54,
+        "preview": "Unit 5 The weather and us How can the weather change our lives? My learning Communication Asking about the weather and activities Vocabulary Weather; indoor and outdoor activities Phonics th Unit 5 The weather and us Big Question How does t"
+      },
+      {
+        "pageNumber": 66,
+        "preview": "Changing for the seasons My learning Communication Describing what we wear and do in different seasons Vocabulary Clothes; seasons Phonics wh Big Question How are our lives different in each season? Unit 6 Changing for the seasons How are o"
+      },
+      {
+        "pageNumber": 82,
+        "preview": "78 Songs 歌 曲 Appendix 1 Unit 1 Helping at home This is the way she cleans her room, cleans her room, cleans her room. This is the way she cleans her room and helps her mum and dad. This is the way he cleans his room, cleans his room, cleans"
+      },
+      {
+        "pageNumber": 83,
+        "preview": "79 Appendix 1 What can we do on a rainy day? What can we do on a rainy day? We can go to the library—oh! What can we do on a windy day? What can we do on a windy day? What can we do on a windy day? We can fly our kite—oh! What can we do on "
+      },
+      {
+        "pageNumber": 84,
+        "preview": "80 Words in each unit 单 元 词 汇 表 注：加*的词为《义务教育英语课程标准（2022年版）》中的二级词； 黑体词要求理解、运用，白体词仅要求在语境中理解。 Unit 1 *PE /ˌpiː ˈiː/ 体育（课） p. 4 *job /dʒɒb/ 工作；职业 p. 4 *doctor /ˈdɒktə(r)/ 医生 p. 4 *farmer /ˈfɑːmə(r)/ 农场主； *农民 p. 5 *nurse /nɜːs/ 护士 p. 5 *office /"
+      },
+      {
+        "pageNumber": 85,
+        "preview": "81 *hospital /ˈhɒspɪtl/ 医院 p. 29 *shop /ʃɒp/ 商店 p. 29 *toilet /ˈtɔɪlət/ 厕所；卫生间 p. 29 *bus /bʌs/ stop /stɒp/ *公共汽车站 p. 29 *library /ˈlaɪbrəri/ 图书馆 p. 31 *sport /spɔːt/ 体育运动 p. 31 *walk /wɔːk/ 散步；行走 p. 32 *community /kəˈmjuːnəti/ 社区 p. 32 *fa"
+      },
+      {
+        "pageNumber": 86,
+        "preview": "Appendix 2 82 Unit 6 *whose /huːz/ 谁 的 p. 64 *sweater /ˈswetə(r)/ 毛衣 p. 64 *sock /sɒk/ 短袜 p. 64 *mine /maɪn/ 我的 p. 64 *wear /weə(r)/ 穿；戴 p. 64 *shirt /ʃɜːt/ 衬衫 p. 64 *coat /kəʊt/ 大衣；外套 p. 64 *dress /dres/ 连衣裙 p. 65 *which /wɪtʃ/ 哪一个；哪一些 p. "
+      },
+      {
+        "pageNumber": 90,
+        "preview": "86 Useful expressions 常 用 表 达 法 Unit 1 What's your mother's job? 你妈妈做什么工作？ She's a doctor. 她是医生。 Mum and Dad are busy and tired. What can we do for them? 爸爸妈妈又忙又累。我们能为他们做 些什么？ We can do some chores. 我们可以做一些家务活。 Unit 2 What's your friend's n"
+      },
+      {
+        "pageNumber": 91,
+        "preview": "87 In the kindergarten, John and Class One are singing songs together. 在幼儿园，约翰和一班（的小朋友 们）在一起唱歌。 Unit 5 Hello! Mark speaking. 你好！我是马克。 Hi, Mark! This is John. What's the weather like in Sydney? 嗨，马克！我是约翰。悉尼的天气怎 么样？ Well, it's sunny today. 噢，"
+      }
+    ],
+    "coordinatePages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93
+    ],
+    "renderedPages": [
+      1,
+      13,
+      84
+    ],
+    "processingErrors": [],
+    "missingComponents": [
+      "chapter_structure",
+      "chapter_audio",
+      "sentence_timeline",
+      "follow_read_text",
+      "structured_vocabulary",
+      "structured_questions"
+    ],
+    "processingStatus": "needs_review"
+  }
+}

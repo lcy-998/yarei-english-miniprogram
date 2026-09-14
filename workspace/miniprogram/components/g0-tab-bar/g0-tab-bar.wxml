@@ -1,0 +1,5 @@
+<view class="g0-tab-bar g0-tab-bar--{{role}}">
+  <button wx:for="{{tabs}}" wx:key="key" class="g0-tab-bar__item {{active === item.key ? 'g0-tab-bar__item--active' : ''}}" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onTap">
+    <view class="g0-tab-bar__icon g0-tab-bar__icon--{{item.key}}" aria-hidden="true"></view><text>{{item.label}}</text>
+  </button>
+</view>

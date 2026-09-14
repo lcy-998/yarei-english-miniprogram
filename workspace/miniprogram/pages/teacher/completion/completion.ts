@@ -1,0 +1,3 @@
+import { ReviewAssignmentView, getCompletion } from '../../../services/app-service'
+import { getCurrentTaskId, getSession } from '../../../session/session'
+Component({data:{loading:true,error:'',rows:[] as ReviewAssignmentView[]},lifetimes:{attached(){this.loadCompletion()}},methods:{async loadCompletion(){const session=getSession();const taskId=getCurrentTaskId();if(!session||!taskId){wx.navigateBack();return}const result=await getCompletion(session.user.id,taskId);if(!result.ok){this.setData({loading:false,error:result.error.message});return}this.setData({loading:false,rows:result.data})},openReview(){wx.navigateTo({url:'/pages/teacher/review-task/review-task'})}}})

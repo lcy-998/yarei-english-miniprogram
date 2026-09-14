@@ -1,0 +1,81 @@
+{
+  "defaults": {
+    "rightsStatus": "user_confirmed_cleared",
+    "visibility": "unassigned",
+    "language": "en-CN"
+  },
+  "files": {
+    "人教版英语·电子课本·四上.pdf": {
+      "resourceId": "book-pep-4a",
+      "resourceType": "textbook",
+      "title": "人教版英语四年级上册",
+      "publisher": "人民教育出版社",
+      "series": "PEP",
+      "grade": 4,
+      "term": "upper",
+      "roles": ["textbook"],
+      "pilotPages": [13, 84],
+      "needsMetadata": ["edition", "isbn"]
+    },
+    "【人教版】七上英语 电子课本（根据2022年版课程标准修订）.pdf": {
+      "resourceId": "book-pep-7a-2022",
+      "resourceType": "textbook",
+      "title": "人教版英语七年级上册",
+      "publisher": "人民教育出版社",
+      "grade": 7,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["edition", "isbn"]
+    },
+    "2025秋季人教版八上英语新教材官方高清彩版.pdf": {
+      "resourceId": "book-pep-8a-2025",
+      "resourceType": "textbook",
+      "title": "人教版英语八年级上册",
+      "publisher": "人民教育出版社",
+      "grade": 8,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["series", "edition", "isbn"]
+    },
+    "【人教版】九上英语 电子课本（根据2022年版课程标准修订）.pdf": {
+      "resourceId": "book-pep-9a-2022",
+      "resourceType": "textbook",
+      "title": "人教版英语九年级上册",
+      "publisher": "人民教育出版社",
+      "grade": 9,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["edition", "isbn"]
+    },
+    "2026Join in新五上电子课本26-6-26.pdf": {
+      "resourceId": "book-join-in-5a-2026",
+      "resourceType": "textbook",
+      "title": "Join in 英语五年级上册",
+      "series": "Join in",
+      "grade": 5,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["publisher", "edition", "isbn"]
+    },
+    "2026秋外研Join in六年级上册 英语.pdf": {
+      "resourceId": "book-join-in-6a-2026",
+      "resourceType": "textbook",
+      "title": "Join in 英语六年级上册",
+      "publisher": "外语教学与研究出版社",
+      "series": "Join in",
+      "grade": 6,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["edition", "isbn"]
+    },
+    "1.三年级上册英语课本电子版（最新正式版）.pdf": {
+      "resourceId": "book-unknown-3a",
+      "resourceType": "textbook",
+      "title": "三年级英语上册（版本待确认）",
+      "grade": 3,
+      "term": "upper",
+      "roles": ["textbook"],
+      "needsMetadata": ["publisher", "series", "edition", "isbn"]
+    }
+  }
+}

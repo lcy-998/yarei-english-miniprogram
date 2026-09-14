@@ -1,0 +1,11 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="选择身份" back="{{true}}"></app-header>
+  <view class="card">
+    <view class="card-brand"><image src="/assets/visual-v2/yarei-crest.png" class="crest" mode="aspectFit"></image><image src="/assets/visual-v2/mascot-reading.png" class="mascot" mode="widthFix"></image></view>
+    <text class="eyebrow">当前演示身份</text><text class="card-title">请选择本次使用的身份</text>
+    <view class="identity-card"><view class="avatar">{{avatarText}}</view><view class="identity-copy"><text class="name">{{name}}</text><text class="summary">{{roleSummary}}</text></view><view class="selected" aria-hidden="true"></view></view>
+    <text class="role">{{roleLabel}}</text>
+    <button class="primary" bindtap="enter">进入工作台</button>
+  </view>
+</view>

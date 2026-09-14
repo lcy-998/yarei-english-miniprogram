@@ -1,0 +1,118 @@
+.page {
+  min-height: 100vh;
+  background: @yr-page-work;
+  position: relative;
+}
+
+.page-bg {
+  position: fixed;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  opacity: @yr-environment-student-secondary;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  padding: 12px 20px 36px;
+}
+
+.summary-card {
+  min-height: 104px;
+  padding: 18px 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: @yr-card-border;
+  border-radius: @yr-radius-student-card;
+  background: rgba(255, 249, 240, .98);
+  box-shadow: @yr-card-shadow-strong;
+}
+
+.summary-card image { flex: 0 0 58px; width: 58px; height: 58px; }
+.summary-card > view:nth-child(2) { flex: 1; min-width: 0; }
+.summary-title { display: block; color: @yr-text-primary; font-size: 20px; font-weight: 900; }
+.summary-note { display: block; margin-top: 6px; color: @yr-text-secondary; font-size: 12px; }
+
+.summary-count {
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: @yr-surface-blue;
+  color: @yr-brand-primary;
+}
+
+.summary-count text:first-child { font-size: 20px; font-weight: 900; }
+.summary-count text:last-child { margin-top: 2px; font-size: 11px; }
+.filters { margin-top: 20px; display: flex; gap: 8px; }
+
+.filter {
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid @yr-border-subtle;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .9);
+  color: @yr-text-secondary;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.filter.active { border-color: @yr-brand-primary; background: @yr-surface-blue; color: @yr-brand-primary; }
+.list { padding: 0; }
+
+.task {
+  position: relative;
+  min-height: 82px;
+  margin-top: 16px;
+  padding: 18px 58px 18px 52px;
+  box-sizing: border-box;
+  border: @yr-card-border;
+  border-radius: @yr-radius-role-card;
+  background: rgba(255, 249, 240, .98);
+  box-shadow: @yr-card-shadow;
+}
+
+.status-mark {
+  position: absolute;
+  left: 20px;
+  top: 24px;
+  width: 14px;
+  height: 14px;
+  border: 4px solid @yr-brand-primary;
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 6px @yr-surface-blue;
+}
+
+.status-mark.completed { border-color: @yr-success; box-shadow: 0 0 0 6px @yr-surface-green; }
+.task-copy { min-width: 0; }
+.title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.meta { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 13px; }
+.arrow { position: absolute; right: 10px; top: 19px; width: 44px; height: 44px; color: @yr-brand-primary; }
+
+.arrow::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 14px;
+  width: 11px;
+  height: 11px;
+  border-right: 3px solid currentColor;
+  border-top: 3px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.empty { margin-top: 16px; padding: 36px 20px; text-align: center; border: @yr-card-border; border-radius: @yr-radius-role-card; background: rgba(255, 249, 240, .95); color: @yr-text-secondary; }

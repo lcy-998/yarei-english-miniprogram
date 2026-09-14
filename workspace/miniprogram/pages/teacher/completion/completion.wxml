@@ -1,0 +1,7 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="任务完成情况" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadCompletion"></state-panel>
+  <view wx:else class="content"><view class="summary"><text>已完成 {{rows.length}} 人</text><button bindtap="openReview">进入点评</button></view><view wx:for="{{rows}}" wx:key="assignmentId" class="row"><text>{{item.studentName}}</text><text>{{item.status === 'awaiting_review' ? '待点评' : item.status === 'completed' ? '已完成' : '未完成'}}</text></view></view>
+</view>

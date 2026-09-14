@@ -1,0 +1,97 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "version": "2.0",
+  "envId": "{{env.TCB_ENV_ID}}",
+  "region": "ap-shanghai",
+  "functionRoot": "./functions",
+  "functions": [
+    {
+      "name": "auth-session",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "task-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "task-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "student-task-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "submission-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "review-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "review-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "parent-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "relationship-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "content-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
+      "name": "organization-admin",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true
+    }
+  ]
+}

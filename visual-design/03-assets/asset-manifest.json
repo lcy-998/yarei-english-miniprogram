@@ -1,0 +1,53 @@
+{
+  "version": "1.1.0",
+  "updatedAt": "2026-09-13",
+  "assets": [
+    {
+      "id": "brand-logo",
+      "source": "asset/logo.png",
+      "workingCopy": "visual-design/03-assets/processed/logo-working.png",
+      "production": "visual-design/03-assets/production/brand-logo.png",
+      "role": "official-logo",
+      "sourceDimensions": "2400x2600",
+      "productionDimensions": "720x780",
+      "alpha": true,
+      "references": ["P-01"],
+      "status": "production-ready"
+    },
+    {
+      "id": "mascot-learning-blue",
+      "source": "asset/吉祥物1.png",
+      "workingCopy": "visual-design/03-assets/processed/吉祥物1-working.png",
+      "production": "visual-design/03-assets/production/mascot-learning-blue.png",
+      "role": "official-learning-mascot",
+      "sourceDimensions": "2887x4331",
+      "productionDimensions": "960x1440",
+      "alpha": true,
+      "references": ["P-01", "S-01"],
+      "status": "production-ready"
+    },
+    {
+      "id": "mascot-speaking-pink",
+      "source": "asset/吉祥物2.png",
+      "workingCopy": "visual-design/03-assets/processed/吉祥物2-working.png",
+      "production": "visual-design/03-assets/production/mascot-speaking-pink.png",
+      "role": "official-speaking-mascot",
+      "sourceDimensions": "2887x4331",
+      "productionDimensions": "960x1440",
+      "alpha": true,
+      "references": ["M3: S-05"],
+      "status": "production-ready"
+    },
+    {
+      "id": "student-public-natural-background-v1",
+      "source": "ImageGen generated on 2026-09-13; prompt recorded in visual-design/00-governance/change-log.md",
+      "production": "visual-design/03-assets/production/student-public-natural-background-v1.png",
+      "role": "student-and-public-environment-background",
+      "productionDimensions": "940x1672",
+      "alpha": false,
+      "references": ["P-01", "S-01"],
+      "constraints": "No text, logo, mascot, UI, character, animal, button, card, progress or business state is embedded.",
+      "status": "production-ready"
+    }
+  ]
+}

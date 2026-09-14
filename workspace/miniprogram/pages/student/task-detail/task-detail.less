@@ -1,0 +1,41 @@
+.page { min-height: 100vh; background: @yr-surface-green-50; position: relative; }
+.page-bg { position: fixed; z-index: 0; left: 0; top: 0; width: 100vw; height: 100vh; opacity: @yr-environment-student-secondary; }
+.content { position: relative; z-index: 1; padding: 12px 20px 36px; }
+
+.hero-card,
+.section,
+.feedback {
+  margin-top: 20px;
+  padding: 22px;
+  border: @yr-card-border;
+  border-radius: @yr-radius-student-entry;
+  background: rgba(255, 249, 240, .98);
+  box-shadow: @yr-card-shadow;
+}
+
+.hero-card { position: relative; overflow: hidden; box-shadow: @yr-card-shadow-strong; }
+.hero-copy { position: relative; z-index: 1; padding-right: 92px; }
+.label { color: @yr-brand-primary; font-size: 13px; font-weight: 700; }
+.title { display: block; margin-top: 8px; font-size: 24px; font-weight: 900; color: @yr-text-primary; }
+.due, .status { display: block; margin-top: 10px; color: @yr-text-secondary; }
+.task-art { position: absolute; z-index: 0; right: 14px; top: 12px; width: 88px; height: 76px; opacity: .9; }
+.progress { height: 8px; margin-top: 20px; border-radius: 4px; background: @yr-track; }
+.progress view { height: 100%; border-radius: 4px; background: linear-gradient(90deg, @yr-success, @yr-success-bright); }
+.status-row { margin-top: 11px; display: flex; align-items: center; gap: 7px; }
+.status-row .status { margin-top: 0; }
+.status-dot { width: 9px; height: 9px; border-radius: 50%; background: @yr-success; box-shadow: 0 0 0 5px @yr-surface-green; }
+.percent { margin-left: auto; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.section-title { display: block; margin-bottom: 14px; color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.description { display: block; color: @yr-text-secondary; line-height: 1.6; }
+.item { min-height: 52px; display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 9px; border-top: 1px solid @yr-border-light; color: @yr-text-secondary; }
+.item-mark { width: 12px; height: 12px; border: 3px solid @yr-brand-primary; border-radius: 50%; box-sizing: border-box; }
+.item text:nth-child(2) { color: @yr-text-primary; font-weight: 700; }
+.feedback { display: flex; gap: 14px; border-left: 5px solid @yr-success; }
+.feedback image { flex: 0 0 54px; width: 54px; height: 54px; }
+.feedback > view { flex: 1; min-width: 0; }
+.score { display: block; color: @yr-brand-primary; font-size: 28px; font-weight: 900; margin-bottom: 8px; }
+textarea { width: 100%; height: 120px; padding: 14px; box-sizing: border-box; border: 1px solid @yr-border-subtle; border-radius: @yr-radius-control; background: @yr-surface-blue-100; }
+.actions { display: flex; gap: 12px; margin-top: 22px; }
+.actions button { flex: 1; min-width: 0; height: 52px; border-radius: 26px; font-weight: 800; }
+.secondary { background: @yr-surface-blue-350; color: @yr-brand-primary; }
+.primary { .yr-primary-action(); }

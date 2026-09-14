@@ -1,0 +1,107 @@
+{
+  "resourceId": "book-join-in-6a-2026",
+  "resourceType": "textbook",
+  "title": "Join in 英语六年级上册",
+  "publisher": "外语教学与研究出版社",
+  "series": "Join in",
+  "grade": 6,
+  "term": "upper",
+  "language": "en-CN",
+  "roles": [
+    "textbook"
+  ],
+  "sourceRelativePath": "2026秋外研Join in六年级上册 英语.pdf",
+  "sourceSha256": "881FA1EDC2FD456D704A7E02FE8B927A02F805AE8C234AF1E29BF70E2B0A0477",
+  "sourceSizeBytes": 27700155,
+  "sourceModifiedAt": "2026-09-11T07:06:58.908778+00:00",
+  "version": 1,
+  "processingStatus": "needs_review",
+  "rightsStatus": "user_confirmed_cleared",
+  "visibility": "unassigned",
+  "needsMetadata": [],
+  "manifestRelativePath": "library/books/book-join-in-6a-2026/v1/manifest.json",
+  "processedAt": "2026-09-11T08:19:44.758770+00:00",
+  "details": {
+    "pageCount": 96,
+    "pagesWithText": 92,
+    "textCoverageRatio": 0.9583,
+    "pdfClassification": "embedded_text",
+    "unitCandidates": [
+      {
+        "pageNumber": 4,
+        "preview": "Contents Unit 1 Good food,good health ① Unit 2 Let's travel! 9 Unit 3 Call of the wild 17 Unit 4 Time flies! 25 Unit 5 Powerful earth 33 Unit 6 Winter fun 41 More activities 49 Plays 75 Words and expressions 82 Vocabulary 86 Proper nouns 90"
+      },
+      {
+        "pageNumber": 5,
+        "preview": "Unit 1 Good food,good health In this unit, you will: ·name healthy and unhealthy food; ·talk about food and health; Ready to learn ·talk about healthy eating. 01 Listen and sing the song. Let's eat a rainbow. It helps us grow. Red, orange, "
+      },
+      {
+        "pageNumber": 13,
+        "preview": "Unit Let's travel! 2 In this unit, you will: ·say some country names; Ready to learn ·talk about your travel experiences; · introduce places of interest. 1Read and write. Then find the message. China the UK Singapore Australia 1. There are "
+      },
+      {
+        "pageNumber": 21,
+        "preview": "Unit Call of the wild 3 In this unit, you will: · talk about animals in danger; Ready to learn ·talk about how to save wild animals; ·call on people to save wild animals. 1Read and circle the right answers. 1. The monkeys are___ a.playing b"
+      },
+      {
+        "pageNumber": 29,
+        "preview": "Unit Time flies! 4 In this unit, you will: ·talk about life in the past; Ready to learn ·talk about life today; ·talk about life changes. ① Read the diary and circle the wrong things. 1 October 1793 3Cloudy Last night, I went to the superma"
+      },
+      {
+        "pageNumber": 37,
+        "preview": "Unit Powerful earth 5 In this unit, you will: ·say names of natural disasters; Ready to learn · talk about what to do in natural disasters; ·share a story of how people helped each other in a disaster. 1 Read and match. 1. It rains for many"
+      },
+      {
+        "pageNumber": 45,
+        "preview": "Unit Winter fun 6 In this unit, you will: ·say names of winter activities; Ready to learn ·talk about the Beijing 2022 Winter Olympics; · talk about how to have fun in winter. 1 Match the pictures with the sentences. ←→ C 回 ☆三 Great winter "
+      },
+      {
+        "pageNumber": 62,
+        "preview": "Unit 3 Call of the wild ① Circle and complete.You may need to change the form of the words. a n im als STAR ives av a rnele a fe w ild pe o p le c at ch N Xing Yue lives in Wuhan. She loves animals.In a TV show,Xing Yue_____about2______monk"
+      },
+      {
+        "pageNumber": 66,
+        "preview": "Unit Time flies! ① Listen and choose. ① 2 ③ ④ ⑤ ⑥ b a e 62"
+      },
+      {
+        "pageNumber": 70,
+        "preview": "Unit 5 Powerful earth 1Look and write. earthquake flood snowstorm tsunami 1 3 4 2 Read and complete. Use the correct form of the expressions in the box. call out fall down look out of move... off…. keep away from 1. Houses may______in a big"
+      },
+      {
+        "pageNumber": 74,
+        "preview": "Unit 6 Winter fun 1 Write sentences about the children. ?? likes doesn't like making icelanternswatching the Winter Olympics Xiaoyu ?? Feifei having a walkin the snow U Mia making asnowman skating ?? Chris Taotao 1._ 2._ 3._ 4. 5._ 70"
+      },
+      {
+        "pageNumber": 86,
+        "preview": "Words and expressions Unit 1 health 健康(状况) healthy 有益健康的；健康的 pea 豌豆 blueberry 蓝莓 eating 饮食 price 价格，价钱 fat 脂肪 sugar 糖 kcal 千卡，大卡(热量单位) unhealthy 对健康有害的 hamburger 汉堡包 exercise 运动，锻炼 couch 长沙发 matter 事情，问题 stomach 胃 diet 日常饮食，日常食物 yoghurt 酸奶 "
+      },
+      {
+        "pageNumber": 87,
+        "preview": "Unit 3 wild 自然状态；野生环境 lake 湖，湖泊 crane 鹤 noise 嘈杂声，喧闹声 flood 洪水，水灾 age 年龄 chimp (非洲的)黑猩猩 danger 危险 rhino 犀牛 kill 弄死，杀死 horn (牛、羊等头上的)角 leopard 豹 fur 毛皮 kingfisher 翠鸟 river 江，河 down 向下；倒下 Unit 4 ring 鸣响 word 字，词 everywhere 在各个地方；处处 village 乡村"
+      },
+      {
+        "pageNumber": 88,
+        "preview": "disaster 灾难，灾祸 rescue 营救，解救，救援 inside 在(建筑物、房间)内 loudly 响亮地；大声地 lift 电梯 Unit 6 ski 滑雪 skate 滑冰，溜冰 mail 邮政，邮递系统 arrive 送达 Plays cheese 干酪，奶酪 queen 王后 gold 金币；黄金制品 person 人 excitedly 激动地，兴奋地 mascot 吉祥物 friendship 友情，友谊，友好 meaning 意义，含义 feeder"
+      }
+    ],
+    "coordinatePages": [
+      2,
+      3,
+      4
+    ],
+    "renderedPages": [
+      1,
+      2
+    ],
+    "processingErrors": [],
+    "missingComponents": [
+      "chapter_structure",
+      "chapter_audio",
+      "sentence_timeline",
+      "follow_read_text",
+      "structured_vocabulary",
+      "structured_questions"
+    ],
+    "processingStatus": "needs_review"
+  }
+}

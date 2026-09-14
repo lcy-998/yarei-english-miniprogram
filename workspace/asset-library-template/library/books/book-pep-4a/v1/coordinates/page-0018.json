@@ -1,0 +1,171 @@
+{
+  "pageNumber": 18,
+  "pageWidth": 521.57506,
+  "pageHeight": 737.00806,
+  "coordinateSystem": "normalized_top_left_0_to_1",
+  "reviewStatus": "auto_extracted_needs_review",
+  "words": [
+    {
+      "text": "22",
+      "bbox": {
+        "x": 0.315218,
+        "y": 0.076124,
+        "width": 0.098063,
+        "height": 0.08141
+      }
+    },
+    {
+      "text": "UUnnitit",
+      "bbox": {
+        "x": 0.097827,
+        "y": 0.08185,
+        "width": 0.21204,
+        "height": 0.059701
+      }
+    },
+    {
+      "text": "MMyy",
+      "bbox": {
+        "x": 0.081522,
+        "y": 0.178003,
+        "width": 0.166741,
+        "height": 0.059701
+      }
+    },
+    {
+      "text": "f",
+      "bbox": {
+        "x": 0.231767,
+        "y": 0.178003,
+        "width": 0.031466,
+        "height": 0.059701
+      }
+    },
+    {
+      "text": "rfrieiennddss",
+      "bbox": {
+        "x": 0.263233,
+        "y": 0.178003,
+        "width": 0.311418,
+        "height": 0.059701
+      }
+    },
+    {
+      "text": "Big",
+      "bbox": {
+        "x": 0.22304,
+        "y": 0.254875,
+        "width": 0.055183,
+        "height": 0.024423
+      }
+    },
+    {
+      "text": "Question",
+      "bbox": {
+        "x": 0.286436,
+        "y": 0.254875,
+        "width": 0.157887,
+        "height": 0.024423
+      }
+    },
+    {
+      "text": "What",
+      "bbox": {
+        "x": 0.190431,
+        "y": 0.263856,
+        "width": 0.126586,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "makes",
+      "bbox": {
+        "x": 0.327968,
+        "y": 0.263856,
+        "width": 0.159762,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "your",
+      "bbox": {
+        "x": 0.498682,
+        "y": 0.263856,
+        "width": 0.106201,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "friends",
+      "bbox": {
+        "x": 0.615835,
+        "y": 0.263856,
+        "width": 0.162339,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "What",
+      "bbox": {
+        "x": 0.22304,
+        "y": 0.296477,
+        "width": 0.126586,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "makes",
+      "bbox": {
+        "x": 0.360577,
+        "y": 0.296477,
+        "width": 0.159762,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "your",
+      "bbox": {
+        "x": 0.531291,
+        "y": 0.296477,
+        "width": 0.106201,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "friends",
+      "bbox": {
+        "x": 0.648444,
+        "y": 0.296477,
+        "width": 0.162339,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "different?",
+      "bbox": {
+        "x": 0.190431,
+        "y": 0.304561,
+        "width": 0.224136,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "special?",
+      "bbox": {
+        "x": 0.22304,
+        "y": 0.337182,
+        "width": 0.193905,
+        "height": 0.032564
+      }
+    },
+    {
+      "text": "14",
+      "bbox": {
+        "x": 0.068749,
+        "y": 0.942629,
+        "width": 0.03068,
+        "height": 0.018996
+      }
+    }
+  ]
+}

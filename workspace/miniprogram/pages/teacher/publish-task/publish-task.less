@@ -1,0 +1,34 @@
+.page { min-height: 100vh; padding-bottom: 104px; box-sizing: border-box; background: @yr-page-work; position: relative; }
+.page-bg { position: fixed; z-index: 0; left: 0; top: 0; width: 100vw; height: 100vh; opacity: @yr-environment-teacher-work; }
+.content { position: relative; z-index: 1; padding: 8px 20px 28px; }
+.steps { padding: 14px 10px 18px; display: flex; align-items: flex-start; justify-content: center; }
+.step { flex: 0 0 70px; display: flex; flex-direction: column; align-items: center; color: @yr-text-secondary; font-size: 11px; font-weight: 700; }
+.step > text:first-child { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255,255,255,.9); border-radius: 50%; background: @yr-brand-primary; color: @yr-white; font-size: 14px; font-weight: 900; box-shadow: @yr-action-shadow; }
+.step > text:last-child { margin-top: 7px; }
+.step-line { flex: 1; max-width: 48px; height: 5px; margin: 15px -6px 0; border-radius: 3px; background: @yr-border-subtle; }
+.step-line.active { background: @yr-brand-primary; }
+.section,.summary,.preview { margin-top: 18px; padding: 20px; border: 2px solid rgba(255,255,255,.9); border-radius: @yr-radius-role-card; background: rgba(255, 249, 240, .98); box-shadow: @yr-card-shadow; }
+.content-section { margin-top: 0; }
+.section-head { display: flex; align-items: center; gap: 12px; }
+.section-head > view { flex: 1; min-width: 0; }
+.section-head image { flex: 0 0 82px; width: 82px; height: 70px; transform: scale(1.06); }
+.section-title { display: block; color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.section-note { display: block; margin-top: 5px; color: @yr-text-secondary; font-size: 12px; }
+.selected-content { min-height: 72px; margin-top: 14px; padding: 12px 13px; box-sizing: border-box; display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 10px; border: 2px solid rgba(31,169,104,.24); border-radius: @yr-radius-control; background: linear-gradient(110deg,@yr-surface-green,rgba(255,249,240,.98)); }
+.selected-mark { width: 12px; height: 12px; border: 3px solid @yr-success; border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 5px @yr-surface-green; }
+.selected-content > view text:first-child { display: block; color: @yr-text-primary; font-size: 14px; font-weight: 800; }
+.selected-content > view text:last-child { display: block; margin-top: 4px; color: @yr-text-secondary; font-size: 11px; }
+.selected-content > text:last-child { color: @yr-success; font-size: 12px; font-weight: 800; }
+.section input,.section textarea { width: 100%; margin-top: 13px; padding: 13px 14px; box-sizing: border-box; border: 1px solid @yr-border-subtle; border-radius: @yr-radius-control; background: @yr-surface-blue-100; }
+.field-label { display: block; margin-top: 20px; color: @yr-text-primary; font-size: 15px; font-weight: 800; }
+.section textarea { height: 112px; }
+.summary-title { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid @yr-border-light; }
+.summary-title text:first-child { color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.summary-title text:last-child { color: @yr-text-secondary; font-size: 11px; }
+.summary-row { margin-top: 14px; display: grid; grid-template-columns: 78px 1fr; gap: 10px; color: @yr-text-secondary; font-size: 13px; }
+.summary-row text:first-child { color: @yr-text-primary; font-weight: 800; }
+.preview > text:nth-child(2) { display: block; margin-top: 12px; color: @yr-text-primary; font-size: 16px; font-weight: 800; }
+.preview > text:last-child { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 12px; line-height: 1.6; }
+.error { display: block; margin: 12px 4px 0; color: @yr-warning; }
+.action-bar { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); box-sizing: border-box; border-top: 1px solid @yr-border-subtle; background: rgba(255, 255, 255, .96); box-shadow: 0 -8px 24px rgba(7,30,73,.09); }
+.primary { width: 100%; height: 52px; margin: 0; border-radius: 26px; .yr-primary-action(); font-weight: 900; }

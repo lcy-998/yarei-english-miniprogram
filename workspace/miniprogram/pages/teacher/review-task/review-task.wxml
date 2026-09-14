@@ -1,0 +1,7 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="检查任务" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadRows"></state-panel>
+  <view wx:else class="content"><view class="editor"><text>本次点评</text><input type="number" value="{{score}}" bindinput="onScore"/><textarea value="{{comment}}" bindinput="onComment"></textarea></view><view wx:for="{{rows}}" wx:key="assignmentId" class="row"><view><text class="name">{{item.studentName}}</text><text class="status">{{item.status}}</text></view><view wx:if="{{item.submissionId}}" class="buttons"><button class="return" data-row="{{item}}" loading="{{reviewingId === item.assignmentId}}" bindtap="returned">退回</button><button class="approve" data-row="{{item}}" loading="{{reviewingId === item.assignmentId}}" bindtap="approve">通过并点评</button></view><text wx:else class="empty">尚未提交</text></view></view>
+</view>

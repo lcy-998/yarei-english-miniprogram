@@ -1,0 +1,28 @@
+{
+  "name": "yarei-english-miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "description": "雅睿英语微信小程序 M0 可运行核心原型",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "visual:check": "node tools/check-visual-contract.mjs",
+    "visual:status": "node tools/check-visual-contract.mjs",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run visual:check && npm run test"
+  },
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "keywords": [
+    "wechat-miniprogram",
+    "typescript",
+    "education"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "miniprogram-api-typings": "^2.8.3-1",
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.0"
+  }
+}

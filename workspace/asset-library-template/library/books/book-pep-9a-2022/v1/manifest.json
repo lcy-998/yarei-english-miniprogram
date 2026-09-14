@@ -1,0 +1,46 @@
+{
+  "resourceId": "book-pep-9a-2022",
+  "resourceType": "textbook",
+  "title": "人教版英语九年级上册",
+  "publisher": "人民教育出版社",
+  "series": null,
+  "grade": 9,
+  "term": "upper",
+  "language": "en-CN",
+  "roles": [
+    "textbook"
+  ],
+  "sourceRelativePath": "【人教版】九上英语 电子课本（根据2022年版课程标准修订）.pdf",
+  "sourceSha256": "BE62A665C04F3BA76862BBDFA573A45CE9A7CE12DF94CB6A84B942DD66A9BB3D",
+  "sourceSizeBytes": 17986347,
+  "sourceModifiedAt": "2026-09-11T07:06:46.004345+00:00",
+  "version": 1,
+  "processingStatus": "needs_ocr",
+  "rightsStatus": "user_confirmed_cleared",
+  "visibility": "unassigned",
+  "needsMetadata": [],
+  "manifestRelativePath": "library/books/book-pep-9a-2022/v1/manifest.json",
+  "processedAt": "2026-09-11T08:20:08.995837+00:00",
+  "details": {
+    "pageCount": 141,
+    "pagesWithText": 0,
+    "textCoverageRatio": 0.0,
+    "pdfClassification": "needs_ocr",
+    "unitCandidates": [],
+    "coordinatePages": [],
+    "renderedPages": [
+      1
+    ],
+    "processingErrors": [],
+    "missingComponents": [
+      "ocr_text",
+      "chapter_structure",
+      "chapter_audio",
+      "sentence_timeline",
+      "follow_read_text",
+      "structured_vocabulary",
+      "structured_questions"
+    ],
+    "processingStatus": "needs_ocr"
+  }
+}

@@ -1,0 +1,3 @@
+<button class="g0-button g0-button--{{variant}}" loading="{{loading}}" disabled="{{disabled || loading}}" form-type="{{formType}}" hover-class="g0-button--pressed" hover-stay-time="80" bindtap="onAction">
+  <slot></slot>
+</button>

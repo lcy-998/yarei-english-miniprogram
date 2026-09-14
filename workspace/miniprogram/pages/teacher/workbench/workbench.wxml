@@ -1,0 +1,17 @@
+<g0-page-shell><view class="page">
+  <app-header title="工作台" showBell="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWorkbench"></state-panel>
+  <view wx:else class="content">
+    <view class="hero"><view class="brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><text>雅睿英语 · 教师端</text></view><text class="greeting">林老师，上午好</text><text class="hero-note">今天还有 {{pendingCount}} 份任务等待检查</text><view class="hero-accent" aria-hidden="true"></view></view>
+    <view class="stats"><view><text>{{pendingCount}}</text><text>待检查</text></view><view><text>{{taskCount}}</text><text>进行中任务</text></view><view><text>36</text><text>授权学员</text></view></view>
+    <view class="section-title"><text>快捷工作</text><text>常用操作</text></view>
+    <view class="grid">
+      <view class="quick quick--blue" bindtap="goPublish" aria-role="button"><g0-icon name="task" size="{{56}}"></g0-icon><view><text>布置任务</text><text>创建课堂任务</text></view><view class="arrow" aria-hidden="true"></view></view>
+      <view class="quick quick--green" bindtap="goCenter" aria-role="button"><g0-icon name="check" size="{{56}}" tone="success"></g0-icon><view><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view><view class="arrow" aria-hidden="true"></view></view>
+      <view class="quick quick--purple" bindtap="goReview" aria-role="button"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>快速点评</text><text>文字与评分反馈</text></view><view class="arrow" aria-hidden="true"></view></view>
+    </view>
+    <view class="recent"><view><text class="recent-label">最近任务</text><text class="recent-title">{{recentTaskTitle}}</text><text class="recent-meta">三年级 2 班 · 今天 20:00 截止</text></view><view class="recent-count"><text>{{taskCount}}</text><text>已发布</text></view></view>
+  </view>
+  <g0-tab-bar role="teacher" active="workbench"></g0-tab-bar>
+</view></g0-page-shell>

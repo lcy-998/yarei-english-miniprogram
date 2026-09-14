@@ -1,0 +1,7 @@
+<view class="app-header" style="padding-top: {{topInset}}px; min-height: {{headerHeight}}px;">
+  <view wx:if="{{back}}" class="header-icon" bindtap="onBack" aria-role="button" aria-label="返回"><view class="back-shape" aria-hidden="true"></view></view>
+  <view wx:else class="header-placeholder"></view>
+  <text class="header-title">{{title}}</text>
+  <view wx:if="{{showBell}}" class="header-icon bell" bindtap="onBell" aria-role="button" aria-label="通知"><view class="bell-shape" aria-hidden="true"></view><text wx:if="{{bellCount > 0}}" class="bell-badge">{{bellCount > 99 ? '99+' : bellCount}}</text></view>
+  <view wx:else class="header-placeholder"></view>
+</view>

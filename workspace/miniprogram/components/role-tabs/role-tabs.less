@@ -1,0 +1,21 @@
+.role-tabs{position:fixed;z-index:30;left:0;right:0;bottom:0;min-height:72px;padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;display:flex;border:2px solid rgba(255,255,255,.94);border-bottom:0;background:@yr-white;border-radius:24px 24px 0 0;box-shadow:0 -7px 22px rgba(7,30,73,.1)}
+.role-tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:@yr-text-secondary}
+.role-tab__icon{position:relative;width:28px;height:28px;box-sizing:border-box;color:inherit}
+.role-tab__icon::before,.role-tab__icon::after{content:"";position:absolute;box-sizing:border-box}
+.role-tab__label{padding:3px 8px;border-radius:11px;font-size:12px;font-weight:700;white-space:nowrap}
+.role-tab.active{color:@yr-brand-primary}
+.role-tab.active .role-tab__label{background:@yr-surface-blue;box-shadow:inset 0 0 0 1px rgba(23,100,216,.08)}
+.role-tabs--teacher .role-tab__label{padding-left:5px;padding-right:5px}
+
+.role-tab__icon--home::before,.role-tab__icon--workbench::before{left:5px;top:9px;width:18px;height:15px;border:2px solid currentColor;border-top:0;border-radius:2px 2px 5px 5px}
+.role-tab__icon--home::after,.role-tab__icon--workbench::after{left:6px;top:3px;width:16px;height:16px;border-left:2px solid currentColor;border-top:2px solid currentColor;border-radius:3px;transform:rotate(45deg)}
+.role-tab__icon--tasks::before{left:5px;top:3px;width:18px;height:22px;border:2px solid currentColor;border-radius:5px}
+.role-tab__icon--tasks::after{left:10px;top:9px;width:9px;height:5px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg)}
+.role-tab__icon--materials::before{left:3px;top:5px;width:11px;height:19px;border:2px solid currentColor;border-radius:5px 1px 1px 5px;border-right-width:1px}
+.role-tab__icon--materials::after{right:3px;top:5px;width:11px;height:19px;border:2px solid currentColor;border-radius:1px 5px 5px 1px;border-left-width:1px}
+.role-tab__icon--students::before,.role-tab__icon--children::before{left:10px;top:3px;width:8px;height:8px;border:2px solid currentColor;border-radius:50%;box-shadow:-8px 5px 0 -1px @yr-white,-8px 5px 0 1px currentColor,8px 5px 0 -1px @yr-white,8px 5px 0 1px currentColor}
+.role-tab__icon--students::after,.role-tab__icon--children::after{left:5px;bottom:2px;width:18px;height:10px;border:2px solid currentColor;border-radius:9px 9px 3px 3px}
+.role-tab__icon--mine::before{left:9px;top:3px;width:10px;height:10px;border:2px solid currentColor;border-radius:50%}
+.role-tab__icon--mine::after{left:5px;bottom:2px;width:18px;height:11px;border:2px solid currentColor;border-radius:12px 12px 4px 4px}
+.role-tab__icon--report::before{left:4px;top:4px;width:20px;height:20px;border:2px solid currentColor;border-radius:5px}
+.role-tab__icon--report::after{left:8px;bottom:7px;width:3px;height:6px;background:currentColor;box-shadow:5px -4px 0 currentColor,10px -8px 0 currentColor;border-radius:2px}

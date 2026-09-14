@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-11T08:22:26.320955+00:00",
+  "target": "wechat_miniprogram_cloudbase",
+  "items": [
+    {
+      "resourceId": "book-join-in-5a-2026",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-join-in-5a-2026/v1",
+      "localManifestRelativePath": "library/books/book-join-in-5a-2026/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-6a-2026",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-join-in-6a-2026/v1",
+      "localManifestRelativePath": "library/books/book-join-in-6a-2026/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-unknown-3a",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-unknown-3a/v1",
+      "localManifestRelativePath": "library/books/book-unknown-3a/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-7a-2022",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-pep-7a-2022/v1",
+      "localManifestRelativePath": "library/books/book-pep-7a-2022/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-9a-2022",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-pep-9a-2022/v1",
+      "localManifestRelativePath": "library/books/book-pep-9a-2022/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-8a-2025",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-pep-8a-2025/v1",
+      "localManifestRelativePath": "library/books/book-pep-8a-2025/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "resourceType": "textbook",
+      "assetKey": "book-pep-4a/v1",
+      "localManifestRelativePath": "library/books/book-pep-4a/v1/manifest.json",
+      "deliveryStatus": "awaiting_cloud_upload",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    }
+  ]
+}

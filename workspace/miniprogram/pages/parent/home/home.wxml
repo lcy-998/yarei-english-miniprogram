@@ -1,0 +1,25 @@
+<g0-page-shell><view class="page">
+  <app-header title="孩子学习" showBell="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadHome"></state-panel>
+  <view wx:else class="content">
+    <view class="child-card">
+      <view class="child-brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><text>雅睿英语 · 家长端</text><text>本周概览</text></view>
+      <view class="child-main"><view class="avatar">宇</view><view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-meta">三年级 2 班 · 本周学习概览</text></view><view class="switch">切换<view class="mini-arrow" aria-hidden="true"></view></view></view>
+    </view>
+    <view class="stats"><view><text>{{pendingCount}}</text><text>待完成</text></view><view><text>{{completedCount}}</text><text>已完成</text></view><view><text>{{reviewedCount}}</text><text>新点评</text></view></view>
+    <view class="section-title"><text>近期任务</text><text>查看全部</text></view>
+    <view wx:for="{{tasks}}" wx:key="task.id" class="task" data-id="{{item.task.id}}" bindtap="openTask">
+      <g0-icon name="task" size="{{58}}"></g0-icon>
+      <view class="task-copy"><view class="task-title-row"><text class="title">{{item.task.title}}</text><text class="status-pill {{item.assignment.status === 'completed' ? 'completed' : item.assignment.status === 'awaiting_review' ? 'review' : ''}}">{{item.assignment.status === 'completed' ? '已完成' : item.assignment.status === 'awaiting_review' ? '待点评' : '进行中'}}</text></view><text class="meta">今天 20:00 截止</text><view class="task-progress"><view style="width: {{item.assignment.progressPercent}}%;"></view></view></view>
+      <view class="arrow" aria-hidden="true"></view>
+    </view>
+    <view class="feedback-card">
+      <view class="feedback-head"><text>最新反馈</text><text class="feedback-status {{reviewedCount ? 'ready' : ''}}">{{reviewedCount ? '查看详情' : '等待点评'}}</text></view>
+      <view wx:if="{{reviewedCount}}" class="feedback-content"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>老师已发布新的任务反馈</text><text>点击上方任务查看评分与评语</text></view></view>
+      <view wx:else class="feedback-empty"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>暂无新反馈</text><text>老师点评后会在这里提醒你</text></view></view>
+    </view>
+    <view class="readonly-note"><view class="lock-mark" aria-hidden="true"></view><text>家长端仅查看学习进度与反馈，不可代替孩子提交。</text></view>
+  </view>
+  <g0-tab-bar role="parent" active="home"></g0-tab-bar>
+</view></g0-page-shell>

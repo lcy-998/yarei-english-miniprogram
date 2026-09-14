@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>雅睿英语｜PDF 点读试加工</title>
+    <style>
+      :root {
+        color: #071e49;
+        background: #fff9f0;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #596987;
+      }
+      .page {
+        position: relative;
+        width: 100%;
+        box-shadow: 0 10px 30px rgb(7 30 73 / 14%);
+        background: white;
+      }
+      .page img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .zone {
+        position: absolute;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        background: rgb(243 185 28 / 6%);
+        cursor: pointer;
+      }
+      .zone:hover,
+      .zone:focus-visible,
+      .zone.active {
+        border-color: #f3b91c;
+        background: rgb(243 185 28 / 23%);
+        outline: none;
+      }
+      #status {
+        min-height: 24px;
+        color: #1764d8;
+        font-weight: 650;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PDF 点读试加工</h1>
+      <p>点击三张便签中的英文句子，查看坐标高亮并播放本地演示语音。</p>
+      <p id="status" aria-live="polite">尚未播放</p>
+      <section class="page" id="page" aria-label="教材第 9 页"></section>
+    </main>
+    <script>
+      const zones = [
+        { id: 'zone-001', text: 'You are a great nurse.', audio: 'audio/seg-001.wav', areas: [[.135,.208,.205,.027],[.135,.234,.097,.027]] },
+        { id: 'zone-002', text: 'You help many people.', audio: 'audio/seg-002.wav', areas: [[.235,.234,.125,.027],[.135,.258,.155,.029]] },
+        { id: 'zone-003', text: 'I can help you at home!', audio: 'audio/seg-003.wav', areas: [[.292,.258,.068,.029],[.135,.283,.240,.030]] },
+        { id: 'zone-004', text: 'You are still a child.', audio: 'audio/seg-004.wav', areas: [[.425,.262,.195,.029],[.425,.287,.095,.030]] },
+        { id: 'zone-005', text: 'What can you do?', audio: 'audio/seg-005.wav', areas: [[.522,.287,.106,.030],[.425,.312,.190,.032]] },
+        { id: 'zone-006', text: 'I am a big boy now.', audio: 'audio/seg-006.wav', areas: [[.655,.192,.270,.030]] },
+        { id: 'zone-007', text: 'I can sweep the floor.', audio: 'audio/seg-007.wav', areas: [[.925,.192,.025,.030],[.655,.218,.250,.031]] },
+        { id: 'zone-008', text: 'I can cook.', audio: 'audio/seg-008.wav', areas: [[.655,.244,.145,.030]] },
+        { id: 'zone-009', text: 'I can look after my baby sister too!', audio: 'audio/seg-009.wav', areas: [[.803,.244,.120,.030],[.655,.270,.258,.030],[.655,.296,.060,.030]] }
+      ];
+      const page = document.querySelector('#page');
+      const status = document.querySelector('#status');
+      const image = document.createElement('img');
+      image.src = 'page-013.png';
+      image.alt = '四年级英语上册 Unit 1 Read and write 页面';
+      page.append(image);
+
+      let currentAudio;
+      for (const zone of zones) {
+        for (const [x, y, width, height] of zone.areas) {
+          const button = document.createElement('button');
+          button.className = 'zone';
+          button.dataset.zoneId = zone.id;
+          button.type = 'button';
+          button.ariaLabel = `播放：${zone.text}`;
+          Object.assign(button.style, {
+            left: `${x * 100}%`, top: `${y * 100}%`,
+            width: `${width * 100}%`, height: `${height * 100}%`
+          });
+          button.addEventListener('click', () => {
+          currentAudio?.pause();
+            document.querySelectorAll('.zone.active').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll(`[data-zone-id="${zone.id}"]`).forEach(item => item.classList.add('active'));
+            status.textContent = `正在播放：${zone.text}`;
+            currentAudio = new Audio(zone.audio);
+            currentAudio.addEventListener('ended', () => {
+              document.querySelectorAll(`[data-zone-id="${zone.id}"]`).forEach(item => item.classList.remove('active'));
+            });
+            currentAudio.play().catch(() => {
+              status.textContent = '浏览器阻止了本地音频播放，请允许媒体播放后重试。';
+            });
+          });
+          page.append(button);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,365 @@
+{
+  "manifest": {
+    "seedVersion": "m1-dev-example-v1",
+    "schemaVersion": 1,
+    "source": "m0-fixture",
+    "generatedAt": "2026-09-11T08:00:00+08:00",
+    "contentHash": "RECOMPUTE_BEFORE_IMPORT",
+    "seedRunId": "seed_m1_dev_example_v1",
+    "expectedCounts": {
+      "organizations": 1,
+      "classes": 1,
+      "users": 3,
+      "auth_identities": 3,
+      "role_assignments": 3,
+      "class_memberships": 1,
+      "teacher_class_grants": 1,
+      "parent_student_links": 1,
+      "learning_resources": 1,
+      "tasks": 1,
+      "task_assignments": 1,
+      "submissions": 1,
+      "review_feedback": 1
+    }
+  },
+  "organizations": [
+    {
+      "_id": "org_qihang_demo",
+      "organizationId": "org_qihang_demo",
+      "name": "启航实验学校",
+      "status": "active",
+      "timeZone": "Asia/Shanghai",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "createdAt": "2026-09-11T08:00:00+08:00",
+      "updatedAt": "2026-09-11T08:00:00+08:00",
+      "createdBy": "sys_seed",
+      "updatedBy": "sys_seed",
+      "deletedAt": null,
+      "deletedBy": null,
+      "deleteReason": null
+    }
+  ],
+  "classes": [
+    {
+      "_id": "cls_grade3_2",
+      "organizationId": "org_qihang_demo",
+      "name": "三年级 2 班",
+      "grade": 3,
+      "term": "2026-autumn-demo",
+      "status": "active",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "createdAt": "2026-09-11T08:00:00+08:00",
+      "updatedAt": "2026-09-11T08:00:00+08:00",
+      "createdBy": "sys_seed",
+      "updatedBy": "sys_seed",
+      "deletedAt": null,
+      "deletedBy": null,
+      "deleteReason": null
+    }
+  ],
+  "users": [
+    {
+      "_id": "usr_student_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "displayName": "小宇",
+      "displayNameMasked": "小宇",
+      "status": "active",
+      "profileVersion": 1,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "createdAt": "2026-09-11T08:00:00+08:00",
+      "updatedAt": "2026-09-11T08:00:00+08:00",
+      "createdBy": "sys_seed",
+      "updatedBy": "sys_seed",
+      "deletedAt": null,
+      "deletedBy": null,
+      "deleteReason": null
+    },
+    {
+      "_id": "usr_teacher_lin",
+      "organizationId": "org_qihang_demo",
+      "displayName": "林老师",
+      "displayNameMasked": "林老师",
+      "status": "active",
+      "profileVersion": 1,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "createdAt": "2026-09-11T08:00:00+08:00",
+      "updatedAt": "2026-09-11T08:00:00+08:00",
+      "createdBy": "sys_seed",
+      "updatedBy": "sys_seed",
+      "deletedAt": null,
+      "deletedBy": null,
+      "deleteReason": null
+    },
+    {
+      "_id": "usr_parent_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "displayName": "小宇家长",
+      "displayNameMasked": "小宇家长",
+      "status": "active",
+      "profileVersion": 1,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "createdAt": "2026-09-11T08:00:00+08:00",
+      "updatedAt": "2026-09-11T08:00:00+08:00",
+      "createdBy": "sys_seed",
+      "updatedBy": "sys_seed",
+      "deletedAt": null,
+      "deletedBy": null,
+      "deleteReason": null
+    }
+  ],
+  "auth_identities": [
+    {
+      "_id": "aid_demo_student_01",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_student_xiaoyu",
+      "provider": "cloudbase_uid",
+      "providerSubjectDigest": "fixture_digest_demo_student_01",
+      "status": "active",
+      "verifiedAt": "2026-09-11T08:00:00+08:00",
+      "lastUsedAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    },
+    {
+      "_id": "aid_demo_teacher_01",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_teacher_lin",
+      "provider": "cloudbase_uid",
+      "providerSubjectDigest": "fixture_digest_demo_teacher_01",
+      "status": "active",
+      "verifiedAt": "2026-09-11T08:00:00+08:00",
+      "lastUsedAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    },
+    {
+      "_id": "aid_demo_parent_01",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_parent_xiaoyu",
+      "provider": "cloudbase_uid",
+      "providerSubjectDigest": "fixture_digest_demo_parent_01",
+      "status": "active",
+      "verifiedAt": "2026-09-11T08:00:00+08:00",
+      "lastUsedAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "role_assignments": [
+    {
+      "_id": "rol_student_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_student_xiaoyu",
+      "role": "student",
+      "status": "active",
+      "permissions": ["task.read.self", "submission.write.self"],
+      "scopeType": "self",
+      "scopeIds": ["usr_student_xiaoyu"],
+      "grantedBy": "sys_seed",
+      "grantedAt": "2026-09-11T08:00:00+08:00",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    },
+    {
+      "_id": "rol_teacher_lin",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_teacher_lin",
+      "role": "teacher",
+      "status": "active",
+      "permissions": ["task.read", "task.publish", "submission.review"],
+      "scopeType": "classes",
+      "scopeIds": ["cls_grade3_2"],
+      "grantedBy": "sys_seed",
+      "grantedAt": "2026-09-11T08:00:00+08:00",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    },
+    {
+      "_id": "rol_parent_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "userId": "usr_parent_xiaoyu",
+      "role": "parent",
+      "status": "active",
+      "permissions": ["child.read.linked"],
+      "scopeType": "self",
+      "scopeIds": ["usr_parent_xiaoyu"],
+      "grantedBy": "sys_seed",
+      "grantedAt": "2026-09-11T08:00:00+08:00",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "class_memberships": [
+    {
+      "_id": "mem_grade3_2_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "classId": "cls_grade3_2",
+      "studentId": "usr_student_xiaoyu",
+      "status": "active",
+      "joinedAt": "2026-09-01T08:00:00+08:00",
+      "leftAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "teacher_class_grants": [
+    {
+      "_id": "grt_lin_grade3_2",
+      "organizationId": "org_qihang_demo",
+      "teacherId": "usr_teacher_lin",
+      "classId": "cls_grade3_2",
+      "permissions": ["task.read", "task.publish", "submission.review"],
+      "status": "active",
+      "grantedBy": "sys_seed",
+      "grantedAt": "2026-09-01T08:00:00+08:00",
+      "revokedAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "parent_student_links": [
+    {
+      "_id": "rel_parent_xiaoyu_student_xiaoyu",
+      "organizationId": "org_qihang_demo",
+      "parentId": "usr_parent_xiaoyu",
+      "studentId": "usr_student_xiaoyu",
+      "status": "active",
+      "confirmedBy": "sys_seed",
+      "confirmedAt": "2026-09-01T08:00:00+08:00",
+      "revokedAt": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "learning_resources": [
+    {
+      "_id": "res_reading_zoo_demo",
+      "organizationId": "org_qihang_demo",
+      "type": "reading",
+      "title": "A Day at the Zoo",
+      "contentVersion": 1,
+      "status": "published",
+      "visibilityScope": {"classIds": ["cls_grade3_2"]},
+      "payload": {"chapterCount": 3, "demoOnly": true},
+      "copyrightStatus": "demo",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "tasks": [
+    {
+      "_id": "tsk_animals_listening",
+      "organizationId": "org_qihang_demo",
+      "creatorTeacherId": "usr_teacher_lin",
+      "title": "动物主题听说练习",
+      "deliveryType": "classroom",
+      "status": "active",
+      "targetType": "classes",
+      "targetClassIds": ["cls_grade3_2"],
+      "targetStudentIds": ["usr_student_xiaoyu"],
+      "startsAt": "2026-09-11T08:00:00+08:00",
+      "dueAt": "2026-09-11T20:00:00+08:00",
+      "latePolicy": {"allowed": true, "days": 7},
+      "description": "完成阅读、单词和习题后提交。",
+      "teacherNote": null,
+      "items": [
+        {
+          "id": "tki_reading",
+          "type": "reading",
+          "resourceId": "res_reading_zoo_demo",
+          "resourceVersion": 1,
+          "resourceSnapshot": {"title": "A Day at the Zoo", "chapterCount": 3, "demoOnly": true},
+          "completionRule": {"kind": "submit_required_content"},
+          "scoringRule": {"kind": "completion_only"},
+          "order": 1,
+          "snapshotSchemaVersion": 1
+        }
+      ],
+      "publishedAt": "2026-09-11T08:00:00+08:00",
+      "visibility": "visible",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1",
+      "deletedAt": null
+    }
+  ],
+  "task_assignments": [
+    {
+      "_id": "asn_xiaoyu_animals",
+      "organizationId": "org_qihang_demo",
+      "taskId": "tsk_animals_listening",
+      "studentId": "usr_student_xiaoyu",
+      "classId": "cls_grade3_2",
+      "status": "completed",
+      "progressPercent": 100,
+      "latestSubmissionId": "sub_xiaoyu_animals_v1",
+      "latestSubmissionVersion": 1,
+      "redoCount": 0,
+      "redoDueAt": null,
+      "isLate": false,
+      "submittedAt": "2026-09-11T10:00:00+08:00",
+      "reviewedAt": "2026-09-11T11:00:00+08:00",
+      "schemaVersion": 1,
+      "version": 2,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "submissions": [
+    {
+      "_id": "sub_xiaoyu_animals_v1",
+      "organizationId": "org_qihang_demo",
+      "taskId": "tsk_animals_listening",
+      "assignmentId": "asn_xiaoyu_animals",
+      "studentId": "usr_student_xiaoyu",
+      "version": 1,
+      "recordVersion": 1,
+      "status": "reviewed",
+      "answers": [{"taskItemId": "tki_reading", "value": "虚构测试作答"}],
+      "isLate": false,
+      "submittedAt": "2026-09-11T10:00:00+08:00",
+      "supersedesSubmissionId": null,
+      "schemaVersion": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ],
+  "review_feedback": [
+    {
+      "_id": "fbk_xiaoyu_animals_v1",
+      "organizationId": "org_qihang_demo",
+      "taskId": "tsk_animals_listening",
+      "assignmentId": "asn_xiaoyu_animals",
+      "submissionId": "sub_xiaoyu_animals_v1",
+      "submissionVersion": 1,
+      "teacherId": "usr_teacher_lin",
+      "decision": "approved",
+      "score": 86,
+      "textComment": "完成认真，继续保持。",
+      "returnReason": null,
+      "publishedAt": "2026-09-11T11:00:00+08:00",
+      "source": "manual",
+      "schemaVersion": 1,
+      "version": 1,
+      "seedRunId": "seed_m1_dev_example_v1"
+    }
+  ]
+}

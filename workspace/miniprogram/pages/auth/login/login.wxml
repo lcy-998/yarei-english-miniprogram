@@ -1,0 +1,11 @@
+<g0-page-shell nature="{{true}}" tone="nature"><view class="page" style="padding-top: {{topInset}}px;">
+  <view class="hero"><view class="brand-lockup"><image src="/assets/g0/brand-logo.png" class="crest" mode="aspectFit"/><view><text class="brand">雅睿英语</text><text class="sub">让英语学习更有趣</text></view></view><image src="/assets/g0/mascot-learning-blue.png" class="login-mascot" mode="widthFix"/></view>
+  <g0-card kind="student">
+    <text class="title">账号登录</text>
+    <g0-input label="手机号" value="{{mobile}}" type="number" placeholder="请输入手机号" bind:input="onMobile"><view slot="prefix" class="field-icon phone-icon"></view></g0-input>
+    <g0-input label="密码" value="{{password}}" password="{{!showPassword}}" placeholder="请输入密码" error="{{error}}" bind:input="onPassword"><view slot="prefix" class="field-icon lock-icon"></view><view slot="suffix" class="password-toggle {{showPassword ? 'is-visible' : ''}}" bindtap="togglePassword" aria-role="button" aria-label="显示或隐藏密码"><view class="eye-shape"></view></view></g0-input>
+    <g0-button loading="{{loading}}" bind:action="submit">登录</g0-button>
+    <text class="forgot" bindtap="forgotPassword">忘记密码</text>
+  </g0-card>
+  <view class="demos"><text>演示身份</text><view class="demo-row"><button data-mobile="13800000001" bindtap="chooseDemo"><text class="demo-icon">学</text><text>学生</text></button><button data-mobile="13800000002" bindtap="chooseDemo"><text class="demo-icon teacher">教</text><text>教师</text></button><button data-mobile="13800000003" bindtap="chooseDemo"><text class="demo-icon parent">家</text><text>家长</text></button></view><text class="tip">统一密码：123456</text></view>
+  </view></g0-page-shell>

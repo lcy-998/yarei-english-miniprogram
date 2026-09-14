@@ -1,0 +1,9 @@
+<view class="g0-input {{error ? 'g0-input--error' : ''}}">
+  <text wx:if="{{label}}" class="g0-input__label">{{label}}</text>
+  <view class="g0-input__shell">
+    <view class="g0-input__prefix"><slot name="prefix"></slot></view>
+    <input class="g0-input__field" value="{{value}}" type="{{type}}" password="{{password}}" disabled="{{disabled}}" placeholder="{{placeholder}}" placeholder-class="g0-input__placeholder" bindinput="onInput" bindfocus="onFocus" bindblur="onBlur"></input>
+    <view class="g0-input__suffix"><slot name="suffix"></slot></view>
+  </view>
+  <text wx:if="{{error}}" class="g0-input__error">{{error}}</text>
+</view>

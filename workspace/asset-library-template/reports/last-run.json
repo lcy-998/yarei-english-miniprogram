@@ -1,0 +1,42 @@
+{
+  "startedAt": "2026-09-11T08:22:25.091110+00:00",
+  "sourceRoot": "F:\\英语资产",
+  "processed": [],
+  "skipped": [
+    {
+      "source": "1.三年级上册英语课本电子版（最新正式版）.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "2025秋季人教版八上英语新教材官方高清彩版.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "2026Join in新五上电子课本26-6-26.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "2026秋外研Join in六年级上册 英语.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "【人教版】七上英语 电子课本（根据2022年版课程标准修订）.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "【人教版】九上英语 电子课本（根据2022年版课程标准修订）.pdf",
+      "reason": "unchanged_sha256"
+    },
+    {
+      "source": "人教版英语·电子课本·四上.pdf",
+      "reason": "unchanged_sha256"
+    }
+  ],
+  "failed": [],
+  "finishedAt": "2026-09-11T08:22:26.319759+00:00",
+  "summary": {
+    "processed": 0,
+    "skipped": 7,
+    "failed": 0
+  }
+}

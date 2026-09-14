@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0",
+  "assetStatus": "pilot_only_not_publishable",
+  "rightsStatus": "unverified",
+  "book": {
+    "id": "book-pep-english-4a-pilot",
+    "title": "人教版英语四年级上册（试加工）",
+    "grade": 4,
+    "term": "upper",
+    "edition": "PEP new textbook",
+    "sourceFile": "人教版英语·电子课本·四上.pdf",
+    "sourceSha256": "6FCDF2B10F7B90F3FDDCE969FC85B57F9FCF595256ED4748B5BF9DB1A076602A"
+  },
+  "page": {
+    "id": "page-pdf-013",
+    "pdfPageNumber": 13,
+    "printedPageNumber": 9,
+    "image": "page-013.png",
+    "coordinateSystem": "normalized top-left origin"
+  },
+  "audio": {
+    "kind": "local_demo_tts",
+    "format": "wav",
+    "publishable": false,
+    "productionRequirement": "Replace with licensed MP3/AAC or approved production TTS before M3/M4."
+  },
+  "clickReadZones": [
+    {
+      "id": "zone-001",
+      "speaker": "Xiao Lin",
+      "text": "You are a great nurse.",
+      "audio": "audio/seg-001.wav",
+      "hitAreas": [
+        { "x": 0.135, "y": 0.208, "width": 0.205, "height": 0.027 },
+        { "x": 0.135, "y": 0.234, "width": 0.097, "height": 0.027 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-002",
+      "speaker": "Xiao Lin",
+      "text": "You help many people.",
+      "audio": "audio/seg-002.wav",
+      "hitAreas": [
+        { "x": 0.235, "y": 0.234, "width": 0.125, "height": 0.027 },
+        { "x": 0.135, "y": 0.258, "width": 0.155, "height": 0.029 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-003",
+      "speaker": "Xiao Lin",
+      "text": "I can help you at home!",
+      "audio": "audio/seg-003.wav",
+      "hitAreas": [
+        { "x": 0.292, "y": 0.258, "width": 0.068, "height": 0.029 },
+        { "x": 0.135, "y": 0.283, "width": 0.24, "height": 0.03 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-004",
+      "speaker": "Mum",
+      "text": "You are still a child.",
+      "audio": "audio/seg-004.wav",
+      "hitAreas": [
+        { "x": 0.425, "y": 0.262, "width": 0.195, "height": 0.029 },
+        { "x": 0.425, "y": 0.287, "width": 0.095, "height": 0.03 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-005",
+      "speaker": "Mum",
+      "text": "What can you do?",
+      "audio": "audio/seg-005.wav",
+      "hitAreas": [
+        { "x": 0.522, "y": 0.287, "width": 0.106, "height": 0.03 },
+        { "x": 0.425, "y": 0.312, "width": 0.19, "height": 0.032 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-006",
+      "speaker": "Xiao Lin",
+      "text": "I am a big boy now.",
+      "audio": "audio/seg-006.wav",
+      "hitAreas": [
+        { "x": 0.655, "y": 0.192, "width": 0.27, "height": 0.03 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-007",
+      "speaker": "Xiao Lin",
+      "text": "I can sweep the floor.",
+      "audio": "audio/seg-007.wav",
+      "hitAreas": [
+        { "x": 0.925, "y": 0.192, "width": 0.025, "height": 0.03 },
+        { "x": 0.655, "y": 0.218, "width": 0.25, "height": 0.031 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-008",
+      "speaker": "Xiao Lin",
+      "text": "I can cook.",
+      "audio": "audio/seg-008.wav",
+      "hitAreas": [
+        { "x": 0.655, "y": 0.244, "width": 0.145, "height": 0.03 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    },
+    {
+      "id": "zone-009",
+      "speaker": "Xiao Lin",
+      "text": "I can look after my baby sister too!",
+      "audio": "audio/seg-009.wav",
+      "hitAreas": [
+        { "x": 0.803, "y": 0.244, "width": 0.12, "height": 0.03 },
+        { "x": 0.655, "y": 0.27, "width": 0.258, "height": 0.03 },
+        { "x": 0.655, "y": 0.296, "width": 0.06, "height": 0.03 }
+      ],
+      "reviewStatus": "manually_reviewed"
+    }
+  ]
+}

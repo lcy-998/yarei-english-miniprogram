@@ -1,0 +1,11 @@
+{
+  "name": "yarei-english-m1-cloudbase-local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "雅睿英语 M1 CloudBase 本地前置骨架；不含环境配置或部署能力",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "check": "npm run typecheck && npm run test"
+  }
+}

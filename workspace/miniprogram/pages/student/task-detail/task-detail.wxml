@@ -1,0 +1,22 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="任务详情" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadDetail"></state-panel>
+  <view wx:elif="{{detail}}" class="content">
+    <view class="hero-card">
+      <view class="hero-copy"><text class="label">课堂任务</text><text class="title">{{detail.task.title}}</text><text class="due">截止时间：今天 20:00</text></view>
+      <image class="task-art" src="/assets/visual-v2/task-generic.png" mode="aspectFit"></image>
+      <view class="progress"><view style="width: {{detail.assignment.progressPercent}}%;"></view></view>
+      <view class="status-row"><view class="status-dot"></view><text class="status">{{detail.assignment.status === 'awaiting_review' ? '已提交，等待点评' : detail.assignment.status === 'completed' ? '已完成' : '进行中'}}</text><text class="percent">{{detail.assignment.progressPercent}}%</text></view>
+    </view>
+    <view class="section">
+      <text class="section-title">任务要求</text>
+      <text class="description">{{detail.task.description}}</text>
+      <view wx:for="{{detail.task.items}}" wx:key="id" class="item"><view class="item-mark"></view><text>{{item.title}}</text><text>{{item.completionRule}}</text></view>
+    </view>
+    <view wx:if="{{detail.feedback}}" class="feedback"><image src="/assets/visual-v2/review-feedback.png" mode="aspectFit"></image><view><text class="section-title">教师反馈</text><text class="score">{{detail.feedback.score}} 分</text><text>{{detail.feedback.textComment}}</text></view></view>
+    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="section"><text class="section-title">学习记录</text><textarea value="{{answer}}" maxlength="200" placeholder="写下你的学习收获或完成情况" bindinput="onAnswer"></textarea></view>
+    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="actions"><button class="secondary" loading="{{saving}}" bindtap="onSave">保存草稿</button><button class="primary" loading="{{submitting}}" bindtap="onSubmit">提交任务</button></view>
+  </view>
+</view>

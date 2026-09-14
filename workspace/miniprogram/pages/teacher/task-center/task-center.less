@@ -1,0 +1,35 @@
+.page { min-height: 100vh; padding-bottom: 92px; box-sizing: border-box; background: @yr-page-work; position: relative; }
+.page-bg { position: fixed; z-index: 0; left: 0; top: 0; width: 100vw; height: 100vh; opacity: @yr-environment-teacher-work; }
+.content { position: relative; z-index: 1; padding: 10px 20px 32px; }
+.overview { min-height: 118px; padding: 20px 22px; box-sizing: border-box; display: flex; align-items: center; gap: 16px; border: 2px solid rgba(255,255,255,.9); border-radius: @yr-radius-role-card; background: linear-gradient(120deg,rgba(255,249,240,.99),@yr-surface-blue); box-shadow: @yr-card-shadow-strong; }
+.overview > view:first-child { flex: 1; min-width: 0; }
+.overview-label { display: block; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.overview-title { display: block; margin-top: 7px; color: @yr-text-primary; font-size: 21px; font-weight: 900; }
+.overview-note { display: block; margin-top: 6px; color: @yr-text-secondary; font-size: 12px; }
+.overview-count { flex: 0 0 64px; width: 64px; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; background: @yr-surface-blue; color: @yr-brand-primary; }
+.overview-count text:first-child { font-size: 24px; font-weight: 900; }
+.overview-count text:last-child { margin-top: 2px; font-size: 11px; }
+.entry-grid { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.entry { min-width: 0; min-height: 148px; padding: 10px 6px 13px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; border: 2px solid rgba(255,255,255,.9); border-radius: 20px; background: rgba(255, 249, 240, .98); box-shadow: @yr-card-shadow; }
+.entry image { width: 78px; height: 68px; transform: scale(1.08); }
+.entry text:nth-child(2) { margin-top: 7px; color: @yr-text-primary; font-size: 15px; font-weight: 900; white-space: nowrap; }
+.entry text:last-child { margin-top: 4px; color: @yr-text-secondary; font-size: 11px; white-space: nowrap; }
+.entry--blue { border-bottom: 5px solid @yr-brand-primary; background: linear-gradient(155deg,@yr-surface-blue,rgba(255,249,240,.99)); }
+.entry--green { border-bottom: 5px solid @yr-success; background: linear-gradient(155deg,@yr-surface-green,rgba(255,249,240,.99)); }
+.entry--purple { border-bottom: 5px solid @yr-accent-purple; background: linear-gradient(155deg,@yr-surface-purple,rgba(255,249,240,.99)); }
+.section-head { margin: 24px 2px 12px; display: flex; align-items: center; justify-content: space-between; }
+.section-head > view:first-child { min-width: 0; }
+.section-head text:first-child { display: block; color: @yr-text-primary; font-size: 20px; font-weight: 900; }
+.section-head text:last-child { display: block; margin-top: 4px; color: @yr-text-secondary; font-size: 12px; }
+.filter-pill { padding: 7px 14px; border-radius: 16px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.task-card { min-height: 132px; padding: 18px; box-sizing: border-box; display: grid; grid-template-columns: 14px 1fr; column-gap: 12px; border: 2px solid rgba(255,255,255,.92); border-radius: @yr-radius-role-card; background: linear-gradient(115deg,rgba(255,249,240,.99),@yr-surface-green-50); box-shadow: @yr-card-shadow-strong; }
+.task-status { width: 12px; height: 12px; margin-top: 5px; border: 3px solid @yr-success; border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 5px @yr-surface-green; }
+.task-copy { min-width: 0; }
+.title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.meta { display: block; margin-top: 6px; color: @yr-text-secondary; font-size: 12px; }
+.task-progress { height: 6px; margin-top: 12px; border-radius: 4px; background: @yr-track; }
+.task-progress view { height: 100%; border-radius: 4px; background: @yr-success; }
+.task-card button { grid-column: 2; justify-self: stretch; height: 42px; margin: 12px 0 0; padding: 0 18px; border-radius: 21px; background: @yr-brand-primary; color: @yr-white; font-size: 13px; font-weight: 900; box-shadow: @yr-action-shadow; }
+.task-card button { grid-column: 1 / -1; }
+.task-card button.secondary { background: @yr-surface-blue; color: @yr-brand-primary; box-shadow: none; }
+.empty { padding: 34px 20px; text-align: center; border: @yr-card-border; border-radius: @yr-radius-role-card; background: rgba(255, 249, 240, .96); color: @yr-text-secondary; }

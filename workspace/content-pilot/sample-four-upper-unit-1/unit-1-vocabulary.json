@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "assetStatus": "pilot_only_not_publishable",
+  "rightsStatus": "unverified",
+  "source": {
+    "file": "人教版英语·电子课本·四上.pdf",
+    "pdfPageNumber": 84,
+    "printedPageNumber": 80,
+    "section": "Words in each unit / Unit 1"
+  },
+  "gradeDisplayPolicy": {
+    "grade": 4,
+    "showIpaToStudent": false,
+    "requireSyllables": true
+  },
+  "reviewStatus": "manual_first_pass",
+  "words": [
+    { "id": "word-001", "text": "PE", "partOfSpeech": null, "meaningZh": "体育（课）", "printedPage": 4, "syllables": ["P", "E"], "displaySyllables": "P-E", "audio": "audio/word-001.wav" },
+    { "id": "word-002", "text": "job", "partOfSpeech": null, "meaningZh": "工作；职业", "printedPage": 4, "syllables": ["job"], "displaySyllables": "job", "audio": "audio/word-002.wav" },
+    { "id": "word-003", "text": "doctor", "partOfSpeech": null, "meaningZh": "医生", "printedPage": 4, "syllables": ["doc", "tor"], "displaySyllables": "doc-tor", "audio": "audio/word-003.wav" },
+    { "id": "word-004", "text": "farmer", "partOfSpeech": null, "meaningZh": "农场主；农民", "printedPage": 5, "syllables": ["farm", "er"], "displaySyllables": "farm-er", "audio": "audio/word-004.wav" },
+    { "id": "word-005", "text": "nurse", "partOfSpeech": null, "meaningZh": "护士", "printedPage": 5, "syllables": ["nurse"], "displaySyllables": "nurse", "audio": "audio/word-005.wav" },
+    { "id": "word-006", "text": "office worker", "partOfSpeech": null, "meaningZh": "公司职员", "printedPage": 5, "syllables": ["of", "fice", "work", "er"], "displaySyllables": "of-fice work-er", "audio": "audio/word-006.wav" },
+    { "id": "word-007", "text": "factory worker", "partOfSpeech": null, "meaningZh": "工厂工人", "printedPage": 5, "syllables": ["fac", "to", "ry", "work", "er"], "displaySyllables": "fac-to-ry work-er", "audio": "audio/word-007.wav" },
+    { "id": "word-008", "text": "busy", "partOfSpeech": null, "meaningZh": "忙碌的", "printedPage": 7, "syllables": ["bus", "y"], "displaySyllables": "bus-y", "audio": "audio/word-008.wav" },
+    { "id": "word-009", "text": "tired", "partOfSpeech": null, "meaningZh": "疲倦的", "printedPage": 7, "syllables": ["tired"], "displaySyllables": "tired", "audio": "audio/word-009.wav" },
+    { "id": "word-010", "text": "chore", "partOfSpeech": null, "meaningZh": "家庭杂务", "printedPage": 7, "syllables": ["chore"], "displaySyllables": "chore", "audio": "audio/word-010.wav" },
+    { "id": "word-011", "text": "cook", "partOfSpeech": null, "meaningZh": "烹饪；煮", "printedPage": 7, "syllables": ["cook"], "displaySyllables": "cook", "audio": "audio/word-011.wav" },
+    { "id": "word-012", "text": "clean", "partOfSpeech": null, "meaningZh": "打扫；干净的", "printedPage": 7, "syllables": ["clean"], "displaySyllables": "clean", "audio": "audio/word-012.wav" },
+    { "id": "word-013", "text": "room", "partOfSpeech": null, "meaningZh": "房间", "printedPage": 7, "syllables": ["room"], "displaySyllables": "room", "audio": "audio/word-013.wav" },
+    { "id": "word-014", "text": "look after", "partOfSpeech": null, "meaningZh": "照顾", "printedPage": 8, "syllables": ["look", "af", "ter"], "displaySyllables": "look af-ter", "audio": "audio/word-014.wav" },
+    { "id": "word-015", "text": "sweep", "partOfSpeech": null, "meaningZh": "扫", "printedPage": 8, "syllables": ["sweep"], "displaySyllables": "sweep", "audio": "audio/word-015.wav" },
+    { "id": "word-016", "text": "floor", "partOfSpeech": null, "meaningZh": "地板；地面", "printedPage": 8, "syllables": ["floor"], "displaySyllables": "floor", "audio": "audio/word-016.wav" },
+    { "id": "word-017", "text": "together", "partOfSpeech": null, "meaningZh": "在一起；共同", "printedPage": 8, "syllables": ["to", "geth", "er"], "displaySyllables": "to-geth-er", "audio": "audio/word-017.wav" },
+    { "id": "word-018", "text": "people", "partOfSpeech": null, "meaningZh": "人；人们", "printedPage": 9, "syllables": ["peo", "ple"], "displaySyllables": "peo-ple", "audio": "audio/word-018.wav" },
+    { "id": "word-019", "text": "child", "partOfSpeech": null, "meaningZh": "儿童；小孩（复数 children）", "printedPage": 9, "syllables": ["child"], "displaySyllables": "child", "audio": "audio/word-019.wav" }
+  ]
+}

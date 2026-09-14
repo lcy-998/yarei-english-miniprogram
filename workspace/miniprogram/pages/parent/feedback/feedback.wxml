@@ -1,0 +1,7 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="老师反馈" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadFeedback"></state-panel>
+  <view wx:elif="{{feedback}}" class="card"><text class="label">本次得分</text><text class="score">{{feedback.score}}</text><text class="comment">{{feedback.textComment}}</text><text class="readonly">家长端为只读查看</text></view>
+</view>

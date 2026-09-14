@@ -1,0 +1,4 @@
+<view class="g0-page-shell g0-page-shell--{{tone}}">
+  <image wx:if="{{nature}}" class="g0-page-shell__nature" src="/assets/g0/student-public-natural-background-v1.png" mode="aspectFill" aria-hidden="true"></image>
+  <view class="g0-page-shell__content"><slot></slot></view>
+</view>

@@ -1,0 +1,123 @@
+{
+  "resourceId": "book-join-in-5a-2026",
+  "resourceType": "textbook",
+  "title": "Join in 英语五年级上册",
+  "publisher": null,
+  "series": "Join in",
+  "grade": 5,
+  "term": "upper",
+  "language": "en-CN",
+  "roles": [
+    "textbook"
+  ],
+  "sourceRelativePath": "2026Join in新五上电子课本26-6-26.pdf",
+  "sourceSha256": "3F492A28AE39AF039D1E4793D721608B68E2CFA7FA810951217F9E62507CDCA4",
+  "sourceSizeBytes": 29265347,
+  "sourceModifiedAt": "2026-09-11T07:07:03.889427+00:00",
+  "version": 1,
+  "processingStatus": "needs_review",
+  "rightsStatus": "user_confirmed_cleared",
+  "visibility": "unassigned",
+  "needsMetadata": [],
+  "manifestRelativePath": "library/books/book-join-in-5a-2026/v1/manifest.json",
+  "processedAt": "2026-09-11T08:19:43.413719+00:00",
+  "details": {
+    "pageCount": 101,
+    "pagesWithText": 98,
+    "textCoverageRatio": 0.9703,
+    "pdfClassification": "embedded_text",
+    "unitCandidates": [
+      {
+        "pageNumber": 4,
+        "preview": "Contents Unit 1 My school is cool 1 Unit 2 School activities are fun! 9 Unit 3 The ice world 17 Unit 4 I love the sea! 25 Unit 5 Work it out! 33 Unit 6 Big days 41 More activities 49 Plays 75 Words and expressions 82 Vocabulary 87 Proper no"
+      },
+      {
+        "pageNumber": 5,
+        "preview": "Unit 1 My school is cool In this unit, you will: · name different places in your school; Ready to learn ·talk about your school and your school life; · say your feelings about your school. ① Listen and write\"√\".Where do they go? toilet art "
+      },
+      {
+        "pageNumber": 13,
+        "preview": "Unit School activitiesare fun! 2 In this unit, you will: · talk about different school activities; Ready to learn · plan a school activity; ·talk about how to prepare a school activity. 1Look at the pictures and complete the table.What scho"
+      },
+      {
+        "pageNumber": 21,
+        "preview": "Unit The ice world 3 In this unit, you will: ·talk about the Arctic and the Antarctic; Ready to learn · plan a trip to the Arctic and the Antarctic;·talk about how to save the Arctic and the Antarctic. ① Read and circle. 1. Polar bears live"
+      },
+      {
+        "pageNumber": 29,
+        "preview": "Unit I love the sea! 4 In this unit, you will: ·say what you can do by the sea; Ready to learn · tell a story about helping sea animals; · talk about how to save the sea. 01 Listen and sing the song. Let's go to the Everybody joins in, in, "
+      },
+      {
+        "pageNumber": 37,
+        "preview": "Unit Work it out! 5 In this unit, you will: · talk about problems; Ready to learn · tell a story about problems; · say how to work out a problem. 01 Listen and take notes. Meet Jack and Nora at the train station Time:1______pm Jack:He is 2_"
+      },
+      {
+        "pageNumber": 45,
+        "preview": "Unit 6 Big days In this unit, you will: · name different festivals; Ready to learn · tell a festival story; ·talk about Chinese festivals. 1 Look and match. 2 5 6 JANUARY 7 8 AM TANKU Spring Festival Lantern Festival Mother's Day Thanksgivi"
+      },
+      {
+        "pageNumber": 54,
+        "preview": "Unit My school is cool 1Read and write the words and expressions in the boxes. maths singing playground teacher Chinese science computer room classroom reading stories student music library playing sport English playing games art room place"
+      },
+      {
+        "pageNumber": 58,
+        "preview": "Unit 2 School activities are fun! 1 Find and circle the ten words. idea welcome class drinks prize party beautiful dress food clever k d m b W y g u y i b r m e e h p g h d q e d a L a q Z V e C S r u C h d g r a I S i t o L a C r f a e n i"
+      },
+      {
+        "pageNumber": 62,
+        "preview": "Unit 3 The ice world ① Complete the passage with the expressions. walk through the snow warm coats take photos do sport look around Anne is one of the scientists in the Antarctic. She studies penguinsthere. Every morning, Anne and other sci"
+      },
+      {
+        "pageNumber": 66,
+        "preview": "Unit 4 I love the sea! 1Look at the pictures and write the letters. ur bt b__ch foot_ fi_ ale S_ _m 62"
+      },
+      {
+        "pageNumber": 70,
+        "preview": "Unit 5 Work it out! 1 Look and write. SRSED TOAC SLGSASE ETIDECX NPOE EKY ORDO RELCVE CRUAEFL 66"
+      },
+      {
+        "pageNumber": 74,
+        "preview": "Unit 6 Big days ① Look,point andsay. What doyou do at these festivals? Spring Festival Lantern Festival Mother's Day Dragon Boat Festival Mid-Autumn Festival New Year's Day At the Spring Festival,1.. 70 ·put up lanterns ·get lucky money ·ea"
+      },
+      {
+        "pageNumber": 86,
+        "preview": "Words andexpressions Unit 1 toilet 厕所，洗手间，卫生间 computer 计算机，电脑 mountain 高山，山岳 thin (身体)瘦的 team (游戏或体育比赛的)队 musical 音乐的 instrument 乐器 musical instrument 乐器 bring 带来 painting 绘画(作品) subject 学科，科目 maths 数学 also 还 deaf 耳聋的，失聪的 student 学生，学员 hear"
+      },
+      {
+        "pageNumber": 87,
+        "preview": "Unit 2 match 体育比赛 festival(电影、戏剧、音乐等 的)节，节庆，汇演 fancy 花哨的；别致的 party 聚会，宴会 lantern 提灯；灯笼 wish 祝愿 writing 用以写的 brush 毛笔 dragon 龙 boat 小船，小舟 first 第一(位)的 whose 谁的(用于询问物品 归属) story (真实或虚构的)故事， 小说 storyteller (尤指给儿童)讲故 事的人 Unit 3 polar 极地的 bear 熊"
+      },
+      {
+        "pageNumber": 88,
+        "preview": "fresh water 淡水 TV 电视 wake 睡醒，醒来 wake up 醒，醒来 lunch 午餐 fishing 钓鱼；捕鱼 real 真的，真正的 visit 参观，游览 end 尽头；末端 on top of the world 极其高兴的 whale 鲸 northern 北部的；来自北部的 light 光，光线 guide 导游，向导 sunshine 阳光，日照 igloo 冰屋 less 不那么多，更(较)少 energy 能源 reuse 再使用，重复"
+      },
+      {
+        "pageNumber": 89,
+        "preview": "plastic 塑料 die 死去，死亡 coral 珊瑚 reef 礁 coral reef 珊瑚礁 choose 挑选，选择 sentence 句子，句 poster 海报 rubbish (已扔掉的)垃圾，废 弃物 Unit 5 assistant 助手，助理 teen (青)少年 knock 敲门(窗) must 必须 answer 答案 key 钥匙 detective 侦探 problem 问题，难题 hole 洞 deep 深的 other 其余的，另外的 di"
+      },
+      {
+        "pageNumber": 99,
+        "preview": "Unit 6,Activity 14 Cut out the pictures and put them in the right place on page 48. jumped More activities, Unit 4, Activity 3 Answers for page 63. 95"
+      }
+    ],
+    "coordinatePages": [
+      2,
+      3,
+      4
+    ],
+    "renderedPages": [
+      1,
+      2
+    ],
+    "processingErrors": [],
+    "missingComponents": [
+      "chapter_structure",
+      "chapter_audio",
+      "sentence_timeline",
+      "follow_read_text",
+      "structured_vocabulary",
+      "structured_questions"
+    ],
+    "processingStatus": "needs_review"
+  }
+}

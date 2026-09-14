@@ -1,0 +1,3 @@
+<view class="g0-card g0-card--{{kind}}" hover-class="{{interactive ? 'g0-card--pressed' : ''}}" hover-stay-time="80" bindtap="onAction">
+  <slot></slot>
+</view>

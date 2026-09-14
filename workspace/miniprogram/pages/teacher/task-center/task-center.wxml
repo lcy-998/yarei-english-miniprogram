@@ -1,0 +1,21 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="任务中心"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTasks"></state-panel>
+  <view wx:else class="content">
+    <view class="overview"><view><text class="overview-label">课堂任务</text><text class="overview-title">今天从这里开始工作</text><text class="overview-note">布置、检查和点评集中处理</text></view><view class="overview-count"><text>{{pendingCount}}</text><text>待检查</text></view></view>
+    <view class="entry-grid">
+      <view class="entry entry--blue" bindtap="publish" aria-role="button"><image src="/assets/visual-v2/task-generic.png" mode="aspectFit"></image><text>布置任务</text><text>创建课堂任务</text></view>
+      <view class="entry entry--green" bindtap="focusTasks" aria-role="button"><image src="/assets/visual-v2/teacher-task-check.png" mode="aspectFit"></image><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view>
+      <view class="entry entry--purple" bindtap="quickReview" aria-role="button"><image src="/assets/visual-v2/review-feedback.png" mode="aspectFit"></image><text>快速点评</text><text>评分与反馈</text></view>
+    </view>
+    <view class="section-head" id="teacher-task-list"><view><text>最近任务</text><text>共 {{tasks.length}} 个已发布任务</text></view><view class="filter-pill">全部</view></view>
+    <view wx:for="{{tasks}}" wx:key="id" class="task-card">
+      <view class="task-status"></view><view class="task-copy"><text class="title">{{item.title}}</text><text class="meta">三年级 2 班 · 完成率 {{item.progressPercent}}% · 待检查 {{item.pendingReviewCount}}</text><view class="task-progress"><view style="width: {{item.progressPercent}}%;"></view></view></view>
+      <button class="{{item.pendingReviewCount ? '' : 'secondary'}}" data-id="{{item.id}}" bindtap="review">{{item.pendingReviewCount ? '检查点评' : '查看完成情况'}}</button>
+    </view>
+    <view wx:if="{{!tasks.length}}" class="empty">暂无已发布任务，使用上方入口创建第一项课堂任务。</view>
+  </view>
+  <role-tabs role="teacher" active="tasks"></role-tabs>
+</view>

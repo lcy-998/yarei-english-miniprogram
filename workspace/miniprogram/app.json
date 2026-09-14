@@ -1,0 +1,34 @@
+{
+  "pages": [
+    "pages/auth/login/login",
+    "pages/auth/role-select/role-select",
+    "pages/index/index",
+    "pages/student/task-list/task-list",
+    "pages/student/task-detail/task-detail",
+    "pages/teacher/workbench/workbench",
+    "pages/teacher/task-center/task-center",
+    "pages/teacher/publish-task/publish-task",
+    "pages/teacher/review-task/review-task",
+    "pages/teacher/completion/completion",
+    "pages/parent/home/home",
+    "pages/parent/task-detail/task-detail",
+    "pages/parent/feedback/feedback",
+    "pages/logs/logs"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom"
+  },
+  "style": "v2",
+  "rendererOptions": {
+    "skyline": {
+      "defaultDisplayBlock": true,
+      "disableABTest": true,
+      "sdkVersionBegin": "3.0.0",
+      "sdkVersionEnd": "15.255.255"
+    }
+  },
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

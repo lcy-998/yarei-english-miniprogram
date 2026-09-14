@@ -1,0 +1,7 @@
+<view class="page">
+  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="孩子任务" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTask"></state-panel>
+  <view wx:elif="{{detail}}" class="content"><view class="card"><text class="title">{{detail.task.title}}</text><text class="meta">{{detail.assignment.status === 'completed' ? '已完成' : '进行中'}}</text><text class="line">任务要求：{{detail.task.description}}</text><text class="line">提交记录：{{detail.submission ? '已提交' : '暂未提交'}}</text></view><button wx:if="{{detail.feedback}}" class="primary" bindtap="openFeedback">查看老师反馈</button><view wx:else class="waiting">老师尚未发布反馈，家长端仅可查看。</view></view>
+</view>
