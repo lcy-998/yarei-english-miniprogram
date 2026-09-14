@@ -1,17 +1,29 @@
-<g0-page-shell><view class="page">
-  <app-header title="工作台" showBell="{{true}}"></app-header>
-  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+<g0-page-shell tone="teacher"><view class="page">
+  <app-header title="" showBell="{{true}}" bellCount="{{pendingCount}}"></app-header>
+  <view class="brand-header"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
+  <state-panel wx:if="{{loading}}" state="loading" message="正在加载教师工作台"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWorkbench"></state-panel>
   <view wx:else class="content">
-    <view class="hero"><view class="brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><text>雅睿英语 · 教师端</text></view><text class="greeting">林老师，上午好</text><text class="hero-note">今天还有 {{pendingCount}} 份任务等待检查</text><view class="hero-accent" aria-hidden="true"></view></view>
-    <view class="stats"><view><text>{{pendingCount}}</text><text>待检查</text></view><view><text>{{taskCount}}</text><text>进行中任务</text></view><view><text>36</text><text>授权学员</text></view></view>
-    <view class="section-title"><text>快捷工作</text><text>常用操作</text></view>
-    <view class="grid">
-      <view class="quick quick--blue" bindtap="goPublish" aria-role="button"><g0-icon name="task" size="{{56}}"></g0-icon><view><text>布置任务</text><text>创建课堂任务</text></view><view class="arrow" aria-hidden="true"></view></view>
-      <view class="quick quick--green" bindtap="goCenter" aria-role="button"><g0-icon name="check" size="{{56}}" tone="success"></g0-icon><view><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view><view class="arrow" aria-hidden="true"></view></view>
-      <view class="quick quick--purple" bindtap="goReview" aria-role="button"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>快速点评</text><text>文字与评分反馈</text></view><view class="arrow" aria-hidden="true"></view></view>
+    <view class="greeting-row"><text>林老师，上午好</text><button data-label="班级筛选" bindtap="openFuture">全部负责班级<view class="filter-arrow" aria-hidden="true"></view></button></view>
+
+    <view class="quick-grid">
+      <button class="quick quick--blue" bindtap="goPublish"><g0-icon name="task" size="{{54}}"></g0-icon><text>布置任务</text></button>
+      <button class="quick quick--green" bindtap="goCenter"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></button>
+      <button class="quick quick--purple" bindtap="goReview"><g0-icon name="review" tone="ai" size="{{54}}"></g0-icon><text>快速点评</text></button>
     </view>
-    <view class="recent"><view><text class="recent-label">最近任务</text><text class="recent-title">{{recentTaskTitle}}</text><text class="recent-meta">三年级 2 班 · 今天 20:00 截止</text></view><view class="recent-count"><text>{{taskCount}}</text><text>已发布</text></view></view>
+
+    <view class="today-card">
+      <view class="card-title"><g0-icon name="check" size="{{42}}"></g0-icon><text>今日待办</text></view>
+      <view class="todo-grid"><view><g0-icon name="check" tone="success" size="{{46}}"></g0-icon><view><text>待检查</text><text>{{pendingCount}}</text></view></view><view><g0-icon name="review" tone="warning" size="{{46}}"></g0-icon><view><text>待点评</text><text>{{pendingCommentCount}}</text></view></view></view>
+      <view class="task-row" bindtap="goReview" aria-role="button"><g0-icon name="task" size="{{44}}"></g0-icon><view><text>{{recentTaskTitle}}</text><text>三年级 2 班</text></view><text><text>{{submittedCount}}</text>/{{authorizedStudentCount}} 已提交</text><view class="row-arrow" aria-hidden="true"></view></view>
+    </view>
+
+    <view class="ongoing-card">
+      <view class="card-title"><g0-icon name="task" size="{{42}}"></g0-icon><text>进行中</text></view>
+      <view class="ongoing-grid"><button bindtap="goCenter"><g0-icon name="task" size="{{46}}"></g0-icon><view><text>课堂任务</text><text>{{activeClassroomCount}}</text></view></button><button data-label="打卡活动" bindtap="openFuture"><g0-icon name="check" tone="success" size="{{46}}"></g0-icon><view><text>打卡活动</text><text>{{activityCount}}</text></view></button></view>
+    </view>
+
+    <view class="class-update" data-label="学员统计" bindtap="openFuture" aria-role="button"><g0-icon name="review" tone="ai" size="{{40}}"></g0-icon><view><text>班级动态</text><text>三年级 2 班已有 {{submittedCount}} 条提交</text></view><text>学员统计</text><view class="row-arrow" aria-hidden="true"></view></view>
   </view>
   <g0-tab-bar role="teacher" active="workbench"></g0-tab-bar>
 </view></g0-page-shell>

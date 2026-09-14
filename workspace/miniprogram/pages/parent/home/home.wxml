@@ -1,23 +1,37 @@
-<g0-page-shell><view class="page">
-  <app-header title="孩子学习" showBell="{{true}}"></app-header>
-  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+<g0-page-shell tone="parent"><view class="page">
+  <app-header title="" showBell="{{true}}"></app-header>
+  <view class="brand-header"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>陪伴成长每一步</text></view></view>
+  <text class="screen-title">家长中心</text>
+  <state-panel wx:if="{{loading}}" state="loading" message="正在加载孩子学习概览"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadHome"></state-panel>
   <view wx:else class="content">
     <view class="child-card">
-      <view class="child-brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><text>雅睿英语 · 家长端</text><text>本周概览</text></view>
-      <view class="child-main"><view class="avatar">宇</view><view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-meta">三年级 2 班 · 本周学习概览</text></view><view class="switch">切换<view class="mini-arrow" aria-hidden="true"></view></view></view>
+      <view class="avatar">{{childAvatarText}}</view>
+      <view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-meta">三年级 2 班</text></view>
+      <button class="switch" data-label="孩子管理" bindtap="openFuture">切换孩子<view class="mini-arrow" aria-hidden="true"></view></button>
     </view>
-    <view class="stats"><view><text>{{pendingCount}}</text><text>待完成</text></view><view><text>{{completedCount}}</text><text>已完成</text></view><view><text>{{reviewedCount}}</text><text>新点评</text></view></view>
-    <view class="section-title"><text>近期任务</text><text>查看全部</text></view>
-    <view wx:for="{{tasks}}" wx:key="key" class="task" data-id="{{item.task.id}}" bindtap="openTask">
-      <g0-icon name="task" size="{{58}}"></g0-icon>
-      <view class="task-copy"><view class="task-title-row"><text class="title">{{item.task.title}}</text><text class="status-pill {{item.assignment.status === 'completed' ? 'completed' : item.assignment.status === 'awaiting_review' ? 'review' : ''}}">{{item.statusLabel}}</text></view><text class="meta">今天 20:00 截止</text><view class="task-progress"><view style="width: {{item.assignment.progressPercent}}%;"></view></view></view>
-      <view class="arrow" aria-hidden="true"></view>
+
+    <view class="overview-card">
+      <view class="overview-grid">
+        <view class="overview-metric overview-metric--success"><g0-icon name="check" tone="success" size="{{52}}"></g0-icon><view><text>本周完成率</text><text>{{completionRate}}%</text></view></view>
+        <view class="overview-metric overview-metric--primary"><g0-icon name="task" size="{{52}}"></g0-icon><view><text>待办任务</text><text>{{pendingCount}}</text></view></view>
+      </view>
+      <view class="overdue-row"><view><g0-icon name="task" tone="warning" size="{{38}}"></g0-icon><text>逾期任务</text><text>{{overdueCount}}</text></view><button class="report-link" data-label="学习报告" bindtap="openFuture">查看学习报告<view class="mini-arrow" aria-hidden="true"></view></button></view>
     </view>
-    <view class="feedback-card">
-      <view class="feedback-head"><text>最新反馈</text><text class="feedback-status {{reviewedCount ? 'ready' : ''}}">{{reviewedCount ? '查看详情' : '等待点评'}}</text></view>
-      <view wx:if="{{reviewedCount}}" class="feedback-content"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>老师已发布新的任务反馈</text><text>点击上方任务查看评分与评语</text></view></view>
-      <view wx:else class="feedback-empty"><g0-icon name="review" size="{{56}}" tone="ai"></g0-icon><view><text>暂无新反馈</text><text>老师点评后会在这里提醒你</text></view></view>
+
+    <view class="section-card">
+      <view class="section-head"><view><g0-icon name="task" size="{{42}}"></g0-icon><text>近期任务</text></view><button bindtap="showAllTasks" aria-label="查看全部任务"><view class="round-arrow" aria-hidden="true"></view></button></view>
+      <view wx:for="{{tasks}}" wx:key="key" class="task" data-id="{{item.task.id}}" bindtap="openTask">
+        <g0-icon name="task" size="{{52}}"></g0-icon>
+        <view class="task-copy"><text class="title">{{item.task.title}}</text><view><text class="due">今天 20:00</text><text class="status-pill {{item.assignment.status === 'completed' ? 'completed' : item.assignment.status === 'awaiting_review' ? 'review' : ''}}">{{item.statusLabel}}</text></view></view>
+      </view>
+      <state-panel wx:if="{{!tasks.length}}" state="empty" message="暂无近期任务"></state-panel>
+    </view>
+
+    <view class="feedback-card" bindtap="openLatestFeedback" aria-role="button">
+      <view class="feedback-head"><view><g0-icon name="review" tone="ai" size="{{42}}"></g0-icon><text>最新点评</text></view><view class="round-arrow" aria-hidden="true"></view></view>
+      <view wx:if="{{reviewedCount}}" class="feedback-content"><text>林老师：{{latestFeedbackText}}</text><text>{{latestFeedbackTaskTitle}}</text></view>
+      <view wx:else class="feedback-empty"><text>暂无新点评</text><text>老师点评后会在这里提醒你</text></view>
     </view>
     <view class="readonly-note"><view class="lock-mark" aria-hidden="true"></view><text>家长端仅查看学习进度与反馈，不可代替孩子提交。</text></view>
   </view>
