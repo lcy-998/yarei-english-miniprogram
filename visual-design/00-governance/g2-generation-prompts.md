@@ -15,18 +15,18 @@
 
 所有主稿为正常有数据状态；不得提前加入超出对应里程碑的功能控件。
 
-## 当前复核候选稿
+## 已批准正式主稿
 
 | 页面 | 当前候选稿 | 本轮结论 |
 | --- | --- | --- |
-| P-03 | `04-pages/history/P-03/v002.png` | 修正空表单按钮状态与两步提示 |
-| P-04 | `04-pages/history/P-04/v002.png` | 补充切换身份固定入口 |
-| S-02 | `04-pages/history/S-02/v003.png` | 音节分隔改为连字符 |
-| S-03 | `04-pages/history/S-03/v003.png` | 对齐统一阅读演示数据；保持母版完整尺寸 |
+| P-03 | `04-pages/current/P-03.png` | 已批准；空表单按钮状态与两步提示正确 |
+| P-04 | `04-pages/current/P-04.png` | 已批准；包含切换身份固定入口 |
+| S-02 | `04-pages/current/S-02.png` | 已批准；音节分隔使用连字符 |
+| S-03 | `04-pages/current/S-03.png` | 已批准；对齐统一阅读演示数据 |
 | S-04 | `04-pages/current/S-04.png` | 用户已批准大幅绘本页图为可见主体；不另行显示抽取正文 |
-| G-02 | `04-pages/history/G-02/v001.png` | 保留原稿 |
-| T-02 | `04-pages/history/T-02/v001.png` | 保留原稿 |
-| T-03 | `04-pages/history/T-03/v002.png` | 移除 M2 打卡、作品与趋势承诺 |
-| A-02 | `04-pages/history/A-02/v004.png` | 补充班级停用入口；画板归一化为母版尺寸 |
-| A-03 | `04-pages/history/A-03/v004.png` | 补充用户停用入口；画板归一化为母版尺寸 |
-| A-04 | `04-pages/history/A-04/v003.png` | 权限树收敛为 M1 可用能力 |
+| G-02 | `04-pages/current/G-02.png` | 已批准 |
+| T-02 | `04-pages/current/T-02.png` | 已批准 |
+| T-03 | `04-pages/current/T-03.png` | 已批准；不提前展示 M2 打卡、作品与趋势 |
+| A-02 | `04-pages/current/A-02.png` | 已批准；包含班级停用入口 |
+| A-03 | `04-pages/current/A-03.png` | 已批准；包含用户停用入口 |
+| A-04 | `04-pages/current/A-04.png` | 已批准；权限树收敛为 M1 可用能力 |
