@@ -7,6 +7,25 @@ const id = (prefix: string): string => `${prefix}_${Date.now()}_${Math.random().
 function ok<T>(data: T): ServiceResult<T> { return { ok: true, data } }
 function fail<T>(code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'NETWORK_ERROR', message: string, retryable = false): ServiceResult<T> { return { ok: false, error: { code, message, retryable } } }
 
+function canTeacherManageTask(teacher: UserAccount, task: Task): boolean {
+  return teacher.role === 'teacher' && (task.creatorTeacherId === teacher.id || teacher.classId === task.classId)
+}
+
+function hasActiveParentStudentLink(state: AppState, parentId: string, studentId: string): boolean {
+  return state.parentStudentLinks.some(link => link.parentId === parentId && link.studentId === studentId && link.status === 'active')
+}
+
+function buildTaskDetail(state: AppState, assignment: AppState['assignments'][number]): TaskDetailView | null {
+  const task = state.tasks.find(item => item.id === assignment.taskId)
+  if (!task) return null
+  const submission = state.submissions.filter(item => item.assignmentId === assignment.id).sort((a, b) => b.version - a.version)[0]
+  const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
+  const view: TaskDetailView = { task, assignment }
+  if (submission) view.submission = submission
+  if (feedback) view.feedback = feedback
+  return view
+}
+
 export async function login(mobile: string, password: string): Promise<ServiceResult<Session>> {
   if (!mobile || !password) return fail('VALIDATION_ERROR', '请输入手机号和密码')
   const state = getState()
@@ -104,7 +123,8 @@ export async function getTeacherTasks(userId: string): Promise<ServiceResult<{ t
   const state = getState()
   const user = state.users.find(item => item.id === userId)
   if (!user || user.role !== 'teacher') return fail('FORBIDDEN', '仅教师可查看')
-  const taskIds = state.tasks.filter(item => item.creatorTeacherId === user.id).map(item => item.id)
+  const manageableTasks = state.tasks.filter(item => canTeacherManageTask(user, item))
+  const taskIds = manageableTasks.map(item => item.id)
   const pendingCount = state.assignments.filter(item => taskIds.includes(item.taskId) && item.status === 'awaiting_review').length
   const progressByTask: Record<string, number> = {}
   const pendingByTask: Record<string, number> = {}
@@ -113,7 +133,7 @@ export async function getTeacherTasks(userId: string): Promise<ServiceResult<{ t
     progressByTask[taskId] = assignments.length ? Math.round(assignments.reduce((total, item) => total + item.progressPercent, 0) / assignments.length) : 0
     pendingByTask[taskId] = assignments.filter(item => item.status === 'awaiting_review').length
   }
-  return ok({ tasks: state.tasks.filter(item => taskIds.includes(item.id)), pendingCount, progressByTask, pendingByTask })
+  return ok({ tasks: manageableTasks, pendingCount, progressByTask, pendingByTask })
 }
 
 export interface ReviewAssignmentView {
@@ -130,7 +150,7 @@ export async function getCompletion(userId: string, taskId: string): Promise<Ser
   const state = getState()
   const teacher = state.users.find(item => item.id === userId)
   const task = state.tasks.find(item => item.id === taskId)
-  if (!teacher || teacher.role !== 'teacher' || !task || task.creatorTeacherId !== teacher.id) return fail('FORBIDDEN', '无权检查该任务')
+  if (!teacher || !task || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权检查该任务')
   const rows = state.assignments.filter(item => item.taskId === taskId).map(assignment => {
     const student = state.users.find(item => item.id === assignment.studentId)
     const submission = assignment.latestSubmissionId ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
@@ -173,9 +193,10 @@ export async function publishClassroomTask(userId: string, title: string, descri
 export async function reviewSubmission(userId: string, taskId: string, decision: 'approved' | 'returned', score: number, comment: string): Promise<ServiceResult<ReviewFeedback>> {
   const state = getState()
   const teacher = state.users.find(item => item.id === userId)
+  const task = state.tasks.find(item => item.id === taskId)
   const assignment = state.assignments.find(item => item.taskId === taskId)
   const submission = assignment ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
-  if (!teacher || teacher.role !== 'teacher' || !assignment || !submission) return fail('FORBIDDEN', '当前提交不可点评')
+  if (!teacher || !task || !canTeacherManageTask(teacher, task) || !assignment || !submission) return fail('FORBIDDEN', '当前提交不可点评')
   if (!canPublishReview(assignment, decision, comment)) return fail('VALIDATION_ERROR', '退回重做必须填写原因')
   const next = mutateState(draft => {
     const feedback: ReviewFeedback = { id: id('fbk'), assignmentId: assignment.id, submissionId: submission.id, teacherId: teacher.id, decision, score: Math.max(0, Math.min(100, score)), textComment: comment.trim(), returnReason: decision === 'returned' ? comment.trim() : undefined, publishedAt: new Date().toISOString() }
@@ -190,26 +211,22 @@ export async function reviewSubmission(userId: string, taskId: string, decision:
 export async function getParentHome(userId: string): Promise<ServiceResult<{ user: UserAccount; child: UserAccount; tasks: TaskDetailView[] }>> {
   const state = getState()
   const parent = state.users.find(item => item.id === userId)
-  const child = state.users.find(item => item.role === 'student')
+  const activeLink = state.parentStudentLinks.find(item => item.parentId === userId && item.status === 'active')
+  const child = activeLink ? state.users.find(item => item.id === activeLink.studentId && item.role === 'student') : undefined
   if (!parent || parent.role !== 'parent' || !child) return fail('FORBIDDEN', '无权查看孩子数据')
-  const tasks: TaskDetailView[] = []
-  state.assignments.filter(item => item.studentId === child.id).forEach(assignment => {
-    const task = state.tasks.find(item => item.id === assignment.taskId)
-    if (!task) return
-    const submission = assignment.latestSubmissionId ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
-    const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
-    const view: TaskDetailView = { task, assignment }
-    if (submission) view.submission = submission
-    if (feedback) view.feedback = feedback
-    tasks.push(view)
-  })
+  const tasks = state.assignments
+    .filter(item => item.studentId === child.id)
+    .map(assignment => buildTaskDetail(state, assignment))
+    .filter((item): item is TaskDetailView => item !== null)
   return ok({ user: parent, child, tasks })
 }
 
 export async function getParentTask(userId: string, taskId: string): Promise<ServiceResult<TaskDetailView>> {
-  const result = await getParentHome(userId)
-  if (!result.ok) return result
-  const detail = result.data.tasks.find(item => item.task.id === taskId)
+  const state = getState()
+  const parent = state.users.find(item => item.id === userId)
+  if (!parent || parent.role !== 'parent') return fail('FORBIDDEN', '无权查看孩子数据')
+  const assignment = state.assignments.find(item => item.taskId === taskId && hasActiveParentStudentLink(state, parent.id, item.studentId))
+  const detail = assignment ? buildTaskDetail(state, assignment) : null
   return detail ? ok(detail) : fail('NOT_FOUND', '任务不存在或不可查看')
 }
 

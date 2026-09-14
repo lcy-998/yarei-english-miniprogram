@@ -8,6 +8,9 @@ export const initialState: AppState = {
     { id: 'usr_teacher_lin', displayName: '林老师', role: 'teacher', classId: 'cls_grade3_2' },
     { id: 'usr_parent_xiaoyu', displayName: '小宇家长', role: 'parent' },
   ],
+  parentStudentLinks: [
+    { id: 'rel_parent_xiaoyu', parentId: 'usr_parent_xiaoyu', studentId: 'usr_student_xiaoyu', status: 'active' },
+  ],
   tasks: [{
     id: 'tsk_animals_listening',
     title: '动物主题听说练习',

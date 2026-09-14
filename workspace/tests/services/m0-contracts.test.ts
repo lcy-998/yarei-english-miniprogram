@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  getCompletion,
+  getParentHome,
   getParentFeedback,
   getParentTask,
   getTaskDetail,
@@ -8,12 +10,19 @@ import {
   reviewSubmission,
   submitTask,
 } from '../../miniprogram/services/app-service'
-import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
+import { getState, initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 
 const STUDENT_ID = 'usr_student_xiaoyu'
 const TEACHER_ID = 'usr_teacher_lin'
 const PARENT_ID = 'usr_parent_xiaoyu'
 const TASK_ID = 'tsk_animals_listening'
+
+async function submitAndReviewTask(): Promise<void> {
+  const submission = await submitTask(STUDENT_ID, TASK_ID, '完成作答')
+  expect(submission.ok).toBe(true)
+  const review = await reviewSubmission(TEACHER_ID, TASK_ID, 'approved', 93, '阅读认真，表达完整。')
+  expect(review.ok).toBe(true)
+}
 
 describe('M0 service boundaries and shared views', () => {
   beforeEach(() => replaceState(initialState))
@@ -71,6 +80,73 @@ describe('M0 service boundaries and shared views', () => {
     expect(parentDetail.data.assignment.status).toBe(studentDetail.data.assignment.status)
     expect(parentDetail.data.feedback).toEqual(studentDetail.data.feedback)
     expect(parentFeedback.data).toEqual(review.data)
+  })
+
+  it('allows every parent read only while an active child link exists', async () => {
+    await submitAndReviewTask()
+
+    const home = await getParentHome(PARENT_ID)
+    const task = await getParentTask(PARENT_ID, TASK_ID)
+    const feedback = await getParentFeedback(PARENT_ID, TASK_ID)
+
+    expect(home.ok).toBe(true)
+    expect(task.ok).toBe(true)
+    expect(feedback.ok).toBe(true)
+  })
+
+  it('denies every parent read immediately after the child link is revoked', async () => {
+    await submitAndReviewTask()
+    const state = getState()
+    state.parentStudentLinks[0]!.status = 'revoked'
+    replaceState(state)
+
+    const home = await getParentHome(PARENT_ID)
+    const task = await getParentTask(PARENT_ID, TASK_ID)
+    const feedback = await getParentFeedback(PARENT_ID, TASK_ID)
+
+    expect(home).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+    expect(task).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    expect(feedback).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+  })
+
+  it('denies every parent read when no child link exists', async () => {
+    await submitAndReviewTask()
+    const state = getState()
+    state.parentStudentLinks = []
+    replaceState(state)
+
+    const home = await getParentHome(PARENT_ID)
+    const task = await getParentTask(PARENT_ID, TASK_ID)
+    const feedback = await getParentFeedback(PARENT_ID, TASK_ID)
+
+    expect(home).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+    expect(task).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    expect(feedback).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+  })
+
+  it('allows class-authorized teachers to review and rejects teachers outside the task class', async () => {
+    const state = getState()
+    state.users.push(
+      { id: 'usr_teacher_colleague', displayName: '陈老师', role: 'teacher', classId: 'cls_grade3_2' },
+      { id: 'usr_teacher_outside', displayName: '赵老师', role: 'teacher', classId: 'cls_grade4_1' },
+    )
+    replaceState(state)
+    const submission = await submitTask(STUDENT_ID, TASK_ID, '完成作答')
+    expect(submission.ok).toBe(true)
+
+    const authorizedTasks = await getTeacherTasks('usr_teacher_colleague')
+    const authorizedCompletion = await getCompletion('usr_teacher_colleague', TASK_ID)
+    const unauthorizedCompletion = await getCompletion('usr_teacher_outside', TASK_ID)
+    const unauthorizedReview = await reviewSubmission('usr_teacher_outside', TASK_ID, 'approved', 90, '不应发布')
+
+    expect(authorizedTasks.ok).toBe(true)
+    if (authorizedTasks.ok) expect(authorizedTasks.data.tasks.map(task => task.id)).toContain(TASK_ID)
+    expect(authorizedCompletion.ok).toBe(true)
+    expect(unauthorizedCompletion).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+    expect(unauthorizedReview).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+
+    const authorizedReview = await reviewSubmission('usr_teacher_colleague', TASK_ID, 'approved', 91, '按班级授权完成点评。')
+    expect(authorizedReview.ok).toBe(true)
   })
 
   it('does not let callers mutate stored data through a command response', async () => {

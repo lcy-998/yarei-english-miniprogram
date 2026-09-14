@@ -11,6 +11,13 @@ export interface UserAccount {
   classId?: string
 }
 
+export interface ParentStudentLink {
+  id: string
+  parentId: string
+  studentId: string
+  status: 'active' | 'revoked'
+}
+
 export interface TaskItem {
   id: string
   type: 'reading' | 'vocabulary' | 'exercise'
@@ -74,6 +81,7 @@ export interface ReviewFeedback {
 
 export interface AppState {
   users: UserAccount[]
+  parentStudentLinks: ParentStudentLink[]
   tasks: Task[]
   assignments: TaskAssignment[]
   submissions: Submission[]
