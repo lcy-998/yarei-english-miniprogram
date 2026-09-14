@@ -45,7 +45,12 @@
   },
   "libVersion": "2.32.3",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "file",
+        "value": "assets/g0/mascot-speaking-pink.png"
+      }
+    ],
     "include": []
   },
   "appid": "wx6881cb67e05b1bd1"

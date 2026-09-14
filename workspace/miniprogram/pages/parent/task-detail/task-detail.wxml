@@ -1,5 +1,5 @@
 <view class="page">
-  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.png" mode="scaleToFill" aria-hidden="true"></image>
+  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
   <app-header title="孩子任务" back="{{true}}"></app-header>
   <state-panel wx:if="{{loading}}" state="loading"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTask"></state-panel>

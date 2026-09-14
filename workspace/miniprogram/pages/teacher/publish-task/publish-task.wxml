@@ -1,5 +1,5 @@
 <view class="page">
-  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.png" mode="scaleToFill" aria-hidden="true"></image>
+  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
   <app-header title="布置课堂任务" back="{{true}}"></app-header>
   <view class="content">
     <view class="steps"><view class="step active"><text>1</text><text>任务内容</text></view><view class="step-line active"></view><view class="step active"><text>2</text><text>发布对象</text></view><view class="step-line active"></view><view class="step active"><text>3</text><text>确认发布</text></view></view>
