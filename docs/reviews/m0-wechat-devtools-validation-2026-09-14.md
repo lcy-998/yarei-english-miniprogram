@@ -98,14 +98,25 @@
 
 ## 8. 未完成门禁与剩余人工项
 
-最后一次代码修改后，`simulator_refresh` 返回：`Failed to connect to WechatIDE. Please run wechatide auth ...`。随后本任务与总控各用专用状态工具复核，均得到同一连接错误。按约束未改用 CLI、未重新授权、未重启工具、未清缓存，也未继续重试。
+最后一次流程代码修改后，`simulator_refresh` 曾返回：`Failed to connect to WechatIDE. Please run wechatide auth ...`。当时本任务与总控均停止重试，因此本节以下事项在该次验收结束时尚未完成。后续恢复结果见第 9 节。
 
 因此以下项目未完成，不能据此宣布 M0 最终通过：
 
-- 最终源码状态的模拟器重新编译、currentPage、Console/Network 和截图复查。
 - 加载、空数据、过期状态的最终模拟器截图。
 - 390×844 与 375×812 两档完整回归中的第二档 375×812。
 - iOS/Android 真机登录、导航、输入、滚动、安全区与返回验证。
 - 至少一名教师与一名家长的正式人工评审、任务创建/点评耗时、误触点记录和产品负责人最终门禁确认。
 
 本记录仅说明已执行证据与代码检查；M0 是否通过由总控在开发者工具连接恢复并补齐上述项目后决定。
+
+## 9. 工作区对齐与 MCP 恢复复查
+
+- 对齐提交：`d5dcca1`。保留开发者工具写入的 TypeScript `ES2017` 目标；将共享配置中的 `es6` 与 `enhance` 同步开启；本地 `*-run-*` 临时截图目录保留在磁盘并通过 `.gitignore` 排除，不删除历史证据。
+- M0 逻辑继续完成 `e70482c` 退回重做规则与 `e036db9` 写操作幂等/版本冲突保护；运行时素材通过 `290ef72` 压缩，预计上传约 755 KB。
+- 使用 WechatIDE 官方 `wechatide.cmd` 绝对路径完成 Codex 授权，`wechatide-skill=0.3.9`、`versionRelation=equal`、`loginExpired=false`、`tokenRequired=false`。
+- 项目窗口复用为 `s0`；最终执行 `simulator_refresh` 成功，`currentPage=pages/auth/login/login`。
+- 最终 Console 中 `error`、`assets/visual-v2` 与 `wx:key` 查询均无命中；Network 中 `error` 无命中。
+- 最终截图：`output/m0-validation/2026-09-14/P-01-final-after-alignment.png`，可见压缩后的 Logo、吉祥物和 JPG 背景正常加载。
+- 本地最终检查：10 个测试文件、48 个用例全部通过；TypeScript 与视觉契约检查通过。
+
+MCP 恢复后，“最终源码状态的模拟器刷新、currentPage、Console/Network 和 P-01 截图复查”已完成。M0 仍需完成第 8 节保留的异常状态、375×812、G-01/T-01 视觉校准、真机与正式用户评审门禁。
