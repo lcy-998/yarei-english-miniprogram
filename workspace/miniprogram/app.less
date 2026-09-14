@@ -64,10 +64,10 @@
 @yr-environment-public: .98;
 @yr-environment-student-home: 1;
 @yr-environment-student-secondary: .42;
-@yr-environment-teacher-home: .62;
-@yr-environment-teacher-work: .52;
+@yr-environment-teacher-home: .88;
+@yr-environment-teacher-work: .72;
 @yr-environment-parent-home: .52;
-@yr-environment-parent-detail: .44;
+@yr-environment-parent-detail: .70;
 
 .yr-card-surface() {
   border: @yr-card-border;
@@ -96,3 +96,26 @@ button::after { border: 0; }
 .yr-card { .yr-card-surface(); border-radius: @yr-radius-role-card; }
 .yr-card--student { border-radius: @yr-radius-student-card; }
 .yr-primary-action { .yr-primary-action(); }
+
+// M0 次级页面：保留清晰的顶部天空和底部植物，中部使用暖白遮罩承载任务内容。
+.page.page--secondary {
+  background: @yr-page-work;
+}
+.page.page--secondary::before {
+  content: "";
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(180deg,rgba(244,250,255,.08) 0%,rgba(255,252,247,.78) 24%,rgba(255,252,247,.92) 70%,rgba(255,252,247,.18) 100%);
+  pointer-events: none;
+}
+.page.page--secondary > .page-bg {
+  opacity: 1;
+  filter: saturate(1.08) contrast(1.02);
+}
+.page.page--secondary > .content,
+.page.page--secondary > .card,
+.page.page--secondary > .action-bar {
+  position: relative;
+  z-index: 2;
+}

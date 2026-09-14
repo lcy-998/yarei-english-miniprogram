@@ -6,7 +6,7 @@
   <view wx:else class="content">
     <view class="overview"><view><text class="overview-label">课堂任务</text><text class="overview-title">今天从这里开始工作</text><text class="overview-note">布置、检查和点评集中处理</text></view><view class="overview-count"><text>{{pendingCount}}</text><text>待检查</text></view></view>
     <view class="entry-grid">
-      <view class="entry entry--blue" bindtap="publish" aria-role="button"><g0-icon name="task" size="68"></g0-icon><text>布置任务</text><text>创建课堂任务</text></view>
+      <view class="entry entry--blue" bindtap="publish" aria-role="button"><g0-icon name="publish" size="68"></g0-icon><text>布置任务</text><text>创建课堂任务</text></view>
       <view class="entry entry--green" bindtap="focusTasks" aria-role="button"><g0-icon name="check" tone="success" size="68"></g0-icon><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view>
       <view class="entry entry--purple" bindtap="quickReview" aria-role="button"><g0-icon name="review" tone="ai" size="68"></g0-icon><text>快速点评</text><text>评分与反馈</text></view>
     </view>

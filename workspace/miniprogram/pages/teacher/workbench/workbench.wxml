@@ -1,4 +1,4 @@
-<g0-page-shell tone="teacher"><view class="page">
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="page">
   <app-header title="" showBell="{{true}}" bellCount="{{pendingCount}}"></app-header>
   <view class="brand-header"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
   <state-panel wx:if="{{loading}}" state="loading" message="正在加载教师工作台"></state-panel>
@@ -7,13 +7,13 @@
     <view class="greeting-row"><text>林老师，上午好</text><button data-label="班级筛选" bindtap="openFuture">全部负责班级<view class="filter-arrow" aria-hidden="true"></view></button></view>
 
     <view class="quick-grid">
-      <button class="quick quick--blue" bindtap="goPublish"><g0-icon name="task" size="{{54}}"></g0-icon><text>布置任务</text></button>
+      <button class="quick quick--blue" bindtap="goPublish"><g0-icon name="publish" size="{{54}}"></g0-icon><text>布置任务</text></button>
       <button class="quick quick--green" bindtap="goCenter"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></button>
       <button class="quick quick--purple" bindtap="goReview"><g0-icon name="review" tone="ai" size="{{54}}"></g0-icon><text>快速点评</text></button>
     </view>
 
     <view class="today-card">
-      <view class="card-title"><g0-icon name="check" size="{{42}}"></g0-icon><text>今日待办</text></view>
+      <view class="card-title"><g0-icon name="calendar" size="{{42}}"></g0-icon><text>今日待办</text></view>
       <view class="todo-grid"><view><g0-icon name="check" tone="success" size="{{46}}"></g0-icon><view><text>待检查</text><text>{{pendingCount}}</text></view></view><view><g0-icon name="review" tone="warning" size="{{46}}"></g0-icon><view><text>待点评</text><text>{{pendingCommentCount}}</text></view></view></view>
       <view class="task-row" bindtap="goReview" aria-role="button"><g0-icon name="task" size="{{44}}"></g0-icon><view><text>{{recentTaskTitle}}</text><text>三年级 2 班</text></view><text><text>{{submittedCount}}</text>/{{authorizedStudentCount}} 已提交</text><view class="row-arrow" aria-hidden="true"></view></view>
     </view>

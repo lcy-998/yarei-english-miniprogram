@@ -52,14 +52,14 @@
       "id": "student-public-natural-background-v1",
       "source": "ImageGen generated on 2026-09-13; prompt recorded in visual-design/00-governance/change-log.md",
       "production": "visual-design/03-assets/production/student-public-natural-background-v1.png",
-      "role": "student-and-public-environment-background",
+      "role": "m0-natural-environment-background",
       "productionDimensions": "940x1672",
       "runtimeCopy": "workspace/miniprogram/assets/g0/student-public-natural-background-v1.jpg",
       "runtimeDimensions": "940x1672",
       "runtimeBytes": 134954,
       "runtimeEncoding": "JPEG quality 88",
       "alpha": false,
-      "references": ["P-01", "S-01"],
+      "references": ["P-01", "P-02", "S-01", "S-08", "S-09", "G-03", "G-05", "T-01", "T-05", "T-06", "T-07", "T-08", "T-17"],
       "constraints": "No text, logo, mascot, UI, character, animal, button, card, progress or business state is embedded.",
       "status": "production-ready"
     }
