@@ -149,6 +149,25 @@ describe('M0 service boundaries and shared views', () => {
     expect(authorizedReview.ok).toBe(true)
   })
 
+  it('reviews only the selected assignment when a task has multiple submissions', async () => {
+    const before = await getCompletion(TEACHER_ID, TASK_ID)
+    expect(before.ok).toBe(true)
+    if (!before.ok) return
+    const pendingRows = before.data.filter((row) => row.status === 'awaiting_review')
+    expect(pendingRows).toHaveLength(6)
+
+    const selected = pendingRows[1]!
+    const untouched = pendingRows[0]!
+    const result = await reviewSubmission(TEACHER_ID, TASK_ID, 'approved', 95, '定位到指定学生点评。', selected.assignmentId)
+    expect(result.ok).toBe(true)
+
+    const after = await getCompletion(TEACHER_ID, TASK_ID)
+    expect(after.ok).toBe(true)
+    if (!after.ok) return
+    expect(after.data.find((row) => row.assignmentId === selected.assignmentId)?.status).toBe('completed')
+    expect(after.data.find((row) => row.assignmentId === untouched.assignmentId)?.status).toBe('awaiting_review')
+  })
+
   it('does not let callers mutate stored data through a command response', async () => {
     const published = await publishClassroomTask(TEACHER_ID, '不可变任务', '验证返回对象隔离')
     expect(published.ok).toBe(true)

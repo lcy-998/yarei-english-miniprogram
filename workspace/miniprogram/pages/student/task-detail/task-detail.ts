@@ -1,9 +1,10 @@
 import { TaskDetailView } from '../../../domain/types'
 import { getTaskDetail, saveDraft, submitTask } from '../../../services/app-service'
 import { getCurrentTaskId, getSession } from '../../../session/session'
+import { assignmentStatusLabel } from '../../../shared/assignment-status'
 
 Component({
-  data: { loading: true, error: '', detail: null as TaskDetailView | null, answer: '', saving: false, submitting: false },
+  data: { loading: true, error: '', detail: null as TaskDetailView | null, statusLabel: '', answer: '', saving: false, submitting: false },
   lifetimes: { attached() { this.loadDetail() } },
   methods: {
     async loadDetail() {
@@ -12,7 +13,7 @@ Component({
       this.setData({ loading: true, error: '' })
       const result = await getTaskDetail(session.user.id, taskId)
       if (!result.ok) { this.setData({ loading: false, error: result.error.message }); return }
-      this.setData({ loading: false, detail: result.data, answer: result.data.submission?.answers[0]?.value ?? '' })
+      this.setData({ loading: false, detail: result.data, statusLabel: assignmentStatusLabel(result.data.assignment.status), answer: result.data.submission?.answers[0]?.value ?? '' })
     },
     onAnswer(event: WechatMiniprogram.Input) { this.setData({ answer: event.detail.value }) },
     async onSave() {

@@ -8,7 +8,7 @@
       <view class="hero-copy"><text class="label">课堂任务</text><text class="title">{{detail.task.title}}</text><text class="due">截止时间：今天 20:00</text></view>
       <view class="task-art"><g0-icon name="task" size="64"></g0-icon></view>
       <view class="progress"><view style="width: {{detail.assignment.progressPercent}}%;"></view></view>
-      <view class="status-row"><view class="status-dot"></view><text class="status">{{detail.assignment.status === 'awaiting_review' ? '已提交，等待点评' : detail.assignment.status === 'completed' ? '已完成' : '进行中'}}</text><text class="percent">{{detail.assignment.progressPercent}}%</text></view>
+      <view class="status-row"><view class="status-dot"></view><text class="status">{{statusLabel}}</text><text class="percent">{{detail.assignment.progressPercent}}%</text></view>
     </view>
     <view class="section">
       <text class="section-title">任务要求</text>

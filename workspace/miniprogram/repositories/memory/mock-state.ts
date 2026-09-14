@@ -1,10 +1,67 @@
-import { AppState } from '../../domain/types'
+import { AppState, ReviewFeedback, Submission, TaskAssignment, UserAccount } from '../../domain/types'
 
-const now = '2026-09-11T08:00:00+08:00'
+const taskDate = new Date()
+const taskStartsAt = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate(), 8).toISOString()
+const taskDueAt = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate(), 20).toISOString()
+const CLASS_ID = 'cls_grade3_2'
+const TASK_ID = 'tsk_animals_listening'
+
+const demoStudents: UserAccount[] = [
+  { id: 'usr_student_xiaoyu', displayName: '小宇', role: 'student', classId: CLASS_ID },
+  ...Array.from({ length: 35 }, (_, index): UserAccount => ({
+    id: `usr_student_demo_${String(index + 2).padStart(2, '0')}`,
+    displayName: `演示学生${String(index + 2).padStart(2, '0')}`,
+    role: 'student',
+    classId: CLASS_ID,
+  })),
+]
+
+const demoAssignments: TaskAssignment[] = demoStudents.map((student, index) => {
+  const assignment: TaskAssignment = {
+    id: index === 0 ? 'asn_xiaoyu_animals' : `asn_demo_${String(index + 1).padStart(2, '0')}`,
+    taskId: TASK_ID,
+    studentId: student.id,
+    classId: CLASS_ID,
+    status: index === 0 ? 'in_progress' : index <= 6 ? 'awaiting_review' : index <= 27 ? 'completed' : 'not_started',
+    progressPercent: index === 0 ? 67 : index <= 27 ? 100 : 0,
+    redoCount: 0,
+  }
+  if (index > 0 && index <= 27) {
+    assignment.latestSubmissionId = `sub_demo_${String(index + 1).padStart(2, '0')}`
+    assignment.submittedAt = taskStartsAt
+  }
+  if (index > 6 && index <= 27) assignment.reviewedAt = taskStartsAt
+  return assignment
+})
+
+const demoSubmissions: Submission[] = demoAssignments
+  .filter((assignment) => Boolean(assignment.latestSubmissionId))
+  .map((assignment, index) => ({
+    id: assignment.latestSubmissionId!,
+    assignmentId: assignment.id,
+    studentId: assignment.studentId,
+    version: 1,
+    status: index < 6 ? 'submitted' : 'reviewed',
+    answers: [{ taskItemId: 'tki_reading', value: '已完成演示学习记录。' }],
+    submittedAt: taskStartsAt,
+  }))
+
+const demoFeedback: ReviewFeedback[] = demoAssignments
+  .filter((assignment) => assignment.status === 'completed' && assignment.latestSubmissionId)
+  .map((assignment, index) => ({
+    id: `fbk_demo_${String(index + 1).padStart(2, '0')}`,
+    assignmentId: assignment.id,
+    submissionId: assignment.latestSubmissionId!,
+    teacherId: 'usr_teacher_lin',
+    decision: 'approved',
+    score: 90,
+    textComment: '完成认真，继续保持。',
+    publishedAt: taskStartsAt,
+  }))
 
 export const initialState: AppState = {
   users: [
-    { id: 'usr_student_xiaoyu', displayName: '小宇', role: 'student', classId: 'cls_grade3_2' },
+    ...demoStudents,
     { id: 'usr_teacher_lin', displayName: '林老师', role: 'teacher', classId: 'cls_grade3_2' },
     { id: 'usr_parent_xiaoyu', displayName: '小宇家长', role: 'parent' },
   ],
@@ -17,9 +74,9 @@ export const initialState: AppState = {
     deliveryType: 'classroom',
     status: 'active',
     creatorTeacherId: 'usr_teacher_lin',
-    classId: 'cls_grade3_2',
-    startsAt: now,
-    dueAt: '2026-09-11T20:00:00+08:00',
+    classId: CLASS_ID,
+    startsAt: taskStartsAt,
+    dueAt: taskDueAt,
     description: '完成听力、跟读和单词练习后提交。',
     items: [
       { id: 'tki_listening', type: 'exercise', title: '听力练习', completionRule: '完成全部题目' },
@@ -28,11 +85,9 @@ export const initialState: AppState = {
     ],
     version: 1,
   }],
-  assignments: [
-    { id: 'asn_xiaoyu_animals', taskId: 'tsk_animals_listening', studentId: 'usr_student_xiaoyu', classId: 'cls_grade3_2', status: 'in_progress', progressPercent: 67, redoCount: 0 },
-  ],
-  submissions: [],
-  feedback: [],
+  assignments: demoAssignments,
+  submissions: demoSubmissions,
+  feedback: demoFeedback,
 }
 
 function cloneState(source: AppState): AppState {

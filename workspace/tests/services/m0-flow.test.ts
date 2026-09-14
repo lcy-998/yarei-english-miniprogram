@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getCompletion, getHome, getParentFeedback, getTeacherTasks, publishClassroomTask, reviewSubmission, submitTask } from '../../miniprogram/services/app-service'
-import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
+import { getState, initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 
 const STUDENT_ID = 'usr_student_xiaoyu'
 const TEACHER_ID = 'usr_teacher_lin'
@@ -14,6 +14,8 @@ describe('M0 teacher-student-parent flow', () => {
     expect(publishResult.ok).toBe(true)
     if (!publishResult.ok) return
     expect(publishResult.data.items.map((item) => item.type)).toEqual(['reading', 'vocabulary', 'exercise'])
+    expect(new Date(publishResult.data.dueAt).getTime()).toBeGreaterThan(new Date(publishResult.data.startsAt).getTime())
+    expect(getState().assignments.filter((item) => item.taskId === publishResult.data.id)).toHaveLength(36)
 
     const homeResult = await getHome(STUDENT_ID)
     expect(homeResult.ok).toBe(true)
@@ -48,8 +50,8 @@ describe('M0 teacher-student-parent flow', () => {
     const result = await getTeacherTasks(TEACHER_ID)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.data.pendingCount).toBe(0)
-    expect(result.data.progressByTask.tsk_animals_listening).toBe(67)
-    expect(result.data.pendingByTask.tsk_animals_listening).toBe(0)
+    expect(result.data.pendingCount).toBe(6)
+    expect(result.data.progressByTask.tsk_animals_listening).toBe(75)
+    expect(result.data.pendingByTask.tsk_animals_listening).toBe(6)
   })
 })

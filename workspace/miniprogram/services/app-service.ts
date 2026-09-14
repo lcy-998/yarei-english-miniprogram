@@ -130,7 +130,8 @@ export async function getTeacherTasks(userId: string): Promise<ServiceResult<{ t
   const pendingByTask: Record<string, number> = {}
   for (const taskId of taskIds) {
     const assignments = state.assignments.filter(item => item.taskId === taskId)
-    progressByTask[taskId] = assignments.length ? Math.round(assignments.reduce((total, item) => total + item.progressPercent, 0) / assignments.length) : 0
+    const submittedCount = assignments.filter(item => item.status === 'awaiting_review' || item.status === 'completed').length
+    progressByTask[taskId] = assignments.length ? Math.round(submittedCount * 100 / assignments.length) : 0
     pendingByTask[taskId] = assignments.filter(item => item.status === 'awaiting_review').length
   }
   return ok({ tasks: manageableTasks, pendingCount, progressByTask, pendingByTask })
@@ -166,6 +167,10 @@ export async function publishClassroomTask(userId: string, title: string, descri
   if (!user || user.role !== 'teacher') return fail('FORBIDDEN', '仅教师可布置任务')
   if (!title.trim()) return fail('VALIDATION_ERROR', '请输入任务名称')
   const task = mutateState(draft => {
+    const startsAt = new Date()
+    const dueAt = new Date(startsAt)
+    dueAt.setHours(20, 0, 0, 0)
+    if (dueAt <= startsAt) dueAt.setDate(dueAt.getDate() + 1)
     const nextTask: Task = {
       id: id('tsk'),
       title: title.trim(),
@@ -173,8 +178,8 @@ export async function publishClassroomTask(userId: string, title: string, descri
       status: 'active',
       creatorTeacherId: user.id,
       classId: 'cls_grade3_2',
-      startsAt: new Date().toISOString(),
-      dueAt: '2026-09-11T20:00:00+08:00',
+      startsAt: startsAt.toISOString(),
+      dueAt: dueAt.toISOString(),
       description: description.trim(),
       items: [
         { id: id('tki_reading'), type: 'reading', title: '阅读练习', completionRule: '完成指定阅读内容' },
@@ -184,17 +189,20 @@ export async function publishClassroomTask(userId: string, title: string, descri
       version: 1,
     }
     draft.tasks.push(nextTask)
-    draft.assignments.push({ id: id('asn'), taskId: nextTask.id, studentId: 'usr_student_xiaoyu', classId: nextTask.classId, status: 'not_started', progressPercent: 0, redoCount: 0 })
+    const students = draft.users.filter(item => item.role === 'student' && item.classId === nextTask.classId)
+    draft.assignments.push(...students.map(student => ({ id: id('asn'), taskId: nextTask.id, studentId: student.id, classId: nextTask.classId, status: 'not_started' as const, progressPercent: 0, redoCount: 0 })))
     return nextTask
   })
   return ok(task.tasks[task.tasks.length - 1])
 }
 
-export async function reviewSubmission(userId: string, taskId: string, decision: 'approved' | 'returned', score: number, comment: string): Promise<ServiceResult<ReviewFeedback>> {
+export async function reviewSubmission(userId: string, taskId: string, decision: 'approved' | 'returned', score: number, comment: string, assignmentId?: string): Promise<ServiceResult<ReviewFeedback>> {
   const state = getState()
   const teacher = state.users.find(item => item.id === userId)
   const task = state.tasks.find(item => item.id === taskId)
-  const assignment = state.assignments.find(item => item.taskId === taskId)
+  const assignment = assignmentId
+    ? state.assignments.find(item => item.taskId === taskId && item.id === assignmentId)
+    : state.assignments.find(item => item.taskId === taskId && item.status === 'awaiting_review' && item.latestSubmissionId)
   const submission = assignment ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
   if (!teacher || !task || !canTeacherManageTask(teacher, task) || !assignment || !submission) return fail('FORBIDDEN', '当前提交不可点评')
   if (!canPublishReview(assignment, decision, comment)) return fail('VALIDATION_ERROR', '退回重做必须填写原因')
