@@ -88,6 +88,7 @@ export const initialState: AppState = {
   assignments: demoAssignments,
   submissions: demoSubmissions,
   feedback: demoFeedback,
+  operationReceipts: [],
 }
 
 function cloneState(source: AppState): AppState {

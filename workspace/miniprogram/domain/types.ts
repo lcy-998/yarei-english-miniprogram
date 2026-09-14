@@ -80,6 +80,16 @@ export interface ReviewFeedback {
   publishedAt: string
 }
 
+export type WriteOperationKind = 'publish_task' | 'save_submission_draft' | 'submit_task' | 'publish_review'
+
+export interface WriteOperationReceipt {
+  operationId: string
+  kind: WriteOperationKind
+  actorUserId: string
+  fingerprint: string
+  result: Task | Submission | ReviewFeedback
+}
+
 export interface AppState {
   users: UserAccount[]
   parentStudentLinks: ParentStudentLink[]
@@ -87,6 +97,7 @@ export interface AppState {
   assignments: TaskAssignment[]
   submissions: Submission[]
   feedback: ReviewFeedback[]
+  operationReceipts: WriteOperationReceipt[]
 }
 
 export interface ServiceError {
