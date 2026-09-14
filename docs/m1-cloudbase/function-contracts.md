@@ -175,7 +175,7 @@ studentId 只取可信上下文。`localDate` 只是用户视图请求，服务�
 
 ### 3.10 `content-query`
 
-M1 只提供基础阅读/单词查询：`listReadingResources`、`getReadingResource`、`listVocabularyPacks`、`getVocabularyPack`。只返回已上架、组织/班级授权内容；任务历史内容从 task snapshot 读取。M2/M3 的媒体、题库、AI 不在此函数提前实现。
+M1 只提供基础阅读/单词查询：`listReadingResources`、`getReadingResource`、`listVocabularyPacks`、`getVocabularyPack`。`getReadingResource` 返回章节、页码、页序、缩略图/高清页图资产描述、图片尺寸、版本和进度所需标识，不返回供 S-04 另行排版展示的正文块；OCR/结构化文本仅作为服务端搜索、无障碍和后续点读映射数据。只返回已上架、组织/班级授权内容；任务历史内容从 task snapshot 读取。M2/M3 的媒体、题库、AI 不在此函数提前实现。
 
 ### 3.11 `organization-admin`
 

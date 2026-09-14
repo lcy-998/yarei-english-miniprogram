@@ -134,6 +134,8 @@ M1 只包含基础阅读和单词的虚构/已授权占位内容。
 
 最小字段：`_id`、`organizationId`、`type: reading|vocabulary|exercise`、`title`、`contentVersion`、`status: draft|published|offline`、`visibilityScope`、`payload`（按类型判别的结构化对象）、`copyrightStatus: demo|verified`、通用字段。
 
+阅读资源的 `payload` 在 M1 至少包含章节与页面顺序、每页缩略图/高清页图的稳定资产键或文件 ID、图片尺寸及版本。OCR/结构化文本可作为搜索、无障碍和后续点读映射数据保留，但不得作为 S-04 的独立可见正文；M3 再在页面记录上补充归一化点读热区、音频片段和跟读文本关联。
+
 索引：`organizationId + type + status + updatedAt`。M1 种子只允许 `copyrightStatus: demo`，不得导入 asset/output 中的真实或待确认教材。
 
 ### 3.11 `tasks`
