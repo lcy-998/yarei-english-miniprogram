@@ -23,7 +23,7 @@
 | P-04 | `04-pages/history/P-04/v002.png` | 补充切换身份固定入口 |
 | S-02 | `04-pages/history/S-02/v003.png` | 音节分隔改为连字符 |
 | S-03 | `04-pages/history/S-03/v003.png` | 对齐统一阅读演示数据；保持母版完整尺寸 |
-| S-04 | `04-pages/history/S-04/v003.png` | 大幅绘本页图为可见主体；不另行显示抽取正文 |
+| S-04 | `04-pages/current/S-04.png` | 用户已批准大幅绘本页图为可见主体；不另行显示抽取正文 |
 | G-02 | `04-pages/history/G-02/v001.png` | 保留原稿 |
 | T-02 | `04-pages/history/T-02/v001.png` | 保留原稿 |
 | T-03 | `04-pages/history/T-03/v002.png` | 移除 M2 打卡、作品与趋势承诺 |
