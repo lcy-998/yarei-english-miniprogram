@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const workspaceRoot = resolve(import.meta.dirname, '..')
@@ -16,6 +16,7 @@ const qaChecklistPath = join(visualRoot, '07-handoff', 'visual-qa-checklist.md')
 const assetManifestPath = join(visualRoot, '03-assets', 'asset-manifest.json')
 const currentPagesRoot = join(visualRoot, '04-pages', 'current')
 const productionAssetsRoot = join(visualRoot, '03-assets', 'production')
+const miniprogramRoot = join(workspaceRoot, 'miniprogram')
 
 const requiredM0Pages = [
   'P-01', 'P-02', 'S-01', 'S-08', 'S-09', 'G-01', 'G-03',
@@ -29,6 +30,10 @@ const requiredProductionAssets = [
 const failures = []
 const expect = (condition, message) => { if (!condition) failures.push(message) }
 const read = (path) => existsSync(path) ? readFileSync(path, 'utf8') : ''
+const walkFiles = (root) => readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+  const path = join(root, entry.name)
+  return entry.isDirectory() ? walkFiles(path) : [path]
+})
 
 for (const [label, path] of [
   ['视觉系统基线', baselinePath],
@@ -74,6 +79,14 @@ if (existsSync(assetManifestPath)) {
     .map((asset) => asset.production?.split('/').at(-1)))
   for (const assetName of requiredProductionAssets) {
     expect(readyAssets.has(assetName), `素材清单未登记为 production-ready：${assetName}`)
+  }
+}
+
+for (const wxmlPath of walkFiles(miniprogramRoot).filter((path) => path.endsWith('.wxml'))) {
+  const source = read(wxmlPath)
+  for (const match of source.matchAll(/<image\b[^>]*\bsrc=["'](\/[^"']+)["']/g)) {
+    const assetPath = join(miniprogramRoot, match[1].slice(1))
+    expect(existsSync(assetPath), `小程序页面引用了不存在的本地图片：${match[1]}（${wxmlPath}）`)
   }
 }
 

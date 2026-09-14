@@ -1,9 +1,9 @@
 <view class="page">
-  <image class="page-bg" src="/assets/visual-v2/nature-background-vivid-v2.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.png" mode="scaleToFill" aria-hidden="true"></image>
   <app-header title="布置课堂任务" back="{{true}}"></app-header>
   <view class="content">
     <view class="steps"><view class="step active"><text>1</text><text>任务内容</text></view><view class="step-line active"></view><view class="step active"><text>2</text><text>发布对象</text></view><view class="step-line active"></view><view class="step active"><text>3</text><text>确认发布</text></view></view>
-    <view class="section content-section"><view class="section-head"><view><text class="section-title">任务内容</text><text class="section-note">已选用 M0 演示资源</text></view><image src="/assets/visual-v2/task-generic.png" mode="aspectFit"></image></view><view class="selected-content"><view class="selected-mark"></view><view><text>英语课堂综合练习</text><text>阅读、单词和习题 · 共 3 项</text></view><text>已选择</text></view></view>
+    <view class="section content-section"><view class="section-head"><view><text class="section-title">任务内容</text><text class="section-note">已选用 M0 演示资源</text></view><g0-icon name="task" size="70"></g0-icon></view><view class="selected-content"><view class="selected-mark"></view><view><text>英语课堂综合练习</text><text>阅读、单词和习题 · 共 3 项</text></view><text>已选择</text></view></view>
     <view class="section"><text class="section-title">任务名称</text><input value="{{title}}" bindinput="onTitle" placeholder="例如：本周阅读与跟读"/><text class="field-label">学生可见要求</text><textarea value="{{description}}" bindinput="onDescription" placeholder="写下完成要求"></textarea></view>
     <view class="summary"><view class="summary-title"><text>发布设置</text><text>固定演示数据</text></view><view class="summary-row"><text>发布对象</text><text>三年级 2 班 · 小宇等 36 人</text></view><view class="summary-row"><text>截止时间</text><text>今天 20:00</text></view></view>
     <view class="preview"><text class="section-title">发布预览</text><text>{{title || '填写任务名称后在这里预览'}}</text><text>{{description || '学生将在任务详情中看到完成要求'}}</text></view>
