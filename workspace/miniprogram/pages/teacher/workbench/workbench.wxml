@@ -7,9 +7,9 @@
     <view class="greeting-row"><text>林老师，上午好</text><button data-label="班级筛选" bindtap="openFuture">全部负责班级<view class="filter-arrow" aria-hidden="true"></view></button></view>
 
     <view class="quick-grid">
-      <button class="quick quick--blue" bindtap="goPublish"><g0-icon name="publish" size="{{54}}"></g0-icon><text>布置任务</text></button>
-      <button class="quick quick--green" bindtap="goCenter"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></button>
-      <button class="quick quick--purple" bindtap="goReview"><g0-icon name="review" tone="ai" size="{{54}}"></g0-icon><text>快速点评</text></button>
+      <view class="quick quick--blue" bindtap="goPublish" aria-role="button"><g0-icon name="publish" size="{{54}}"></g0-icon><text>布置任务</text></view>
+      <view class="quick quick--green" bindtap="goCenter" aria-role="button"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></view>
+      <view class="quick quick--purple" bindtap="goReview" aria-role="button"><g0-icon name="review" tone="ai" size="{{54}}"></g0-icon><text>快速点评</text></view>
     </view>
 
     <view class="today-card">
