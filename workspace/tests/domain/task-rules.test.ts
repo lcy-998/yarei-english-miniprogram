@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canPublishReview, canSubmitAssignment, getTodayTask, nextAssignmentStatusAfterSubmit } from '../../miniprogram/domain/task-rules'
+import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayTask, hasReachedRedoLimit, nextAssignmentStatusAfterSubmit } from '../../miniprogram/domain/task-rules'
 import { Task, TaskAssignment } from '../../miniprogram/domain/types'
 
 const assignment = (status: TaskAssignment['status']): TaskAssignment => ({ id: 'asn_demo', taskId: 'tsk_demo', studentId: 'usr_student', classId: 'cls_demo', status, progressPercent: 0, redoCount: 0 })
@@ -7,11 +7,25 @@ const task = (id: string, dueAt: string): Task => ({ id, title: id, deliveryType
 
 describe('M0 task rules', () => {
   it('allows submission only while an assignment is actionable', () => {
-    expect(canSubmitAssignment(assignment('not_started'))).toBe(true)
-    expect(canSubmitAssignment(assignment('in_progress'))).toBe(true)
-    expect(canSubmitAssignment(assignment('redo_required'))).toBe(true)
-    expect(canSubmitAssignment(assignment('awaiting_review'))).toBe(false)
+    const now = '2026-09-14T08:00:00.000Z'
+    expect(canSubmitAssignment(assignment('not_started'), now)).toBe(true)
+    expect(canSubmitAssignment(assignment('in_progress'), now)).toBe(true)
+    expect(canSubmitAssignment({ ...assignment('redo_required'), redoDueAt: '2026-09-17T08:00:00.000Z' }, now)).toBe(true)
+    expect(canSubmitAssignment(assignment('awaiting_review'), now)).toBe(false)
     expect(nextAssignmentStatusAfterSubmit()).toBe('awaiting_review')
+  })
+
+  it('calculates and enforces the fixed three-day redo period', () => {
+    const redoDueAt = getRedoDueAt('2026-09-14T08:30:00.000Z')
+    const redoAssignment = { ...assignment('redo_required'), redoDueAt }
+    expect(redoDueAt).toBe('2026-09-17T08:30:00.000Z')
+    expect(canSubmitAssignment(redoAssignment, redoDueAt)).toBe(true)
+    expect(canSubmitAssignment(redoAssignment, '2026-09-17T08:30:00.001Z')).toBe(false)
+  })
+
+  it('recognizes the two-return limit', () => {
+    expect(hasReachedRedoLimit({ ...assignment('awaiting_review'), redoCount: 1 })).toBe(false)
+    expect(hasReachedRedoLimit({ ...assignment('awaiting_review'), redoCount: 2 })).toBe(true)
   })
 
   it('requires a reason when a teacher returns work', () => {

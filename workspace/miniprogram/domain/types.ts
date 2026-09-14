@@ -48,6 +48,7 @@ export interface TaskAssignment {
   progressPercent: number
   latestSubmissionId?: string
   redoCount: number
+  redoDueAt?: string
   submittedAt?: string
   reviewedAt?: string
 }
@@ -89,7 +90,7 @@ export interface AppState {
 }
 
 export interface ServiceError {
-  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'NETWORK_ERROR'
+  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'TASK_NOT_SUBMITTABLE' | 'REDO_LIMIT_REACHED' | 'NETWORK_ERROR'
   message: string
   retryable: boolean
 }

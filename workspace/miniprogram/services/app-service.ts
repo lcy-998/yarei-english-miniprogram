@@ -1,11 +1,12 @@
-import { canPublishReview, canSubmitAssignment, getTodayTask, nextAssignmentStatusAfterSubmit } from '../domain/task-rules'
+import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayTask, hasReachedRedoLimit, nextAssignmentStatusAfterSubmit } from '../domain/task-rules'
 import { getState, mutateState } from '../repositories/memory/mock-state'
-import { AppState, HomeView, ReviewFeedback, Role, ServiceResult, Session, Submission, Task, TaskDetailView, UserAccount } from '../domain/types'
+import { AppState, HomeView, ReviewFeedback, Role, ServiceError, ServiceResult, Session, Submission, Task, TaskDetailView, UserAccount } from '../domain/types'
+import { Clock, systemClock } from './clock'
 
 const id = (prefix: string): string => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
 
 function ok<T>(data: T): ServiceResult<T> { return { ok: true, data } }
-function fail<T>(code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'NETWORK_ERROR', message: string, retryable = false): ServiceResult<T> { return { ok: false, error: { code, message, retryable } } }
+function fail<T>(code: ServiceError['code'], message: string, retryable = false): ServiceResult<T> { return { ok: false, error: { code, message, retryable } } }
 
 function canTeacherManageTask(teacher: UserAccount, task: Task): boolean {
   return teacher.role === 'teacher' && (task.creatorTeacherId === teacher.id || teacher.classId === task.classId)
@@ -104,16 +105,24 @@ export async function saveDraft(userId: string, taskId: string, answer: string):
   return saved ? ok(saved) : fail('CONFLICT', '草稿保存失败，请重试', true)
 }
 
-export async function submitTask(userId: string, taskId: string, answer: string): Promise<ServiceResult<Submission>> {
+export async function submitTask(userId: string, taskId: string, answer: string, clock: Clock = systemClock): Promise<ServiceResult<Submission>> {
   const state = getState()
   const assignment = state.assignments.find(item => item.taskId === taskId && item.studentId === userId)
-  if (!assignment || !canSubmitAssignment(assignment)) return fail('FORBIDDEN', '当前任务不可提交')
+  if (!assignment) return fail('FORBIDDEN', '当前任务不可提交')
+  const now = clock.now()
+  if (!canSubmitAssignment(assignment, now.toISOString())) return fail('TASK_NOT_SUBMITTABLE', '当前任务不可提交')
   const existing = state.submissions.filter(item => item.assignmentId === assignment.id).sort((a, b) => b.version - a.version)[0]
   const next = mutateState(draft => {
-    const submission: Submission = { id: id('sub'), assignmentId: assignment.id, studentId: userId, version: (existing?.version ?? 0) + 1, status: 'submitted', answers: [{ taskItemId: 'tki_reading', value: answer }], submittedAt: new Date().toISOString() }
+    const submission: Submission = { id: id('sub'), assignmentId: assignment.id, studentId: userId, version: (existing?.version ?? 0) + 1, status: 'submitted', answers: [{ taskItemId: 'tki_reading', value: answer }], submittedAt: now.toISOString() }
     draft.submissions.push(submission)
     const item = draft.assignments.find(current => current.id === assignment.id)
-    if (item) { item.status = nextAssignmentStatusAfterSubmit(); item.progressPercent = 100; item.latestSubmissionId = submission.id; item.submittedAt = submission.submittedAt }
+    if (item) {
+      item.status = nextAssignmentStatusAfterSubmit()
+      item.progressPercent = 100
+      item.latestSubmissionId = submission.id
+      item.redoDueAt = undefined
+      item.submittedAt = submission.submittedAt
+    }
     return submission
   })
   return ok(next.submissions[next.submissions.length - 1])
@@ -196,7 +205,7 @@ export async function publishClassroomTask(userId: string, title: string, descri
   return ok(task.tasks[task.tasks.length - 1])
 }
 
-export async function reviewSubmission(userId: string, taskId: string, decision: 'approved' | 'returned', score: number, comment: string, assignmentId?: string): Promise<ServiceResult<ReviewFeedback>> {
+export async function reviewSubmission(userId: string, taskId: string, decision: 'approved' | 'returned', score: number, comment: string, assignmentId?: string, clock: Clock = systemClock): Promise<ServiceResult<ReviewFeedback>> {
   const state = getState()
   const teacher = state.users.find(item => item.id === userId)
   const task = state.tasks.find(item => item.id === taskId)
@@ -205,12 +214,25 @@ export async function reviewSubmission(userId: string, taskId: string, decision:
     : state.assignments.find(item => item.taskId === taskId && item.status === 'awaiting_review' && item.latestSubmissionId)
   const submission = assignment ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
   if (!teacher || !task || !canTeacherManageTask(teacher, task) || !assignment || !submission) return fail('FORBIDDEN', '当前提交不可点评')
+  if (decision === 'returned' && hasReachedRedoLimit(assignment)) return fail('REDO_LIMIT_REACHED', '该任务已达到退回重做次数上限')
   if (!canPublishReview(assignment, decision, comment)) return fail('VALIDATION_ERROR', '退回重做必须填写原因')
+  const publishedAt = clock.now().toISOString()
   const next = mutateState(draft => {
-    const feedback: ReviewFeedback = { id: id('fbk'), assignmentId: assignment.id, submissionId: submission.id, teacherId: teacher.id, decision, score: Math.max(0, Math.min(100, score)), textComment: comment.trim(), returnReason: decision === 'returned' ? comment.trim() : undefined, publishedAt: new Date().toISOString() }
+    const feedback: ReviewFeedback = { id: id('fbk'), assignmentId: assignment.id, submissionId: submission.id, teacherId: teacher.id, decision, score: Math.max(0, Math.min(100, score)), textComment: comment.trim(), returnReason: decision === 'returned' ? comment.trim() : undefined, publishedAt }
     draft.feedback.push(feedback)
     const target = draft.assignments.find(item => item.id === assignment.id)
-    if (target) { target.status = decision === 'approved' ? 'completed' : 'redo_required'; target.reviewedAt = feedback.publishedAt; if (decision === 'returned') target.redoCount += 1 }
+    const targetSubmission = draft.submissions.find(item => item.id === submission.id)
+    if (targetSubmission) targetSubmission.status = decision === 'approved' ? 'reviewed' : 'returned'
+    if (target) {
+      target.status = decision === 'approved' ? 'completed' : 'redo_required'
+      target.reviewedAt = feedback.publishedAt
+      if (decision === 'returned') {
+        target.redoCount += 1
+        target.redoDueAt = getRedoDueAt(feedback.publishedAt)
+      } else {
+        target.redoDueAt = undefined
+      }
+    }
     return feedback
   })
   return ok(next.feedback[next.feedback.length - 1])
