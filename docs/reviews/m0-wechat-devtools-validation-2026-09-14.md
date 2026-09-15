@@ -239,3 +239,13 @@ MCP 恢复后，“最终源码状态的模拟器刷新、currentPage、Console/
 - T-17 进入点评：104×42，不再挤压 27/36 统计；`output/m0-validation/2026-09-15/T-17-review-action-aligned-v2.png`。
 - T-08 退回 / 通过并点评：72×40、108×40；`output/m0-validation/2026-09-15/T-08-review-actions-aligned.png`。
 - S-09 保存草稿 / 提交任务：168×52、171×52；`output/m0-validation/2026-09-15/S-09-actions-aligned.png`。
+
+## 14. 点评输入、S-08 返回与家长报告入口
+
+2026-09-15 用户继续复核三个控件问题，本轮按同一套公共控件原则修正：
+
+- T-08“本次点评”数值输入框明确为 310×48、行高 48px；评语输入框提高为 310×96，并设置 15px 字号和 1.55 行高。截图：`output/m0-validation/2026-09-15/T-08-editor-height-fixed.png`。
+- S-08 由学生底部“我的”通过 `reLaunch` 进入时，页面栈实测只有一层。公共 `app-header` 新增可选 `backUrl`；有历史栈时继续 `navigateBack`，单层栈时 S-08 使用 `/pages/index/index` 兜底。返回前截图：`S-08-before-back.png`；点击后 `currentPage=pages/index/index`，截图：`S-08-back-returned-home.png`。
+- G-01“查看学习报告”从原生 `button` 改为保留按钮语义和原点击反馈的 `view`，增加右侧自动间距和固定内容宽度。模拟器位置为 `left≈214.6`、`width=138`，入口回到概览行右侧。截图：`G-01-report-link-aligned.png`。
+
+临时虚构会话参数在取证后已删除；没有新增正式场景开关或提前实现学习报告页面。

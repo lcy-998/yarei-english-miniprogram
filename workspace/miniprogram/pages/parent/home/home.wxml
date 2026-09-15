@@ -16,7 +16,7 @@
         <view class="overview-metric overview-metric--success"><g0-icon name="check" tone="success" size="{{52}}"></g0-icon><view><text>本周完成率</text><text>{{completionRate}}%</text></view></view>
         <view class="overview-metric overview-metric--primary"><g0-icon name="task" size="{{52}}"></g0-icon><view><text>待办任务</text><text>{{pendingCount}}</text></view></view>
       </view>
-      <view class="overdue-row"><view><g0-icon name="task" tone="warning" size="{{38}}"></g0-icon><text>逾期任务</text><text>{{overdueCount}}</text></view><button class="report-link" data-label="学习报告" bindtap="openFuture">查看学习报告<view class="mini-arrow" aria-hidden="true"></view></button></view>
+      <view class="overdue-row"><view><g0-icon name="task" tone="warning" size="{{38}}"></g0-icon><text>逾期任务</text><text>{{overdueCount}}</text></view><view class="report-link" data-label="学习报告" bindtap="openFuture" aria-role="button">查看学习报告<view class="mini-arrow" aria-hidden="true"></view></view></view>
     </view>
 
     <view class="section-card">

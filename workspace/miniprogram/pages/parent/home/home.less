@@ -31,7 +31,7 @@
 .overdue-row > view,.report-link { display: flex; align-items: center; gap: 7px; }
 .overdue-row > view > text:nth-child(2) { color: @yr-urgent; font-size: 14px; font-weight: 800; }
 .overdue-row > view > text:last-child { color: @yr-urgent; font-size: 19px; font-weight: 900; }
-.report-link { min-height: 38px; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.report-link { flex: 0 0 auto; min-width: 126px; min-height: 38px; margin-left: auto; padding-left: 12px; justify-content: flex-end; color: @yr-brand-primary; font-size: 13px; font-weight: 800; white-space: nowrap; }
 
 .section-card,.feedback-card { width: auto; margin-top: 10px; padding: 10px 12px; box-sizing: border-box; border: @yr-card-border; border-radius: @yr-radius-role-card; background: rgba(255,249,240,.97); box-shadow: @yr-card-shadow; text-align: left; }
 .section-head,.feedback-head { display: flex; align-items: center; justify-content: space-between; }

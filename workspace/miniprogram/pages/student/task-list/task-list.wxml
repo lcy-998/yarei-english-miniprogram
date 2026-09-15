@@ -1,6 +1,6 @@
 <view class="page page--secondary">
   <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
-  <app-header title="我的任务" back="{{true}}"></app-header>
+  <app-header title="我的任务" back="{{true}}" backUrl="/pages/index/index"></app-header>
   <state-panel wx:if="{{loading}}" state="loading"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTasks"></state-panel>
   <view wx:else class="content">
