@@ -17,6 +17,6 @@
     </view>
     <view wx:if="{{detail.feedback}}" class="feedback"><g0-icon name="review" tone="ai" size="54"></g0-icon><view><text class="section-title">教师反馈</text><text class="score">{{detail.feedback.score}} 分</text><text>{{detail.feedback.textComment}}</text></view></view>
     <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="section"><text class="section-title">学习记录</text><textarea value="{{answer}}" maxlength="200" placeholder="写下你的学习收获或完成情况" bindinput="onAnswer"></textarea></view>
-    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="actions"><button class="secondary" loading="{{saving}}" bindtap="onSave">保存草稿</button><button class="primary" loading="{{submitting}}" bindtap="onSubmit">提交任务</button></view>
+    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="actions"><view class="task-action secondary" bindtap="onSave" aria-role="button">{{saving ? '保存中…' : '保存草稿'}}</view><view class="task-action primary" bindtap="onSubmit" aria-role="button">{{submitting ? '提交中…' : '提交任务'}}</view></view>
   </view>
 </view>

@@ -19,7 +19,8 @@
 .selected-content > view text:first-child { display: block; color: @yr-text-primary; font-size: 14px; font-weight: 800; }
 .selected-content > view text:last-child { display: block; margin-top: 4px; color: @yr-text-secondary; font-size: 11px; }
 .selected-content > text:last-child { color: @yr-success; font-size: 12px; font-weight: 800; }
-.section input,.section textarea { width: 100%; margin-top: 13px; padding: 13px 14px; box-sizing: border-box; border: 1px solid @yr-border-subtle; border-radius: @yr-radius-control; background: @yr-surface-blue-100; }
+.section input { width: 100%; height: 52px; margin-top: 13px; padding: 0 16px; box-sizing: border-box; border: 1px solid @yr-border-subtle; border-radius: @yr-radius-control; background: @yr-surface-blue-100; font-size: 15px; line-height: 52px; }
+.section textarea { width: 100%; margin-top: 13px; padding: 13px 14px; box-sizing: border-box; border: 1px solid @yr-border-subtle; border-radius: @yr-radius-control; background: @yr-surface-blue-100; font-size: 15px; line-height: 1.55; }
 .field-label { display: block; margin-top: 20px; color: @yr-text-primary; font-size: 15px; font-weight: 800; }
 .section textarea { height: 112px; }
 .summary-title { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid @yr-border-light; }
@@ -31,4 +32,4 @@
 .preview > text:last-child { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 12px; line-height: 1.6; }
 .error { display: block; margin: 12px 4px 0; color: @yr-warning; }
 .action-bar { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); box-sizing: border-box; border-top: 1px solid @yr-border-subtle; background: rgba(255, 255, 255, .96); box-shadow: 0 -8px 24px rgba(7,30,73,.09); }
-.primary { width: 100%; height: 52px; margin: 0; border-radius: 26px; .yr-primary-action(); font-weight: 900; }
+.primary { width: 100%; height: 52px; margin: 0; border-radius: 26px; .yr-primary-action(); .yr-control-content-center(); font-weight: 900; }

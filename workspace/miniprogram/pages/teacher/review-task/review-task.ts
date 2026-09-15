@@ -32,7 +32,7 @@ Component({
     },
     async publishReview(row: ReviewAssignmentView, decision: 'approved' | 'returned') {
       const session = getSession()
-      if (!session || !row.submissionId || row.submissionVersion === undefined) return
+      if (!session || !row.submissionId || row.submissionVersion === undefined || this.data.reviewingId) return
       const intentKey = `${row.assignmentId}:${decision}`
       const intentFingerprint = JSON.stringify({ taskId: this.data.taskId, assignmentId: row.assignmentId, submissionId: row.submissionId, submissionVersion: row.submissionVersion, decision, score: this.data.score, comment: this.data.comment.trim() })
       const currentIntent = this.data.reviewIntents[intentKey] ?? EMPTY_WRITE_INTENT
