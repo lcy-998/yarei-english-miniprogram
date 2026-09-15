@@ -1,8 +1,8 @@
 # M1 CloudBase 开发环境准备
 
-> 状态：设计草案，不代表 M1 已启动或环境已创建。当前主线仍是 M0。  
+> 状态：M0 已于 2026-09-15 验收，当前主线为 M1；本文件同时作为开发环境复核门禁。
 > 适用范围：仅 M1 后端核心闭环的开发/测试环境；不包含生产、提审、体验版、付费资源开通或真实数据。  
-> 基线：`DOCUMENTATION.md` / `product-requirements-core.md` 0.15.0、`docs/architecture.md`、`docs/service-contracts.md`。0.15.0 的视觉资料清理不改变本目录的 M1 后端范围。
+> 基线：`DOCUMENTATION.md` / `product-requirements-core.md` 0.18.0、`docs/architecture.md`、`docs/service-contracts.md`。
 
 ## 1. 已确定的腾讯云方案
 
@@ -11,7 +11,7 @@
 - **账号主体**：环境必须归属于雅睿英语实际运营主体实名认证的腾讯云主账号，不使用开发者个人账号。主账号只做开通、计费和紧急管理；日常使用 CAM 子用户。
 - **地域**：固定 `ap-shanghai`（上海）。当前 CloudBase 文档型数据库和手机号登录/验证码能力均明确支持上海；本项目不选新加坡 PostgreSQL，也不使用白名单地域。
 - **数据库**：CloudBase 文档型数据库，延续现有 repository 与文档快照设计。
-- **环境**：M1 前置阶段只创建一个 `yarei-m1-dev` 免费体验环境；不在 M0 期间创建付费测试环境。M0 退出后再创建独立 `yarei-m1-test` 个人版环境。
+- **环境**：M1 先使用一个 `yarei-m1-dev` 免费体验环境；独立 `yarei-m1-test` 个人版环境仅在用户另行确认购买后创建。
 - **计费**：开发环境选择免费体验版、关闭超限按量、不开资源包；腾讯云账号设置 50 元/月非生产预算，50%/80%/100% 告警。若账号不具备免费环境资格，停止在支付页，不自动购买。
 - **身份**：使用 CloudBase Authentication v2 托管账号密码。学生/家长/教师是注册用户（external/registered user），由管理员预创建；登录名使用已绑定手机号，密码不进入业务数据库。
 - **无自主注册**：客户端只调用 `Auth.signIn`，不提供 `signUp`。CloudBase 官方也不允许直接以“用户名+密码”注册；任何没有业务 `users + role_assignments` 映射的 CloudBase UID 即使存在，也无法进入产品。
@@ -20,15 +20,15 @@
 - **租户**：M1 一个环境只服务一个试点学校，但每条业务数据仍保留 `organizationId`，不删除未来多学校扩展边界。
 - **事务上限**：M1 单次任务发布最多 50 名学生；超出返回 `VALIDATION_ERROR`，不得静默分批。该限制只用于 M1 核心闭环，后续扩容需重新评审事务方案。
 
-详细控制台执行步骤见 `console-runbook.md`。真实个人信息、合规期限、M0 退出批准仍不是腾讯云技术可以代替决定的事项，继续列在 `open-questions.md`。
+详细控制台执行步骤见 `console-runbook.md`。现有任务记录表明开发环境、17 个空集合、默认拒绝规则、索引和 Auth 登录方式已配置；新 M1 任务必须在不输出 envId/账号信息的前提下先只读复核。真实个人信息与合规期限仍不是腾讯云技术可以代替决定的事项，继续列在 `open-questions.md`。
 
 ## 2. 环境拓扑
 
 | 逻辑用途 | 建议显示名 | 环境 ID | 数据 | 是否允许部署 |
 | --- | --- | --- | --- | --- |
 | 本地/M0 | `yarei-local-m0` | 不适用 | 现有内存虚构数据 | 不使用 CloudBase |
-| M1 开发 | `yarei-m1-dev` | 用户创建后填写本地 `.env.local` | 仅虚构种子 | 可由用户按 runbook 创建；不部署代码 |
-| M1 测试 | `yarei-m1-test` | M0 退出后创建独立环境 | 仅虚构测试数据 | 个人版购买必须单独确认支付 |
+| M1 开发 | `yarei-m1-dev` | 仅填入本机 `.env.local`，不得提交 | 仅虚构种子 | 已有环境待只读复核；部署须单独授权 |
+| M1 测试 | `yarei-m1-test` | 用户确认购买后创建独立环境 | 仅虚构测试数据 | 个人版购买必须单独确认支付 |
 | 预生产/生产 | 待命名 | 未创建 | 禁止在本任务使用 | 禁止 |
 
 上述别名与地域已经确定；真实 `envId` 仍不写入仓库。即使环境 ID 本身不是密钥，也通过本地环境变量注入，避免误部署到错误环境。
@@ -50,7 +50,7 @@
 
 ## 4. 本地准备（不登录、不部署）
 
-本目录提供以下安全模板：
+本目录提供以下安全模板，当前 `workspace/m1-cloudbase/` 已作为隔离的本地实现目录：
 
 - `templates/cloudbaserc.example.json`：仅声明计划函数与环境变量占位符。
 - `templates/.env.example`：只包含非秘密变量名和空占位值。
@@ -58,7 +58,7 @@
 - `templates/function-security-rules.example.json`：云函数调用的第一层门禁草案。
 - `templates/development-seed.example.json`：最小虚构闭环数据，不含账号凭据。
 
-准备方式：将示例文件复制到独立的 M1 后端工作目录后再填写本机 `.env.local`。本任务不在 `workspace/miniprogram` 中创建 CloudBase 适配器，也不安装 CLI 或 SDK。
+准备方式：需要联调时在 `workspace/m1-cloudbase/` 中创建被 Git 忽略的 `.env.local`，只由操作者在本机填写。M1 通过 repository adapter 接入，页面不得直接调用 CloudBase；未经授权不安装 CLI/SDK、不登录、不部署。
 
 若后续决定使用 CloudBase CLI，先由用户确认安装与账号授权，再按官方流程安装 `@cloudbase/cli`。`tcb login` 会触发账号授权，本任务禁止执行；任何 `tcb fn deploy`、数据库导入或规则发布同样禁止执行。
 

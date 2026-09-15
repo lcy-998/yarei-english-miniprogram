@@ -1,6 +1,6 @@
-# M1 CloudBase 前置设计索引
+# M1 CloudBase 设计与实施索引
 
-本目录是与 M0 并行但隔离的 M1 后端准备，不表示 M1 已开工，不覆盖权威产品/交互文档，也不要求修改 M0 页面。
+M0 已于 2026-09-15 经用户审批通过，M1 现已开工。本目录记录 M1 后端设计、实施门禁和验证要求，不覆盖权威产品/交互文档；M0 页面及 memory repository 继续保留为回退基线。
 
 | 文件 | 内容 |
 | --- | --- |
@@ -17,8 +17,8 @@
 
 权威顺序仍为 `DOCUMENTATION.md` 所定义顺序。本目录有冲突时服从 `product-requirements-core.md` 和 `page-interaction-spec.md`。
 
-本任务开始时读取的权威基线为 0.11.3；当前已复核至 0.15.0。后续的视觉资料清理没有改变 M1 后端核心闭环范围。本目录仍从属于权威产品与交互文档，且未修改任何权威文档。
+当前权威基线为 0.18.0。M1 只实现 `product-requirements-core.md` 与 `page-interaction-spec.md` 已列出的 M1 切片；付费、云端部署、规则发布、种子导入、真实账号/内容和生产动作仍需各自的明确授权。
 
-## 本地前置代码（2026-09-13）
+## 本地代码起点（2026-09-15）
 
-`workspace/m1-cloudbase/` 只实现 `m1.v1` 协议、错误映射、可信 actor 接口、幂等请求摘要、CloudBase adapter 边界和函数占位入口；不含 CloudBase SDK、envId、认证、数据库操作、种子导入或部署。请在该目录运行 `npm install`、`npm run typecheck`、`npm test`、`npm run check`。所有函数在未注入已评审的 CloudBase 运行时与业务 handler 前均返回 `SERVICE_UNAVAILABLE`，不得将其部署或接到 M0 页面。
+`workspace/m1-cloudbase/` 已实现 `m1.v1` 协议、错误映射、可信 actor 接口、幂等请求摘要、CloudBase adapter 边界和函数占位入口；尚不含 CloudBase SDK、envId、认证、数据库操作、种子导入或部署。请在该目录运行 `npm install`、`npm run typecheck`、`npm test`、`npm run check`。所有函数在未注入已评审的 CloudBase 运行时与业务 handler 前均返回 `SERVICE_UNAVAILABLE`。M1 首批应先完成严格 action schema、handler/database port 和 memory 合约测试，再经单独授权进入开发环境联调。
