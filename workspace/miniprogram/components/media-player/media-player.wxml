@@ -1,0 +1,19 @@
+<view class="media-player media-player--{{state}}" aria-label="{{title || '媒体播放器'}}">
+  <view class="media-player__heading">
+    <view><text class="media-player__title">{{title}}</text><status-badge wx:if="{{locked}}" tone="warning" icon="lock" label="不可快进"></status-badge></view>
+    <button class="media-player__mode {{earMode ? 'is-active' : ''}}" bindtap="onEarMode">磨耳朵</button>
+  </view>
+  <view wx:if="{{state === 'loading'}}" class="media-player__message">正在缓冲…</view>
+  <view wx:elif="{{state === 'error' || state === 'offline' || state === 'removed'}}" class="media-player__message media-player__message--error">
+    <visual-icon name="warning" size="28" label=""></visual-icon><text>{{state === 'removed' ? '资源已下架' : state === 'offline' ? '网络不可用' : '播放失败，已保留进度'}}</text><button bindtap="onRetry">重试</button>
+  </view>
+  <block wx:else>
+    <view class="media-player__timeline"><view class="media-player__verified" style="width:{{progress}}%"></view><view wx:if="{{locked}}" class="media-player__unverified"></view></view>
+    <view class="media-player__times"><text>{{currentTime}}</text><text>{{duration}}</text></view>
+    <view class="media-player__controls">
+      <button class="media-player__play" bindtap="onToggle" aria-label="{{playing ? '暂停' : '播放'}}"><visual-icon name="{{playing ? 'pause' : 'play'}}" size="28" label=""></visual-icon></button>
+      <button class="media-player__speed" bindtap="onSpeed">{{speed}}</button>
+      <text class="media-player__hint">{{locked ? '可暂停、调速和向后回放' : '可拖动播放进度'}}</text>
+    </view>
+  </block>
+</view>

@@ -56,3 +56,8 @@ button::after { border: 0; }
 .class-update > view:nth-child(2) text:first-child { color: @yr-text-primary; font-size: 17px; font-weight: 900; }
 .class-update > view:nth-child(2) text:last-child { margin-top: 3px; color: @yr-text-secondary; font-size: 11px; }
 .class-update > text { flex: 0 0 auto; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.workbench-class-filter { position: relative; z-index: 20; }
+.workbench-class-menu { position: absolute; z-index: 30; top: 50px; right: 0; width: 150px; padding: 6px; border-radius: 14px; background: #fff; box-shadow: 0 8px 18px rgba(7,30,73,.16); }
+.workbench-class-option { min-height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: @yr-text-primary; font-size: 12px; font-weight: 800; }
+.workbench-class-option.selected { background: @yr-surface-blue; color: @yr-brand-primary; }
+.greeting-row .filter-arrow.is-open { transform: rotate(225deg) translate(-1px,-1px); }

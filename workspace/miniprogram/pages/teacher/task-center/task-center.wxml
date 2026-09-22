@@ -17,5 +17,5 @@
     </view>
     <view wx:if="{{!tasks.length}}" class="empty">暂无已发布任务，使用上方入口创建第一项课堂任务。</view>
   </view>
-  <role-tabs role="teacher" active="tasks"></role-tabs>
+  <g0-tab-bar role="teacher" active="tasks"></g0-tab-bar>
 </view>

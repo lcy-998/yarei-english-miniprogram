@@ -24,7 +24,7 @@ Component({
       this.setData({ loading: false, home: result.data })
     },
     openTask() { const taskId = this.data.home?.task?.id; if (taskId) { setCurrentTaskId(taskId); wx.navigateTo({ url: '/pages/student/task-detail/task-detail' }) } },
-    openVocabulary() { wx.showToast({ title: '单词练习将在 M1 接入', icon: 'none' }) },
+    openVocabulary() { wx.navigateTo({ url: '/pages/student/word-practice/word-practice' }) },
     openNotice() { wx.showToast({ title: '暂无新通知', icon: 'none' }) },
   },
 })

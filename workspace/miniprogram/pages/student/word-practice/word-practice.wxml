@@ -1,0 +1,26 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page word-page">
+    <app-header title="单词练习" back="{{true}}" backUrl="/pages/index/index"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWord"></state-panel>
+    <view wx:elif="{{word}}" class="m1-content">
+      <view class="m1-card pack-card" bindtap="choosePack">
+        <view class="pack-copy"><text class="pack-title">{{word.packLabel}}</text><text>今日 {{word.todayCompleted}}/{{word.todayTotal}}</text></view>
+        <view class="pack-progress"><view class="m1-progress"><view style="width: {{word.masteredPercent}}%"></view></view><text>{{word.masteredPercent}}%</text></view>
+        <view class="m1-chevron"></view>
+      </view>
+      <view class="m1-card">
+        <view class="m1-tabs"><view class="m1-tab {{tab === 'learn' ? 'm1-tab--active' : ''}}" data-tab="learn" bindtap="setTab">学习</view><view class="m1-tab {{tab === 'practice' ? 'm1-tab--active' : ''}}" data-tab="practice" bindtap="setTab">练习</view><view class="m1-tab {{tab === 'wrong' ? 'm1-tab--active' : ''}}" data-tab="wrong" bindtap="setTab">错词</view></view>
+        <view wx:if="{{tab === 'wrong'}}" class="wrong-summary"><text>待复习错词</text><text>{{word.wrongCount}} 个</text><text>本轮从错词中生成练习，不修改词包内容。</text></view>
+        <view wx:elif="{{tab === 'practice'}}" class="word-card word-card--practice">
+          <text class="word-title">{{word.word}}</text><text class="syllables">音节：{{word.syllables}}</text><text class="question">请选择正确释义</text>
+          <view class="options"><button wx:for="{{word.options}}" wx:key="*this" class="option {{selected === item ? 'selected' : ''}} {{answered && item === word.correctOption ? 'correct' : ''}}" data-option="{{item}}" bindtap="selectOption">{{item}}</button></view>
+          <view wx:if="{{answered}}" class="answer-feedback {{correct ? 'is-correct' : ''}}">{{correct ? '回答正确，掌握度已更新' : '再看一遍释义，下一题会加入复习'}}</view>
+          <view class="m1-actions"><g0-button wx:if="{{answered}}" bind:action="nextWord">下一词</g0-button><g0-button wx:else bind:action="submitAnswer">提交答案</g0-button></view>
+        </view>
+        <view wx:else class="word-card"><view class="word-illustration">☀</view><text class="word-title">{{word.word}}</text><text class="syllables">音节：{{word.syllables}}</text><text class="meaning">{{word.meaning}}</text><text class="example">{{word.example}}</text></view>
+      </view>
+    </view>
+  </view>
+</g0-page-shell>
+

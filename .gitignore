@@ -14,9 +14,13 @@ build/
 # WeChat Developer Tools local state
 **/project.private.config.json
 *.wxapkg
+/wechatide-isolated-data/
+/wechatide-login-qr.jpg
+/tools/
 
 # Logs and caches
 *.log
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

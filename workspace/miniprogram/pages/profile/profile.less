@@ -1,0 +1,8 @@
+@import "../../styles/m1-pages.less";
+@import "../../styles/m1-alignment-fixes.less";
+.profile-card { display: grid; grid-template-columns: 68px minmax(0,1fr); align-items: center; gap: 12px 14px; }.profile-copy { min-width: 0; }.profile-copy text { display: block; margin-top: 3px; color: @yr-text-secondary; font-size: 13px; line-height: 1.45; }.profile-name { margin: 0 0 4px!important; color: @yr-text-primary!important; font-size: 25px!important; font-weight: 900; }.edit-button { grid-column: 2; width: 100%; margin: 0; padding: 0 14px; min-height: 40px; border-radius: 20px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }.edit-button::after,.logout::after { border: 0; }.logout { width: 100%; min-height: 52px; border-radius: 26px; background: rgba(255,255,255,.9); color: @yr-danger; font-size: 17px; font-weight: 900; box-shadow: @yr-card-shadow; }
+/* User review: distinguish profile, learning records and account settings surfaces. */
+.profile-card { background: linear-gradient(135deg,#fff9f0,#fffdf8); }
+.profile-card + .m1-card { background: linear-gradient(135deg,#eef7ff,#fff); }
+.profile-card + .m1-card + .m1-card { background: linear-gradient(135deg,#f2edff,#fff); }
+

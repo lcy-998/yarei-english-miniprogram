@@ -3,9 +3,9 @@
   <app-header title="选择身份" back="{{true}}"></app-header>
   <view class="card">
     <view class="card-brand"><image src="/assets/g0/brand-logo.png" class="crest" mode="aspectFit"></image><image src="/assets/g0/mascot-learning-blue.png" class="mascot" mode="widthFix"></image></view>
-    <text class="eyebrow">当前演示身份</text><text class="card-title">请选择本次使用的身份</text>
-    <view class="identity-card"><view class="avatar">{{avatarText}}</view><view class="identity-copy"><text class="name">{{name}}</text><text class="summary">{{roleSummary}}</text></view><view class="selected" aria-hidden="true"></view></view>
-    <text class="role">{{roleLabel}}</text>
-    <button class="primary" bindtap="enter">进入工作台</button>
+    <text class="eyebrow">{{name}}</text><text class="card-title">请选择本次使用的身份</text>
+    <view wx:for="{{roles}}" wx:key="role" class="identity-card" style="border-color: {{selectedRole === item.role ? '#1764d8' : 'transparent'}}" data-role="{{item.role}}" bindtap="chooseRole"><view class="avatar">{{avatarText}}</view><view class="identity-copy"><text class="name">{{item.label}}</text><text class="summary">{{item.summary}}</text></view><view wx:if="{{selectedRole === item.role}}" class="selected" aria-hidden="true"></view></view>
+    <text wx:if="{{error}}" class="role" style="color:#c93535;background:#fff0ea">{{error}}</text>
+    <button class="primary" bindtap="enter" loading="{{loading}}" disabled="{{!selectedRole}}">进入工作台</button>
   </view>
 </view>

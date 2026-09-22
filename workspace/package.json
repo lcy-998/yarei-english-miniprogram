@@ -7,9 +7,10 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "visual:check": "node tools/check-visual-contract.mjs",
     "visual:status": "node tools/check-visual-contract.mjs",
+    "admin:check": "npm --prefix admin-console run check",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run visual:check && npm run test"
+    "check": "npm run typecheck && npm run visual:check && npm run test && npm run admin:check"
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
@@ -24,5 +25,8 @@
     "miniprogram-api-typings": "^2.8.3-1",
     "typescript": "^5.9.2",
     "vitest": "^5.0.0"
+  },
+  "dependencies": {
+    "@cloudbase/js-sdk": "3.9.3"
   }
 }

@@ -15,6 +15,7 @@ Component({
     error: '',
     childName: '',
     childAvatarText: '',
+    childClassName: '',
     tasks: [] as ParentTaskListItem[],
     pendingCount: 0,
     completedCount: 0,
@@ -41,6 +42,7 @@ Component({
         loading: false,
         childName: result.data.child.displayName,
         childAvatarText: result.data.child.displayName.slice(-1),
+        childClassName: result.data.child.className ?? '班级信息暂未提供',
         tasks,
         pendingCount: summary.pendingCount,
         completedCount: summary.completedCount,
@@ -60,6 +62,9 @@ Component({
       if (!this.data.latestFeedbackTaskId) { wx.showToast({ title: '暂无新点评', icon: 'none' }); return }
       setCurrentTaskId(this.data.latestFeedbackTaskId)
       wx.navigateTo({ url: '/pages/parent/feedback/feedback' })
+    },
+    openChildren() {
+      wx.reLaunch({ url: '/pages/parent/children/children' })
     },
     showAllTasks() {
       wx.showToast({ title: this.data.tasks.length ? '当前已展示全部任务' : '暂无近期任务', icon: 'none' })

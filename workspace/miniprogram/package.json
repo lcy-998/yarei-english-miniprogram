@@ -1,0 +1,7 @@
+{
+  "name": "yarei-english-miniprogram-runtime",
+  "private": true,
+  "dependencies": {
+    "@cloudbase/js-sdk": "3.9.3"
+  }
+}

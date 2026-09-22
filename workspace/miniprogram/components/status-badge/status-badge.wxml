@@ -1,0 +1,4 @@
+<view class="status-badge status-badge--{{tone}}" role="status">
+  <visual-icon wx:if="{{icon}}" name="{{icon}}" size="14" label=""></visual-icon>
+  <text>{{label}}</text>
+</view>

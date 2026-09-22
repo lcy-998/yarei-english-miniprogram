@@ -2,10 +2,30 @@
   "name": "yarei-english-m1-cloudbase-local",
   "version": "0.1.0",
   "private": true,
-  "description": "雅睿英语 M1 CloudBase 本地前置骨架；不含环境配置或部署能力",
+  "description": "雅睿英语 M1 CloudBase 本地实现与离线部署构建；不含环境配置且不执行部署",
   "scripts": {
+    "build:functions": "node tools/build-cloud-functions.mjs",
+    "seed:validate": "node tools/run-seed-tool.mjs validate",
+    "seed:plan": "node tools/run-seed-tool.mjs plan",
+    "seed:hash": "node tools/run-seed-tool.mjs hash",
+    "seed:materialize-runtime": "node tools/run-cloud-runtime-seed-materializer.mjs",
+    "seed:cloud-operator": "node tools/run-cloud-seed-operator.mjs",
+    "cloud:smoke:auth": "node tools/run-authenticated-cloud-smoke.mjs",
+    "cloud:smoke:cross-org": "node tools/run-cross-organization-cloud-smoke.mjs",
+    "cloud:smoke:main-loop": "node tools/run-cloud-main-loop-smoke.mjs",
+    "cloud:smoke:revocation": "node tools/run-cloud-revocation-smoke.mjs",
+    "cloud:smoke:capacity": "node tools/run-cloud-capacity-smoke.mjs",
+    "cloud:smoke:admin-update-user": "node tools/run-cloud-admin-update-user-smoke.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "check": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@cloudbase/adapter-node": "2.0.0",
+    "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "@cloudbase/js-sdk": "3.9.3",
+    "@cloudbase/node-sdk": "3.18.3"
   }
 }

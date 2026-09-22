@@ -1,0 +1,14 @@
+<view class="recording-panel recording-panel--{{state}}" role="group" aria-label="录音">
+  <view class="recording-panel__summary">
+    <status-badge tone="{{state === 'recording' ? 'danger' : state === 'failed' ? 'danger' : state === 'success' ? 'success' : state === 'generating' ? 'ai' : 'primary'}}" label="{{state === 'idle' ? '未录制' : state === 'recording' ? '录音中' : state === 'local' ? '录音已保留' : state === 'uploading' ? '上传中' : state === 'generating' ? '评分生成中' : state === 'success' ? '评分完成' : '处理失败'}}"></status-badge>
+    <text>{{duration}}</text><text wx:if="{{attempt}}">第 {{attempt}}/{{maxAttempts}} 次</text>
+  </view>
+  <view wx:if="{{state === 'uploading' || state === 'generating'}}" class="recording-panel__progress"><view style="width:{{progress}}%"></view></view>
+  <view class="recording-panel__wave" aria-hidden="true"><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view><view class="wave-bar"></view></view>
+  <text wx:if="{{message}}" class="recording-panel__message">{{message}}</text>
+  <view class="recording-panel__actions">
+    <button wx:if="{{state === 'idle' || state === 'recording'}}" class="recording-panel__primary" bindtap="onPrimary"><visual-icon name="{{state === 'recording' ? 'stop' : 'microphone'}}" size="26" label=""></visual-icon><text>{{state === 'recording' ? '停止录音' : '开始录音'}}</text></button>
+    <block wx:elif="{{state === 'local' || state === 'success' || state === 'failed'}}"><button bindtap="onPlay">试听</button><button bindtap="onRedo">重录</button><button wx:if="{{state === 'failed'}}" bindtap="onRetry">重试</button></block>
+    <button wx:else disabled>处理中…</button>
+  </view>
+</view>

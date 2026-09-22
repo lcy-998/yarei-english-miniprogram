@@ -1,0 +1,9 @@
+<view class="filter-bar {{disabled ? 'filter-bar--disabled' : ''}}">
+  <view class="filter-bar__search">
+    <visual-icon name="search" size="20" label=""></visual-icon>
+    <input value="{{keyword}}" placeholder="{{placeholder}}" disabled="{{disabled}}" confirm-type="search" bindinput="onInput" bindconfirm="onSearch"></input>
+  </view>
+  <button class="filter-bar__filter" disabled="{{disabled}}" bindtap="onFilter" aria-label="筛选{{activeCount ? '，已选' + activeCount + '项' : ''}}">
+    <visual-icon name="filter" size="20" label=""></visual-icon><text>筛选</text><text wx:if="{{activeCount}}" class="filter-bar__count">{{activeCount}}</text>
+  </button>
+</view>

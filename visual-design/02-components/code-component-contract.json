@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "components": {
+    "visual-icon": {
+      "milestones": ["M2", "M3"],
+      "properties": ["name", "size", "label"],
+      "source": "workspace/miniprogram/components/visual-icon"
+    },
+    "status-badge": {
+      "milestones": ["M2", "M3"],
+      "properties": ["tone", "label", "icon"],
+      "tones": ["neutral", "primary", "success", "warning", "urgent", "danger", "ai"],
+      "source": "workspace/miniprogram/components/status-badge"
+    },
+    "filter-bar": {
+      "milestones": ["M2", "M3"],
+      "properties": ["keyword", "placeholder", "activeCount", "disabled"],
+      "events": ["change", "search", "filter"],
+      "source": "workspace/miniprogram/components/filter-bar"
+    },
+    "media-player": {
+      "milestones": ["M3"],
+      "properties": ["title", "playing", "progress", "currentTime", "duration", "speed", "locked", "earMode", "state"],
+      "states": ["ready", "loading", "error", "offline", "removed"],
+      "events": ["toggle", "speed", "earmode", "retry"],
+      "source": "workspace/miniprogram/components/media-player"
+    },
+    "recording-panel": {
+      "milestones": ["M3"],
+      "properties": ["state", "duration", "progress", "attempt", "maxAttempts", "message"],
+      "states": ["idle", "recording", "local", "uploading", "generating", "success", "failed"],
+      "events": ["primary", "play", "redo", "retry"],
+      "source": "workspace/miniprogram/components/recording-panel"
+    },
+    "admin-visual-foundation": {
+      "milestones": ["M2", "M3"],
+      "exports": ["SemanticStatus", "FilterToolbar", "ProgressBar", "SideDrawer", "ReviewCheckList"],
+      "source": "workspace/admin-console/src/components/visual-foundation.tsx"
+    }
+  }
+}

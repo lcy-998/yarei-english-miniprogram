@@ -1,0 +1,20 @@
+<g0-page-shell nature="{{true}}" tone="nature"><view class="page">
+  <app-header title="单词练习" back="{{true}}" backUrl="/pages/index/index"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadPack"></state-panel>
+  <view wx:elif="{{!pack}}" class="empty-card">暂无可用单词包</view>
+  <block wx:else>
+    <view class="pack-card"><view><text class="pack-title">{{pack.title}}</text><text class="pack-progress">今日 {{completedCount}}/{{pack.words.length}} · 正确率 {{correctRate}}% · 错词 {{wrongWords.length}}</text></view><view class="progress"><view style="width: {{completedCount * 100 / pack.words.length}}%"></view></view></view>
+    <view class="word-card">
+      <view class="mode-tabs"><button class="{{mode === 'study' ? 'active' : ''}}" data-mode="study" bindtap="selectMode">学习</button><button class="{{mode === 'practice' ? 'active' : ''}}" data-mode="practice" bindtap="selectMode">练习</button><button class="{{mode === 'wrong' ? 'active' : ''}}" data-mode="wrong" bindtap="selectMode">错词</button></view>
+      <block wx:if="{{mode !== 'wrong'}}">
+        <view class="word-visual"><view class="sun">☀</view><button class="sound" bindtap="playWord">⌕</button></view>
+        <text class="word">{{syllableLabel}}</text><text class="meaning" wx:if="{{mode === 'study'}}">{{pack.words[wordIndex].meaning}}</text>
+        <text class="example">{{pack.words[wordIndex].example}}</text>
+        <block wx:if="{{mode === 'practice'}}"><text class="prompt">请选择正确释义</text><view class="choices"><button data-meaning="{{pack.words[wordIndex].meaning}}" class="{{selectedMeaning === pack.words[wordIndex].meaning ? 'selected' : ''}}" bindtap="chooseMeaning">{{pack.words[wordIndex].meaning}}</button><button data-meaning="雨天" class="{{selectedMeaning === '雨天' ? 'selected' : ''}}" bindtap="chooseMeaning">雨天</button><button data-meaning="森林" class="{{selectedMeaning === '森林' ? 'selected' : ''}}" bindtap="chooseMeaning">森林</button></view><text wx:if="{{answered && answerCorrect}}" class="result success">回答正确</text><text wx:elif="{{answered}}" class="result danger">正确释义：{{pack.words[wordIndex].meaning}}</text></block>
+        <button class="primary" wx:if="{{!answered && mode === 'practice'}}" bindtap="submitAnswer">提交答案</button><button class="primary" wx:else bindtap="nextWord">下一个单词</button>
+      </block>
+      <view wx:else class="wrong-list"><text wx:if="{{!wrongWords.length}}">暂时没有错词，继续保持！</text><button wx:for="{{wrongWords}}" wx:key="id" data-id="{{item.id}}" bindtap="practiceWrong"><text>{{item.word}}</text><text>{{item.meaning}}</text><text>再次练习 ›</text></button></view>
+    </view>
+  </block>
+</view></g0-page-shell>

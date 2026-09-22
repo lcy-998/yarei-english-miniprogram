@@ -1,10 +1,11 @@
 import { failure, type RequestIdGenerator, type ResultClock } from '../../src/shared/result';
-import type { FunctionName, ServiceResult } from '../../src/shared/protocol';
+import type { FunctionName, FunctionRequest, JsonObject, ServiceResult } from '../../src/shared/protocol';
 import { parseFunctionRequest } from '../../src/shared/validation';
 
 export type PayloadValidator<TAction extends string> = (
   action: TAction,
   payload: Readonly<Record<string, unknown>>,
+  request: FunctionRequest<TAction, JsonObject>,
 ) => Readonly<Record<string, string>> | null;
 
 const SYSTEM_CLOCK: ResultClock = {
@@ -34,7 +35,7 @@ export function createUnconfiguredFunction<TAction extends string>(
     if (!parsed.ok) {
       return failure('VALIDATION_ERROR', meta, parsed.fieldErrors);
     }
-    const payloadErrors = validatePayload?.(parsed.value.action, parsed.value.payload);
+    const payloadErrors = validatePayload?.(parsed.value.action, parsed.value.payload, parsed.value);
     if (payloadErrors !== undefined && payloadErrors !== null) {
       return failure('VALIDATION_ERROR', meta, payloadErrors);
     }

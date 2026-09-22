@@ -1,4 +1,5 @@
 import { login } from '../../../services/app-service'
+import { postLoginPath, ROLE_SELECT_PATH } from '../../../session/auth-flow'
 import { saveSession } from '../../../session/session'
 
 Component({
@@ -13,7 +14,7 @@ Component({
     onMobile(event: WechatMiniprogram.Input) { this.setData({ mobile: event.detail.value }) },
     onPassword(event: WechatMiniprogram.Input) { this.setData({ password: event.detail.value }) },
     togglePassword() { this.setData({ showPassword: !this.data.showPassword }) },
-    forgotPassword() { wx.showToast({ title: '找回密码将在后续页面开放', icon: 'none' }) },
+    forgotPassword() { wx.navigateTo({ url: '/pages/auth/forgot-password/forgot-password' }) },
     async submit() {
       if (this.data.loading) return
       this.setData({ loading: true, error: '' })
@@ -21,7 +22,9 @@ Component({
       if (!result.ok) { this.setData({ loading: false, error: result.error.message }); return }
       saveSession(result.data)
       this.setData({ loading: false })
-      wx.redirectTo({ url: '/pages/auth/role-select/role-select' })
+      const url = postLoginPath(result.data)
+      if (url === ROLE_SELECT_PATH) wx.redirectTo({ url })
+      else wx.reLaunch({ url })
     },
   },
 })

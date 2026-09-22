@@ -22,7 +22,13 @@ export interface PlatformIdentity {
 }
 
 export interface TrustedActorResolver {
-  resolve(identity: PlatformIdentity, functionName: FunctionName): Promise<TrustedActorContext | null>;
+  resolve(identity: PlatformIdentity, functionName: FunctionName, sessionId: string | null): Promise<TrustedActorContext | null>;
+}
+
+export function isTrustedPlatformIdentity(identity: PlatformIdentity): boolean {
+  return identity.isAuthenticated
+    && identity.loginType !== 'UNKNOWN'
+    && identity.subject.trim().length > 0;
 }
 
 export function hasPermission(actor: TrustedActorContext, permission: string): boolean {
@@ -43,5 +49,5 @@ export function isAllowedRole(actor: TrustedActorContext, allowedRoles: readonly
  * accepting them as an authorization source.
  */
 export function hasUntrustedActorFields(payload: Readonly<Record<string, unknown>>): boolean {
-  return ['actorUserId', 'actorRole', 'organizationId', 'sessionId'].some((field) => field in payload);
+  return ['actorUserId', 'actorRole', 'organizationId', 'sessionId', 'businessSessionToken'].some((field) => field in payload);
 }

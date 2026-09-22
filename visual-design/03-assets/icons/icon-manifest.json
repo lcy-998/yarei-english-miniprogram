@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "grid": 24,
+  "strokeWidth": 2,
+  "style": "rounded-outline",
+  "color": "#1764D8",
+  "icons": ["play", "pause", "microphone", "stop", "headphones", "lock", "upload", "retry", "search", "filter", "check", "warning"]
+}

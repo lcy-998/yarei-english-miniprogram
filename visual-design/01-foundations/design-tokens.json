@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "baseline": "0.18.0",
+  "colors": {
+    "primary": "#1764D8",
+    "primaryPressed": "#0C4FB8",
+    "textPrimary": "#071E49",
+    "textSecondary": "#596987",
+    "success": "#1FA968",
+    "warning": "#F3B91C",
+    "urgent": "#E45A22",
+    "ai": "#6542CE",
+    "danger": "#D9342B",
+    "surface": "#FFF9F0",
+    "pageNeutral": "#F6F8FC",
+    "sky": "#76CBEF",
+    "border": "#D9E3F5"
+  },
+  "spacing": { "1": 4, "2": 8, "3": 12, "4": 16, "5": 20, "6": 24, "7": 28, "8": 32 },
+  "radius": { "studentCard": 24, "roleCard": 22, "adminCard": 14, "control": 14, "pill": 999 },
+  "size": { "miniProgramActionHeight": 52, "adminActionHeight": 44, "miniProgramTouchTarget": 44, "adminTouchTarget": 40 },
+  "shadow": { "card": "0 6px 18px rgba(7,30,73,.10)", "adminCard": "0 4px 12px rgba(7,30,73,.08)", "action": "0 8px 18px rgba(23,100,216,.24)" },
+  "viewport": { "miniProgramPrimary": "390x844", "miniProgramCompact": "375x812", "adminPrimary": "1440x900", "adminCompact": "1280x800", "adminTabletMinWidth": 768 }
+}

@@ -1,0 +1,14 @@
+@import "../../../styles/m1-pages.less";
+.word-brand-area { position: relative; z-index: 2; height: 154px; padding: 0 22px; box-sizing: border-box; }
+.word-brand-area .brand-line { height: 56px; display: flex; align-items: center; gap: 10px; }
+.word-brand-area .brand-line image { width: 42px; height: 48px; }
+.word-brand-area .brand-line text { color: @yr-text-primary; font-size: 21px; font-weight: 900; }
+.word-mascot { position: absolute; right: 24px; bottom: -20px; width: 132px; }
+.word-page > .m1-content { padding-top: 0; }
+.pack-card{display:flex;align-items:center;gap:10px}.pack-copy{flex:0 1 116px;min-width:102px}.pack-copy text{display:block;color:@yr-text-secondary;font-size:13px}.pack-title{overflow:hidden;color:@yr-text-primary!important;font-size:16px!important;font-weight:900;white-space:nowrap;text-overflow:ellipsis}.pack-progress{flex:1;min-width:56px}.pack-progress>text{display:block;margin-top:4px;text-align:right;color:@yr-brand-primary;font-size:12px;font-weight:800}.word-card{padding-top:20px;text-align:center}.word-illustration{width:100%;height:150px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(#8edbff,#fff4aa);font-size:84px}.word-title{display:block;margin-top:12px;color:@yr-text-primary;font-size:34px;font-weight:900}.syllables{display:block;margin-top:3px;color:@yr-brand-primary;font-size:14px;font-weight:800}.meaning{display:block;margin-top:5px;color:@yr-text-secondary;font-size:20px;font-weight:800}.example{display:block;margin-top:10px;padding:12px;border-radius:16px;background:@yr-surface-blue;color:@yr-text-primary;font-size:16px}.question{display:block;margin:18px 0 10px;color:@yr-text-primary;font-size:17px;font-weight:900}.options{display:flex;gap:8px}.option{flex:1;min-height:48px;margin:0;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:1px solid #c5d8f4;border-radius:15px;background:#fff;color:@yr-text-primary;font-weight:800;line-height:1.2;text-align:center}.option::after{border:0}.option.selected{border-color:@yr-brand-primary;background:@yr-surface-blue}.option.correct{border-color:@yr-success;background:@yr-surface-green;color:@yr-success}.answer-feedback{margin-top:12px;color:@yr-urgent;font-size:13px}.answer-feedback.is-correct{color:@yr-success}.wrong-summary{padding:34px 8px;text-align:center}.wrong-summary text{display:block;margin-top:7px;color:@yr-text-secondary}.wrong-summary text:nth-child(2){color:@yr-brand-primary;font-size:30px;font-weight:900}
+/* User review: keep S-02 focused on the exercise content. */
+.word-brand-area { display: none; }
+.word-card--practice .word-illustration,
+.word-card--practice .meaning,
+.word-card--practice .example { display: none; }
+

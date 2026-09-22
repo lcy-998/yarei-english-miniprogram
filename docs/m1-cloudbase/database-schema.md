@@ -47,6 +47,8 @@
 
 不在班级文档嵌入大数组的 `studentIds/teacherIds`；成员与授权独立存储，以避免数组膨胀和并发覆盖。
 
+`classes.version` 同时作为该班有效成员集合的并发 guard。创建成员、转班、停用或恢复 `class_memberships` 时，必须在同一事务内递增受影响班级的 `classes.version`；转班同时递增原班级和目标班级。按班级发布或修改已排期任务时，事务外先解析候选 membership 并记录班级版本，事务内仅按确定性 ID `get` 班级与候选 membership；班级版本变化即返回 `CONFLICT`，不得用旧候选集合生成不完整快照。无需新增独立 guard 集合。
+
 索引：
 
 - `organizationId + status + grade`
@@ -54,7 +56,9 @@
 
 ### 3.3 `users`
 
-最小字段：`_id`、`organizationId`、`displayName`、`displayNameMasked`、`avatarKey?`、`status: active|disabled`、`profileVersion`、通用字段。
+最小字段：`_id`、`organizationId`、`displayName`、`displayNameMasked`、`avatarKey?`、`status: active|disabled`、`profileVersion`、`authorizationVersion`（从 1 开始的用户级单调整数）、通用字段。
+
+`authorizationVersion` 是业务会话唯一使用的授权版本。每次成功的角色授权/撤销，以及会影响教师数据范围的 `teacher_class_grants` 授予/撤销，都必须在同一事务内对目标用户文档执行 CAS 并递增一次。会话 bootstrap、角色选择和 actor 解析不得再从单条授权记录的 `version` 推导或取最大值；会话中的旧版本一律立即拒绝。
 
 不得保存明文密码或可登录手机号。账号密码与手机号由 CloudBase Authentication v2 托管；业务库只可在 OQ-10 批准后保存页面确需的 `mobileMasked?`，且不能用于认证或查询完整号码。虚构种子不提供该字段。
 
@@ -132,11 +136,25 @@ CloudBase 当前控制台会把字段集合相同且方向相同、仅交换 `te
 
 M1 只包含基础阅读和单词的虚构/已授权占位内容。
 
-最小字段：`_id`、`organizationId`、`type: reading|vocabulary|exercise`、`title`、`contentVersion`、`status: draft|published|offline`、`visibilityScope`、`payload`（按类型判别的结构化对象）、`copyrightStatus: demo|verified`、通用字段。
+最小字段：`_id`、`organizationId`、`type: reading|vocabulary|exercise`、`title`、`contentVersion`、`status: draft|published|offline`、`visibilityScope`、`payload`（按类型判别的结构化对象）、`copyrightStatus: demo|verified`、通用字段。M1 学习进度服务使用同一资源文档的服务端访问投影：`allowedStudentIds`、阅读型 `pages[{id, chapterId, pageNumber}]`、单词型 `wordIds`；投影只能由内容/授权服务维护，客户端不得传入或改写。
 
 阅读资源的 `payload` 在 M1 至少包含章节与页面顺序、每页缩略图/高清页图的稳定资产键或文件 ID、图片尺寸及版本。OCR/结构化文本可作为搜索、无障碍和后续点读映射数据保留，但不得作为 S-04 的独立可见正文；M3 再在页面记录上补充归一化点读热区、音频片段和跟读文本关联。
 
 索引：`organizationId + type + status + updatedAt`。M1 种子只允许 `copyrightStatus: demo`，不得导入 asset/output 中的真实或待确认教材。
+
+### 3.10a `reading_progress`
+
+记录学生自主阅读的续读位置和收藏状态。最小字段：`_id`、`organizationId`、`studentId`、`resourceId`、`chapterId`、`pageId`、`pageNumber`、`favorite`、`updatedAt`、`version`、软删除字段。
+
+`_id` 由 `organizationId + studentId + resourceId` 确定性生成；服务端同时按这三个字段校验唯一归属。索引：`organizationId + studentId + resourceId`（唯一）。查询和写入必须使用可信会话中的学生身份；资源下架或学生不在资源授权投影中时不返回进度正文，也不允许更新。
+
+### 3.10b `vocabulary_progress`
+
+记录学生按词包累计的练习结果。最小字段：`_id`、`organizationId`、`studentId`、`packId`、`completedCount`、`correctCount`、`correctRate`、`wrongWordIds`、`updatedAt`、`version`、软删除字段。
+
+`_id` 由 `organizationId + studentId + packId` 确定性生成；服务端同时按这三个字段校验唯一归属。索引：`organizationId + studentId + packId`（唯一）。错词 ID 必须属于当前词包；正确数不得大于完成数。首次创建要求 `expectedVersion=0`，后续更新使用文档 `version` 做 CAS。
+
+两类进度写入均在同一原生事务中完成：资源授权复核、进度 CAS、`idempotency_records` 和 `operation_logs` 原子提交。相同 `operationId` 和相同请求返回第一次结果；相同键不同请求返回 `CONFLICT`。事务提交失败时不得留下部分进度或成功幂等记录。
 
 ### 3.11 `tasks`
 
@@ -210,7 +228,7 @@ M1 只包含基础阅读和单词的虚构/已授权占位内容。
 
 ### 3.17 `migration_runs`
 
-仅开发/测试环境使用。字段：`_id`、`schemaVersion`、`seedVersion`、`source: m0-fixture`、`status`、`startedAt/finishedAt`、`counts`、`contentHash`、`createdDocumentIds?`、`executedBy`。不存账号凭据。
+仅开发/测试环境使用。字段：`_id`、`organizationId`、`schemaVersion`、`seedVersion`、`source: m0-fixture`、`status`、`startedAt/finishedAt`、`counts`、`contentHash`、`createdDocumentIds?`、`executedBy`。分批种子另记录 `requestId`、`batchSize`、`totalBatches`、`nextBatchIndex`、`verifiedBatchCount`、`rollbackCursor`、`failureCode?` 和 `failedFromStatus?`。状态固定为 `planned|applying|verifying|succeeded|failed|rolling_back|rolled_back`；只有全量文档与 run 归属 verify 完成后才可进入 `succeeded`。不存账号凭据。
 
 ## 4. 关系与写入聚合
 
@@ -221,6 +239,7 @@ classes 1 ── * class_memberships / teacher_class_grants
 parent users 1 ── * parent_student_links * ── 1 student users
 tasks 1 ── * task_assignments 1 ── * submissions 1 ── 0..1 review_feedback
 learning_resources 1 ── * tasks.items.resourceSnapshot（复制，不引用可变正文）
+users(student) 1 ── * reading_progress / vocabulary_progress
 ```
 
 事务边界：
@@ -229,8 +248,11 @@ learning_resources 1 ── * tasks.items.resourceSnapshot（复制，不引用�
 2. 正式提交：assignment 版本校验、新提交版本、assignment 当前指针/状态、幂等记录、审计日志。
 3. 发布点评：提交版本/教师授权校验、反馈、submission/assignment 状态、重做次数与期限、幂等记录、审计日志。
 4. 使用绑定码：码状态/次数、双方绑定上限、关系创建、码消费和审计日志。
+5. 保存学习进度：资源授权、进度唯一键/CAS、幂等记录和审计日志。
 
 CloudBase 当前服务端事务有操作数与仅按文档访问等限制。目标学生必须在事务前按授权查询解析，事务内再按确定性文档 ID 复核。单次发布规模超过已批准事务预算时禁止静默分批；需先关闭 OQ-09 并评审可恢复的批次方案。
+
+按班级解析目标学生时还必须把 `classes.version` 带入事务作为 membership 集合 guard；事务内 guard 校验、membership 复核、任务/assignment/幂等/审计写入属于同一原子事务。按学员布置不依赖班级集合扫描，仍逐个按 membership 确定性 ID 复核。
 
 ## 5. M0 → M1 映射
 
@@ -247,6 +269,7 @@ CloudBase 当前服务端事务有操作数与仅按文档访问等限制。目�
 | `AppState.feedback` | `review_feedback` | 精确绑定 submission/version，只追加 |
 | M0 内存操作结果 | `idempotency_records` | 支持网络重试返回同一 receipt |
 | M0 无审计集合 | `operation_logs` | 仅白名单元数据 |
+| M0 页面本地阅读/单词记录 | `reading_progress` + `vocabulary_progress` | 以组织+学生+资源/词包唯一，支持跨函数实例续读和复习 |
 
 当前 `domain/types.ts` 和 `app-service.ts` 是可运行 M0 的轻量实现，不要求现在改动。M1 接入阶段在 repository/cloudbase 与 service 映射层把上述集合聚合成当前页面需要的 `HomeView`、`TaskDetailView` 等；新增 M1 字段先作为服务端/adapter 内部类型。
 

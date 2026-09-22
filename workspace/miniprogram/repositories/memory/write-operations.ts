@@ -13,7 +13,6 @@ export interface OperationLookup<T extends WriteOperationResult> {
   status: 'missing' | 'replay' | 'conflict'
   result?: T
 }
-
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }

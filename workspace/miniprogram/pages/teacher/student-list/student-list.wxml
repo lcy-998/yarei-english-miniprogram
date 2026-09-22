@@ -1,0 +1,13 @@
+<g0-page-shell tone="teacher">
+  <view class="m1-page teacher-students" bindtap="closeClassMenu">
+    <app-header title=""></app-header>
+    <view class="teacher-brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
+    <view class="m1-content">
+      <view class="list-heading"><text class="m1-title">学员列表</text><view class="class-filter-wrap"><button class="class-filter" bindtap="chooseClass">{{selectedClass}}<text class="filter-arrow {{classFilterOpen ? 'is-open' : ''}}"></text></button><view wx:if="{{classFilterOpen}}" class="class-menu"><view wx:for="{{classOptions}}" wx:key="*this" class="class-option {{selectedClass === item ? 'selected' : ''}}" data-class-name="{{item}}" bindtap="selectClass">{{item}}</view></view></view></view>
+      <view class="control-panel"><view class="m1-toolbar"><view class="search-wrap"><view class="search-symbol"></view><input value="{{keyword}}" placeholder="搜索姓名或学号" bindinput="onSearch"/></view><button class="status-filter" bindtap="toggleStatus">{{status === 'all' ? '全部状态' : '待跟进'}}<text class="filter-arrow"></text></button></view><view class="list-tools"><button class="import" bindtap="importStudents"><view class="tool-icon">↑</view><text>批量导入</text></button><button class="export" bindtap="exportStudents"><view class="tool-icon">≡</view><text>导出名单</text></button><button class="primary" bindtap="addStudent"><view class="tool-icon">＋</view><text>新建学员</text></button></view></view>
+      <state-panel wx:if="{{loading}}" state="loading"></state-panel><state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadStudents"></state-panel><view wx:else class="student-list"><view wx:for="{{students}}" wx:key="id" class="student-card student-card--{{item.status}}" data-id="{{item.id}}" bindtap="openStudent"><view class="student-avatar">{{item.displayName}}</view><view class="student-copy"><view class="student-head"><text class="student-name">{{item.displayName}}</text><text class="status {{item.status === 'active' ? 'status--success' : 'status--urgent'}}">{{item.statusLabel}}</text></view><text class="student-meta">学号 {{item.studentNumber}}</text><text class="student-meta">{{item.className}}</text></view><view class="m1-chevron"></view><view class="student-progress"><text>任务完成 <text>{{item.completedCount}}/{{item.totalCount}}</text></text><text>{{item.completionPercent}}%</text><view class="m1-progress"><view style="width: {{item.completionPercent}}%"></view></view></view></view><view wx:if="{{!students.length}}" class="m1-card m1-empty">当前筛选下暂无学员。</view></view>
+    </view>
+    <g0-tab-bar role="teacher" active="students"></g0-tab-bar>
+  </view>
+</g0-page-shell>
+

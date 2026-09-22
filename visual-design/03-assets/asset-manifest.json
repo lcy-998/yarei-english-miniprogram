@@ -1,6 +1,6 @@
 {
-  "version": "1.2.0",
-  "updatedAt": "2026-09-14",
+  "version": "1.4.0",
+  "updatedAt": "2026-09-16",
   "assets": [
     {
       "id": "brand-logo",
@@ -61,6 +61,94 @@
       "alpha": false,
       "references": ["P-01", "P-02", "S-01", "S-08", "S-09", "G-03", "G-05", "T-01", "T-05", "T-06", "T-07", "T-08", "T-17"],
       "constraints": "No text, logo, mascot, UI, character, animal, button, card, progress or business state is embedded.",
+      "status": "production-ready"
+    },
+    {
+      "id": "media-library-empty-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/media-library-empty-v1.png",
+      "role": "media-library-empty-state",
+      "productionDimensions": "1254x1254",
+      "alpha": true,
+      "references": ["T-19", "A-08"],
+      "constraints": "No text, logo, mascot, person, button or business state is embedded.",
+      "status": "production-ready"
+    },
+    {
+      "id": "recording-ai-retry-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/recording-ai-retry-v1.png",
+      "role": "recording-ai-retry-empty-state",
+      "productionDimensions": "1536x1024",
+      "alpha": true,
+      "references": ["S-05", "S-07", "T-20"],
+      "constraints": "No text, logo, mascot, person, score, button or business state is embedded.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-zoo-picture-book-cover-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-zoo-picture-book-cover-v1.png",
+      "role": "fictional-picture-book-cover",
+      "productionDimensions": "1183x1330",
+      "alpha": true,
+      "references": ["S-03", "S-04", "T-16", "T-18"],
+      "constraints": "Synthetic development-only content; no text, logo, publisher or copyrighted character.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-zoo-page-02-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-zoo-page-02-v1.png",
+      "role": "fictional-picture-book-page",
+      "productionDimensions": "1024x1536",
+      "alpha": false,
+      "references": ["S-04", "T-16"],
+      "constraints": "Synthetic development-only page image; no text, logo, real child identity or copyrighted character.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-sync-textbook-cover-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-sync-textbook-cover-v1.png",
+      "role": "fictional-sync-textbook-cover",
+      "productionDimensions": "1218x1291",
+      "alpha": true,
+      "references": ["T-12", "T-13", "T-14", "T-18", "A-05"],
+      "constraints": "Synthetic development-only cover; no text, logo, grade, publisher or copyrighted content.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-original-reader-cover-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-original-reader-cover-v1.png",
+      "role": "fictional-original-reader-cover",
+      "productionDimensions": "1254x1254",
+      "alpha": true,
+      "references": ["S-03", "T-16", "T-18"],
+      "constraints": "Synthetic development-only cover; no text, logo, publisher or copyrighted content.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-current-affairs-cover-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-current-affairs-cover-v1.png",
+      "role": "fictional-current-affairs-cover",
+      "productionDimensions": "1213x1296",
+      "alpha": true,
+      "references": ["S-03", "T-16", "T-18"],
+      "constraints": "Synthetic development-only cover; no text, logo, publisher, real photo or copyrighted content.",
+      "status": "production-ready"
+    },
+    {
+      "id": "demo-chapter-reader-cover-v1",
+      "source": "ImageGen generated on 2026-09-16; prompt recorded in visual-design/00-governance/g4-g5-asset-prompts.md",
+      "production": "visual-design/03-assets/production/demo-chapter-reader-cover-v1.png",
+      "role": "fictional-chapter-reader-cover",
+      "productionDimensions": "1254x1254",
+      "alpha": true,
+      "references": ["S-03", "T-16", "T-18"],
+      "constraints": "Synthetic development-only cover; no text, logo, publisher or copyrighted content.",
       "status": "production-ready"
     }
   ]

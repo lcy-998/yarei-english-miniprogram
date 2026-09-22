@@ -7,14 +7,17 @@ import { parseFunctionRequest } from '../../src/shared/validation';
 
 describe('M1 线协议输入校验', () => {
   it('接受 m1.v1 已知 action，并拒绝未知 action、操作 ID 与版本', () => {
-    const valid = parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: { role: 'student' }, operationId: 'op_select_0001', expectedVersion: 1 }, ['selectRole'] as const);
+    const valid = parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: { role: 'student' }, businessSessionToken: 'opaque.session.token', operationId: 'op_select_0001', expectedVersion: 1 }, ['selectRole'] as const);
     expect(valid.ok).toBe(true);
+    expect(valid).toMatchObject({ ok: true, value: { businessSessionToken: 'opaque.session.token' } });
     expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'admin', payload: {} }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { action: expect.any(String) } });
     expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: {}, expectedVersion: 0 }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { expectedVersion: expect.any(String) } });
+    expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: {}, businessSessionToken: 'bad token' }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { businessSessionToken: expect.any(String) } });
   });
 
   it('拒绝未在 action schema 中声明的字段', () => {
     expect(parseExactObject({ role: 'student', actorUserId: 'usr_forged' }, ['role'])).toEqual({ ok: false, fieldErrors: { actorUserId: '不支持的字段。' } });
+    expect(parseExactObject({ role: 'student', businessSessionToken: 'opaque.session.token' }, ['role'])).toEqual({ ok: false, fieldErrors: { businessSessionToken: '不支持的字段。' } });
   });
 
   it('未配置函数永远不执行命令', async () => {
@@ -24,6 +27,15 @@ describe('M1 线协议输入校验', () => {
       expect(result.error.code).toBe('SERVICE_UNAVAILABLE');
       expect(result.error.retryable).toBe(true);
     }
+  });
+
+  it('未配置 auth 入口仍执行严格 action schema', async () => {
+    expect(await authSessionMain({ apiVersion: 'm1.v1', action: 'logout', payload: {} })).toMatchObject({
+      ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { operationId: expect.any(String) } },
+    });
+    expect(await authSessionMain({ apiVersion: 'm1.v1', action: 'logout', payload: {}, operationId: 'op_logout_0001' })).toMatchObject({
+      ok: false, error: { code: 'SERVICE_UNAVAILABLE' },
+    });
   });
 
   it('代表性 auth action 以精确 schema 拒绝伪造 actor 字段', async () => {

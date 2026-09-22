@@ -47,8 +47,8 @@
   "packOptions": {
     "ignore": [
       {
-        "type": "file",
-        "value": "assets/g0/mascot-speaking-pink.png"
+        "value": "assets/g0/mascot-speaking-pink.png",
+        "type": "file"
       }
     ],
     "include": []

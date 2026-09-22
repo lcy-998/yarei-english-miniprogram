@@ -176,7 +176,7 @@
 此阶段可以创建空集合，但不要导入数据：
 
 1. 打开 **数据库/文档型数据库**。
-2. 依次创建：`organizations`、`classes`、`users`、`auth_identities`、`role_assignments`、`class_memberships`、`teacher_class_grants`、`parent_student_links`、`binding_codes`、`learning_resources`、`tasks`、`task_assignments`、`submissions`、`review_feedback`、`idempotency_records`、`operation_logs`、`migration_runs`。
+2. 依次创建：`organizations`、`classes`、`users`、`auth_identities`、`role_assignments`、`class_memberships`、`teacher_class_grants`、`parent_student_links`、`binding_codes`、`learning_resources`、`reading_progress`、`vocabulary_progress`、`tasks`、`task_assignments`、`submissions`、`review_feedback`、`idempotency_records`、`operation_logs`、`migration_runs`。
 3. 每创建一个集合立即进入 **权限管理** → **安全规则/自定义规则**。
 4. 填入并发布：
 

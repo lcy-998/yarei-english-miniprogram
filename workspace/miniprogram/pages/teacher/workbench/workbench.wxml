@@ -1,14 +1,14 @@
-<g0-page-shell nature="{{true}}" tone="teacher"><view class="page">
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="page" bindtap="closeClassFilter">
   <app-header title="" showBell="{{true}}" bellCount="{{pendingCount}}"></app-header>
   <view class="brand-header"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
   <state-panel wx:if="{{loading}}" state="loading" message="正在加载教师工作台"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWorkbench"></state-panel>
   <view wx:else class="content">
-    <view class="greeting-row"><text>林老师，上午好</text><button data-label="班级筛选" bindtap="openFuture">全部负责班级<view class="filter-arrow" aria-hidden="true"></view></button></view>
+    <view class="greeting-row"><text>林老师，上午好</text><view class="workbench-class-filter"><button bindtap="toggleClassFilter">{{selectedClass}}<view class="filter-arrow {{classFilterOpen ? 'is-open' : ''}}" aria-hidden="true"></view></button><view wx:if="{{classFilterOpen}}" class="workbench-class-menu"><view wx:for="{{classOptions}}" wx:key="*this" class="workbench-class-option {{selectedClass === item ? 'selected' : ''}}" data-class-name="{{item}}" bindtap="selectClass">{{item}}</view></view></view></view>
 
     <view class="quick-grid">
       <view class="quick quick--blue" bindtap="goPublish" aria-role="button"><g0-icon name="publish" size="{{54}}"></g0-icon><text>布置任务</text></view>
-      <view class="quick quick--green" bindtap="goCenter" aria-role="button"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></view>
+      <view class="quick quick--green" bindtap="goCheckTasks" aria-role="button"><g0-icon name="check" tone="success" size="{{54}}"></g0-icon><text>检查任务</text></view>
       <view class="quick quick--purple" bindtap="goReview" aria-role="button"><g0-icon name="review" tone="ai" size="{{54}}"></g0-icon><text>快速点评</text></view>
     </view>
 

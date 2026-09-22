@@ -1,20 +1,16 @@
 import { createUnconfiguredFunction } from '../shared/unconfigured-function';
-import { parseExactObject } from '../../src/shared/strict-object';
+import { AUTH_SESSION_ACTIONS, validateAuthRequest } from '../../src/contracts/auth-session';
+import { createDefaultCloudBaseAuthFunction } from '../shared/default-cloudbase-function';
+import { createAuthSessionFunction } from './function-entry';
 
-const AUTH_ACTIONS = ['bootstrap', 'selectRole', 'getCurrentSession', 'logout'] as const;
+export { createAuthSessionFunction } from './function-entry';
 
-export const main = createUnconfiguredFunction('auth-session', AUTH_ACTIONS, (action, payload) => {
-  const exact = action === 'selectRole'
-    ? parseExactObject(payload, ['role'])
-    : parseExactObject(payload, []);
-  if (!exact.ok) {
-    return exact.fieldErrors;
-  }
-  if (action === 'selectRole') {
-    const role = exact.value.role;
-    if (role !== 'student' && role !== 'parent' && role !== 'teacher') {
-      return { role: '角色必须是学生、家长或教师。' };
-    }
-  }
-  return null;
+const unavailable = createUnconfiguredFunction('auth-session', AUTH_SESSION_ACTIONS, (_action, _payload, request) => {
+  const validated = validateAuthRequest(request);
+  return validated.ok ? null : validated.fieldErrors;
 });
+
+export const main = createDefaultCloudBaseAuthFunction(
+  unavailable,
+  (_capabilities, dependencies) => createAuthSessionFunction(dependencies),
+);

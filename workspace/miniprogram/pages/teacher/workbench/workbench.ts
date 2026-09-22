@@ -17,6 +17,10 @@ Component({
     taskProgress: 0,
     recentTaskTitle: '暂无已发布任务',
     recentTaskId: '',
+    selectedClass: '全部负责班级',
+    classFilterOpen: false,
+    suppressClose: false,
+    classOptions: ['全部负责班级', '三年级 2 班', '四年级 1 班'],
   },
   lifetimes: { attached() { this.loadWorkbench() } },
   pageLifetimes: { show() { this.loadWorkbench() } },
@@ -52,12 +56,16 @@ Component({
       })
     },
     goCenter() { wx.navigateTo({ url: '/pages/teacher/task-center/task-center' }) },
+    goCheckTasks() { wx.navigateTo({ url: '/pages/teacher/task-review-list/task-review-list' }) },
     goPublish() { wx.navigateTo({ url: '/pages/teacher/publish-task/publish-task' }) },
     goReview() {
       if (!this.data.recentTaskId) { wx.showToast({ title: '暂无可点评任务', icon: 'none' }); return }
       setCurrentTaskId(this.data.recentTaskId)
       wx.navigateTo({ url: '/pages/teacher/completion/completion' })
     },
+    closeClassFilter() { if (this.data.suppressClose) { this.setData({ suppressClose: false }); return } this.setData({ classFilterOpen: false }) },
+    toggleClassFilter() { this.setData({ classFilterOpen: !this.data.classFilterOpen, suppressClose: true }) },
+    selectClass(event: WechatMiniprogram.TouchEvent) { this.setData({ selectedClass: event.currentTarget.dataset.className as string, classFilterOpen: false, suppressClose: true }) },
     openFuture(event: WechatMiniprogram.TouchEvent) {
       const label = event.currentTarget.dataset.label as string
       wx.showToast({ title: `${label}将在后续里程碑开放`, icon: 'none' })

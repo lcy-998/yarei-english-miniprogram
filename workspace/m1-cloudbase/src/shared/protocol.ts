@@ -39,8 +39,19 @@ export interface FunctionRequest<TAction extends string, TPayload> {
   readonly apiVersion: ApiVersion;
   readonly action: TAction;
   readonly payload: TPayload;
+  /** Opaque bearer value issued by auth-session; never contains actor claims. */
+  readonly businessSessionToken?: string;
   readonly operationId?: string;
   readonly expectedVersion?: number;
+}
+
+/**
+ * Per-invocation transport context derived only after the wire envelope passes
+ * strict validation. The token is still untrusted until the server resolves it
+ * and binds the resulting session to the CloudBase platform subject.
+ */
+export interface CloudCallContext {
+  readonly businessSessionToken: string | null;
 }
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -49,6 +60,7 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 
 export const FUNCTION_NAMES = [
   'auth-session',
+  'admin-session',
   'task-query',
   'task-command',
   'student-task-query',
@@ -59,6 +71,10 @@ export const FUNCTION_NAMES = [
   'relationship-command',
   'content-query',
   'organization-admin',
+  'teacher-student-query',
+  'teacher-student-command',
+  'learning-progress-query',
+  'learning-progress-command',
 ] as const;
 
 export type FunctionName = (typeof FUNCTION_NAMES)[number];

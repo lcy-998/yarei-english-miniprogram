@@ -89,6 +89,11 @@ export const initialState: AppState = {
   submissions: demoSubmissions,
   feedback: demoFeedback,
   operationReceipts: [],
+  bindingCodes: [{ id: 'bind_demo_xiaoyu', studentId: 'usr_student_xiaoyu', code: '482731', status: 'active', attemptCount: 0, expiresAt: '2099-09-16T00:00:00.000Z' }],
+  relationshipOperationReceipts: [],
+  readingProgress: [],
+  vocabularyProgress: [],
+  learningOperationReceipts: [],
 }
 
 function cloneState(source: AppState): AppState {

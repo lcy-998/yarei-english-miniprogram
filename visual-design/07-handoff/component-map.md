@@ -1,4 +1,4 @@
-# G0 页面—组件映射
+# 全项目页面—组件映射
 
 | 页面 | 固定公共组件 | 页面专属组合 | 开发约束 |
 | --- | --- | --- | --- |
@@ -23,3 +23,28 @@
 | 顶栏、角标与状态反馈 | `components/app-header`、`components/state-panel` | 所有 M0 页面 |
 
 生产位图从 `miniprogram/assets/g0/` 引用；效果图目录和 `visual-design/03-assets/production/` 不被小程序运行时直接引用。
+
+## G2—G4 页面分组映射
+
+| 页面组 | 公共组件 | 专属组件 | 状态板 |
+| --- | --- | --- | --- |
+| P-03/P-04/G-02/T-02/T-03 | 导航、按钮输入、卡片列表、弹窗 Toast | 验证步骤、孩子关系、学员筛选/详情 | common、permission |
+| S-02/S-03/S-04 | 导航、卡片列表、筛选 | 单词练习、阅读分类、页图阅读器 | common、permission |
+| G3 教学扩展页面 | 导航、卡片列表、任务反馈、表格筛选 | 长期任务、排行榜、模板、教材/题库选择 | common、task-lifecycle |
+| S-05/S-07 | 按钮输入、媒体录音、任务反馈、弹窗 Toast | 跟读原文、录音、模拟 AI 维度分 | media-recording-ai、permission |
+| T-19/T-20 | 导航、按钮输入、卡片列表、媒体录音、弹窗 Toast | 媒体库、上传转码、波形时间轴、题目片段映射 | media-recording-ai、common |
+| A-01—A-08 | 后台导航、按钮输入、卡片列表、表格筛选、抽屉 Toast | 组织树、权限树、内容审核、媒体审核 | common、permission、media-recording-ai |
+
+组件视觉输入以 `02-components/*.png` 为准，行为、字段和权限仍以权威产品/交互文档为准。页面实现不得直接使用组件状态板 PNG。
+
+## M2/M3 施工组件源
+
+| 组件 | 代码位置 | 优先接入页面 |
+| --- | --- | --- |
+| 统一图标 | `miniprogram/components/visual-icon` | 全部 M2/M3 小程序页 |
+| 状态标签 | `miniprogram/components/status-badge` | S-10—S-12、T-09—T-20 |
+| 搜索筛选 | `miniprogram/components/filter-bar` | P-05、S-03/S-12、T-04/T-09—T-20 |
+| 媒体播放器 | `miniprogram/components/media-player` | S-04/S-05/S-07、T-19/T-20 |
+| 录音面板 | `miniprogram/components/recording-panel` | S-05/S-07、T-20 |
+
+组件只提供表现、可访问状态和事件边界；防快进、播放连续性、录音保存、AI 次数、媒体审核与权限仍由领域/service 层实现。

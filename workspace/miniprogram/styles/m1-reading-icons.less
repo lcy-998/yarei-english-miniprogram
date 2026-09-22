@@ -1,0 +1,18 @@
+.reading-library .category-icon { position: relative; color: @yr-brand-primary; }
+.reading-library .category-icon > view { display: none; }
+.reading-library .category-icon::before,
+.reading-library .category-icon::after { content: ""; position: absolute; box-sizing: border-box; }
+.reading-library .category-icon--original { color: @yr-success; }
+.reading-library .category-icon--original::before,
+.reading-library .category-icon--picture::before { left: 7px; top: 9px; width: 10px; height: 18px; border: 3px solid currentColor; border-right-width: 1px; border-radius: 6px 1px 1px 5px; }
+.reading-library .category-icon--original::after,
+.reading-library .category-icon--picture::after { right: 7px; top: 9px; width: 10px; height: 18px; border: 3px solid currentColor; border-left-width: 1px; border-radius: 1px 6px 5px 1px; }
+.reading-library .category-icon--textbook::before { left: 9px; top: 7px; width: 18px; height: 23px; border: 3px solid currentColor; border-radius: 4px; box-shadow: 4px 3px 0 rgba(23,100,216,.28); }
+.reading-library .category-icon--textbook::after { left: 14px; top: 13px; width: 9px; height: 3px; border-radius: 2px; background: currentColor; box-shadow: 0 6px 0 currentColor; }
+.reading-library .category-icon--current { color: @yr-urgent; }
+.reading-library .category-icon--current::before { left: 9px; top: 6px; width: 18px; height: 24px; border: 3px solid currentColor; border-radius: 4px; }
+.reading-library .category-icon--current::after { left: 14px; top: 12px; width: 9px; height: 3px; border-radius: 2px; background: currentColor; box-shadow: 0 6px 0 currentColor; }
+.reading-library .category-icon--chapter { color: @yr-accent-purple; }
+.reading-library .category-icon--chapter::before { left: 8px; top: 8px; width: 21px; height: 7px; border-radius: 4px; background: currentColor; box-shadow: 0 8px 0 currentColor,0 16px 0 currentColor; }
+.reading-library .category.active .category-icon { color: #fff; }
+

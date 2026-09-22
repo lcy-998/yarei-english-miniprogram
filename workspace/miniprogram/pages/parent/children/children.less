@@ -1,0 +1,27 @@
+@import "../../../styles/m1-pages.less";
+@import "../../../styles/m1-alignment-fixes.less";
+.child-card { display: grid; grid-template-columns: 68px minmax(0,1fr); align-items: center; gap: 10px 14px; }.child-copy { min-width: 0; }.child-copy > text { display: block; margin-top: 4px; color: @yr-text-secondary; font-size: 13px; line-height: 1.45; }.child-name { margin: 0!important; color: @yr-text-primary!important; font-size: 22px!important; font-weight: 900; }.child-copy .m1-pill { display: inline-flex; margin-top: 8px; }.child-actions { grid-column: 2; display: flex; justify-content: flex-end; gap: 12px; }.child-actions button { margin: 0; padding: 0 10px; min-height: 36px; background: transparent; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }.child-actions button::after { border: 0; }.child-actions .remove { color: @yr-danger; }.add-card { text-align: center; }.add-card > text { display: block; margin-bottom: 16px; color: @yr-text-secondary; }.add-symbol { width: 64px; height: 64px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 20px; background: linear-gradient(145deg,#56b8ff,@yr-brand-primary); color: #fff; font-size: 40px; box-shadow: @yr-action-shadow; }.add-form { text-align: left; }.add-actions { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }.validity { margin-top: 14px!important; font-size: 12px!important; }
+/* G2 visual refinement: keep child actions aligned to the right rail of each card. */
+.child-card { grid-template-columns: 68px minmax(0,1fr) 118px; }
+.child-actions { grid-column: 3; grid-row: 1; flex-direction: column; align-items: flex-end; justify-content: center; gap: 4px; }
+.child-actions button { padding: 0 4px; }
+/* G2 follow-up: keep binding form actions as two non-overlapping equal columns. */
+.add-actions { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; padding: 0 4px; box-sizing: border-box; }
+.add-actions g0-button { display: block; width: 100%; min-width: 0; box-sizing: border-box; }
+/* Latest device review: give the danger action a readable right-side rail and remove button grid overflow. */
+.child-actions { padding-right: 12px; transform: translateX(6px); }
+.child-actions button { font-size: 15px; min-height: 42px; padding: 0 2px; white-space: nowrap; }
+.child-actions .remove { font-size: 16px; letter-spacing: .5px; }
+.add-actions { display: flex; align-items: stretch; gap: 16px; padding: 0 8px; }
+.add-actions g0-button { flex: 1 1 0; width: auto; min-width: 0; max-width: none; }
+/* Device review: detach relationship actions from the metadata flow and anchor them to the card's right edge. */
+.child-card { position: relative; grid-template-columns: 68px minmax(0,1fr) 104px; box-sizing: border-box; }
+.child-actions { position: absolute; right: 14px; top: 50%; width: 96px; padding: 0; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; box-sizing: border-box; }
+.child-actions button { width: 96px; min-width: 0; min-height: 44px; margin: 0; padding: 0; display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; background: transparent; font-size: 16px; line-height: 1.2; text-align: right; white-space: nowrap; }
+.child-actions .remove { color: @yr-danger; font-size: 18px; font-weight: 900; letter-spacing: 0; }
+@media (max-width: 370px) { .child-card { grid-template-columns: 64px minmax(0,1fr) 100px; } .child-actions { right: 12px; width: 92px; } .child-actions button { width: 92px; } .child-actions .remove { font-size: 17px; } }
+/* Final relationship action placement: a compact danger pill, slightly left and above center. */
+.child-actions { right: 22px; top: 44%; }
+.child-actions .remove { min-height: 38px; padding: 0 13px; justify-content: center; border: 1px solid #f2a99f; border-radius: 19px; background: #fff0ed; color: @yr-danger; font-size: 16px; line-height: 38px; box-shadow: 0 4px 10px rgba(217,52,43,.10); }
+.child-actions .remove::after { border: 0; }
+@media (max-width: 370px) { .child-actions { right: 18px; top: 43%; } .child-actions .remove { min-height: 36px; padding: 0 10px; border-radius: 18px; font-size: 15px; line-height: 36px; } }

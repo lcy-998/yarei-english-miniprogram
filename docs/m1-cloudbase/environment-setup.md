@@ -14,13 +14,13 @@
 - **环境**：M1 先使用一个 `yarei-m1-dev` 免费体验环境；独立 `yarei-m1-test` 个人版环境仅在用户另行确认购买后创建。
 - **计费**：开发环境选择免费体验版、关闭超限按量、不开资源包；腾讯云账号设置 50 元/月非生产预算，50%/80%/100% 告警。若账号不具备免费环境资格，停止在支付页，不自动购买。
 - **身份**：使用 CloudBase Authentication v2 托管账号密码。学生/家长/教师是注册用户（external/registered user），由管理员预创建；登录名使用已绑定手机号，密码不进入业务数据库。
-- **无自主注册**：客户端只调用 `Auth.signIn`，不提供 `signUp`。CloudBase 官方也不允许直接以“用户名+密码”注册；任何没有业务 `users + role_assignments` 映射的 CloudBase UID 即使存在，也无法进入产品。
+- **无自主注册**：客户端只调用 Auth v2 `signInWithPassword({ phone, password })`，不提供 `signUp`。手机号和密码只进入官方 SDK，不进入业务函数；任何没有业务 `users + role_assignments` 映射的 CloudBase UID 即使存在，也无法进入产品。
 - **微信身份**：M1 以 CloudBase UID 作为唯一认证 subject，不把 openid 当业务主键，也不在 M1 自动合并账号。微信 provider 绑定留到订阅消息/生产联调前单独验证。
 - **后台管理员**：使用同一 CloudBase 用户目录和默认 Auth client，但使用独立 Web 页面与业务 session audience；管理员不出现在小程序。管理员账号采用组织成员/internal user 和更短业务会话。任何真实管理员启用前必须使用支持 MFA 的套餐/配置；免费开发环境只放虚构管理员。
 - **租户**：M1 一个环境只服务一个试点学校，但每条业务数据仍保留 `organizationId`，不删除未来多学校扩展边界。
 - **事务上限**：M1 单次任务发布最多 50 名学生；超出返回 `VALIDATION_ERROR`，不得静默分批。该限制只用于 M1 核心闭环，后续扩容需重新评审事务方案。
 
-详细控制台执行步骤见 `console-runbook.md`。现有任务记录表明开发环境、17 个空集合、默认拒绝规则、索引和 Auth 登录方式已配置；新 M1 任务必须在不输出 envId/账号信息的前提下先只读复核。真实个人信息与合规期限仍不是腾讯云技术可以代替决定的事项，继续列在 `open-questions.md`。
+详细控制台执行步骤见 `console-runbook.md`。2026-09-17 复核确认既有 17 个集合均为空；经用户单独授权后补建 `reading_progress`、`vocabulary_progress`，并将全部 19 个集合统一为 `ADMINONLY`。两个新增进度集合的三字段唯一索引已核验；`auth-session` 所需三类身份集合主查询索引也已复核。其他既有索引仍须按 `database-schema.md` 完成全量对账，不能沿用历史记录直接判定通过。真实个人信息与合规期限仍不是腾讯云技术可以代替决定的事项，继续列在 `open-questions.md`。
 
 ## 2. 环境拓扑
 

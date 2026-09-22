@@ -22,7 +22,7 @@ Component({
       this.setData({ loading: false, tasks, pendingCount: result.data.pendingCount })
     },
     publish() { wx.navigateTo({ url: '/pages/teacher/publish-task/publish-task' }) },
-    focusTasks() { wx.pageScrollTo({ selector: '#teacher-task-list', duration: 280 }) },
+    focusTasks() { wx.navigateTo({ url: '/pages/teacher/task-review-list/task-review-list' }) },
     quickReview() {
       const task = this.data.tasks[0]
       if (!task) { wx.showToast({ title: '暂无可点评任务', icon: 'none' }); return }

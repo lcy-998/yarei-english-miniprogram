@@ -7,8 +7,8 @@
   <view wx:else class="content">
     <view class="child-card">
       <view class="avatar">{{childAvatarText}}</view>
-      <view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-meta">三年级 2 班</text></view>
-      <button class="switch" data-label="孩子管理" bindtap="openFuture">切换孩子<view class="mini-arrow" aria-hidden="true"></view></button>
+      <view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-meta">{{childClassName}}</text></view>
+      <button class="switch" bindtap="openChildren">切换孩子<view class="mini-arrow" aria-hidden="true"></view></button>
     </view>
 
     <view class="overview-card">
