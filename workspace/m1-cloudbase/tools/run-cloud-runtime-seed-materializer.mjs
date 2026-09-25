@@ -81,10 +81,12 @@ async function readAccount(cliLaunch, envId, name) {
 }
 
 function resolveCliLaunch(tcbCli) {
-  if (!tcbCli.toLowerCase().endsWith('.cmd')) return { command: tcbCli, arguments: [] };
+  if (!tcbCli.toLowerCase().endsWith('.cmd')) {
+    return { command: process.execPath, arguments: [tcbCli] };
+  }
   return {
     command: process.execPath,
-    arguments: [resolve(dirname(tcbCli), '..', '@cloudbase', 'cli', 'bin', 'tcb')],
+    arguments: [resolve(dirname(tcbCli), 'node_modules', '@cloudbase', 'cli', 'bin', 'tcb')],
   };
 }
 

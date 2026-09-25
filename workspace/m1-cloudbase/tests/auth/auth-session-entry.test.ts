@@ -3,7 +3,8 @@ import { createAuthSessionFunction } from '../../functions/auth-session';
 import { AuthSessionHandler } from '../../src/auth/auth-session-handler';
 import { InMemoryBusinessSessionRepository, InMemoryIdentityRepository, type AuthorizationFixture } from '../../src/runtime/memory-ports';
 import { createCloudBaseRuntimeAdapter, createOpaqueSessionIdSource } from '../../src/runtime/cloudbase-runtime-adapter';
-import type { BusinessSessionRepository, CloudBaseRuntimePort } from '../../src/runtime/ports';
+import { DocumentDatabasePlatformError } from '../../src/repositories/document-database-port';
+import type { BusinessSessionRepository, CloudBaseRuntimePort, IdentityRepository } from '../../src/runtime/ports';
 import type { BusinessSessionRecord, RoleAssignmentRecord, UserRecord } from '../../src/runtime/records';
 
 const now = '2026-09-16T00:00:00.000Z';
@@ -130,6 +131,68 @@ describe('auth-session 可注入本地函数入口', () => {
     const afterLogout = await harness.main({ apiVersion: 'm1.v1', action: 'bootstrap', payload: {} });
     if (!afterLogout.ok || !isSessionView(afterLogout.data)) throw new Error('bootstrap expected to succeed');
     expect(afterLogout.data.sessionId).not.toBe(first.data.sessionId);
+  });
+
+  it('bootstrap 遇到一次会话事务冲突后重试并成功', async () => {
+    const stableSessions = new InMemoryBusinessSessionRepository();
+    let starts = 0;
+    const sessions: BusinessSessionRepository = {
+      startOrResume: async (candidate, startedAt) => {
+        starts += 1;
+        if (starts === 1) throw new DocumentDatabasePlatformError('conflict', 'test-only conflict');
+        return stableSessions.startOrResume(candidate, startedAt);
+      },
+      find: (sessionId) => stableSessions.find(sessionId),
+      replace: (session, expectedVersion) => stableSessions.replace(session, expectedVersion),
+    };
+    const handler = new AuthSessionHandler(
+      new InMemoryIdentityRepository(fixture),
+      sessions,
+      digest,
+      clock,
+      { next: (prefix: string): string => `${prefix}_retry` },
+    );
+
+    await expect(handler.handle(
+      { action: 'bootstrap', payload: {} },
+      { subject: 'trusted-subject', loginType: 'USERNAME', isAuthenticated: true },
+      null,
+      { requestId: 'req_bootstrap_retry', serverTime: now, apiVersion: 'm1.v1' },
+    )).resolves.toMatchObject({ ok: true, data: { activeRole: null, roles: ['teacher'] } });
+    expect(starts).toBe(2);
+  });
+
+  it('bootstrap 遇到一次身份解析事务冲突后重试并成功', async () => {
+    const stableIdentities = new InMemoryIdentityRepository(fixture);
+    let identityReads = 0;
+    const identities: IdentityRepository = {
+      findIdentityByDigest: async (digestValue) => {
+        identityReads += 1;
+        if (identityReads === 1) throw new DocumentDatabasePlatformError('conflict', 'test-only conflict');
+        return stableIdentities.findIdentityByDigest(digestValue);
+      },
+      findUser: (userId, organizationId) => stableIdentities.findUser(userId, organizationId),
+      findOrganization: (organizationId) => stableIdentities.findOrganization(organizationId),
+      listActiveRoles: (userId, organizationId) => stableIdentities.listActiveRoles(userId, organizationId),
+      findActiveTeacherGrant: (organizationId, teacherId, classId) => stableIdentities.findActiveTeacherGrant(organizationId, teacherId, classId),
+      findActiveParentLink: (organizationId, parentId, studentId) => stableIdentities.findActiveParentLink(organizationId, parentId, studentId),
+      listActiveParentLinks: (organizationId, parentId) => stableIdentities.listActiveParentLinks(organizationId, parentId),
+    };
+    const handler = new AuthSessionHandler(
+      identities,
+      new InMemoryBusinessSessionRepository(),
+      digest,
+      clock,
+      { next: (prefix: string): string => `${prefix}_identity_retry` },
+    );
+
+    await expect(handler.handle(
+      { action: 'bootstrap', payload: {} },
+      { subject: 'trusted-subject', loginType: 'USERNAME', isAuthenticated: true },
+      null,
+      { requestId: 'req_identity_retry', serverTime: now, apiVersion: 'm1.v1' },
+    )).resolves.toMatchObject({ ok: true, data: { activeRole: null, roles: ['teacher'] } });
+    expect(identityReads).toBe(2);
   });
 
   it('角色列表异常变化时仍不会保留已经撤销的当前角色', async () => {

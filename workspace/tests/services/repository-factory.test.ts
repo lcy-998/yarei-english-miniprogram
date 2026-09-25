@@ -7,7 +7,7 @@ import {
   FunctionRequest,
 } from '../../miniprogram/repositories/cloudbase/protocol'
 import { configureRepositories, getRepositoryMode } from '../../miniprogram/repositories/repository-factory'
-import { getDraftOptions, getHome, getParentFeedback, getParentHome, getReadingProgress, getReadingResource, getTaskDetail, getVocabularyProgress, listReadingResources, listVocabularyPacks, login, logout, publishClassroomTask, requestPasswordResetCode, resetPassword, saveDraft, saveReadingProgress, saveVocabularyProgress, selectRole, submitTask } from '../../miniprogram/services/app-service'
+import { getCompletion, getDraftOptions, getHome, getParentFeedback, getParentHome, getReadingProgress, getReadingResource, getTaskDetail, getTeacherTasks, getVocabularyProgress, listReadingResources, listVocabularyPacks, login, logout, publishClassroomTask, requestPasswordResetCode, resetPassword, saveDraft, saveReadingProgress, saveVocabularyProgress, selectRole, submitTask } from '../../miniprogram/services/app-service'
 import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 import {
   PARENT_QUERY_ACTIONS,
@@ -123,6 +123,39 @@ describe('repository factory and CloudBase request mapping', () => {
     configureRepositories({ mode: 'memory' })
   })
 
+  it('教师完成情况使用授权学员姓名、学号和真实评分', async () => {
+    const invoker = new FakeInvoker()
+    invoker.enqueue(success({
+      task: { taskId: 'task_a', title: '虚构阅读任务', classIds: ['class_a'] },
+      assignments: { items: [{ assignmentId: 'assignment_a', studentId: 'student_a', classId: 'class_a', status: 'completed', latestSubmissionId: 'submission_a', latestSubmissionVersion: 1, submittedAt: '2026-09-16T10:00:00.000Z', reviewedAt: '2026-09-16T11:00:00.000Z', score: 86 }], total: 1, nextCursor: null },
+    }))
+    invoker.enqueue(success({ classes: [{ id: 'class_a', name: '虚构三年级 2 班', grade: '三年级', term: '上学期' }], items: [{ studentId: 'student_a', displayName: '小宇', studentNumber: '0321', classInfo: { id: 'class_a', name: '虚构三年级 2 班', grade: '三年级', term: '上学期' }, accountStatus: 'active', needsAttention: false, performance: { assignedCount: 1, completedCount: 1, overdueCount: 0, redoCount: 0, completionRate: 100, averageScore: 86 } }], total: 1, nextCursor: null }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'ses_teacher' }) })
+    expect(await getCompletion('teacher', 'task_a')).toMatchObject({ ok: true, data: [{ studentName: '小宇', studentNumber: '0321', className: '虚构三年级 2 班', score: 86, submittedAt: '2026-09-16T10:00:00.000Z' }] })
+    expect(invoker.calls.map(call => call.functionName)).toEqual(['task-query', 'teacher-student-query'])
+  })
+
+  it('加载所有任务页，供快速点评选择有待点评提交的任务', async () => {
+    const invoker = new FakeInvoker()
+    const task = (taskId: string, pendingReviewCount: number) => ({ taskId, title: `虚构任务 ${taskId}`, status: 'active', startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-17T00:00:00.000Z', classIds: ['class_a'], completedCount: 0, totalCount: 3, pendingReviewCount, version: 2 })
+    invoker.enqueue(success({ items: [task('task_a', 2)], total: 2, nextCursor: 'cursor_2' }))
+    invoker.enqueue(success({ items: [task('task_b', 1)], total: 2, nextCursor: null }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'ses_teacher' }) })
+    expect(await getTeacherTasks('teacher')).toMatchObject({ ok: true, data: { pendingCount: 3, pendingByTask: { task_a: 2, task_b: 1 } } })
+    expect(invoker.calls[1]?.request).toMatchObject({ action: 'listTeacherTasks', payload: { page: { limit: 100, cursor: 'cursor_2' } } })
+  })
+
+  it('加载当前任务的全部完成情况页再筛选班级', async () => {
+    const invoker = new FakeInvoker()
+    const assignment = (assignmentId: string, studentId: string, classId: string) => ({ assignmentId, studentId, classId, status: 'awaiting_review', latestSubmissionId: `submission_${studentId}`, latestSubmissionVersion: 1, submittedAt: '2026-09-16T10:00:00.000Z', reviewedAt: null, score: null })
+    invoker.enqueue(success({ task: { taskId: 'task_a' }, assignments: { items: [assignment('assignment_a', 'student_a', 'class_a')], total: 2, nextCursor: 'cursor_2' } }))
+    invoker.enqueue(success({ task: { taskId: 'task_a' }, assignments: { items: [assignment('assignment_b', 'student_b', 'class_b')], total: 2, nextCursor: null } }))
+    invoker.enqueue(success({ classes: [], items: [], total: 0, nextCursor: null }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'ses_teacher' }) })
+    expect(await getCompletion('teacher', 'task_a')).toMatchObject({ ok: true, data: [{ classId: 'class_a' }, { classId: 'class_b' }] })
+    expect(invoker.calls[1]?.request).toMatchObject({ action: 'getCompletion', payload: { page: { limit: 100, cursor: 'cursor_2' } } })
+  })
+
   it('keeps memory as the default and preserves the existing M0 login behavior', async () => {
     expect(getRepositoryMode()).toBe('memory')
 
@@ -154,6 +187,22 @@ describe('repository factory and CloudBase request mapping', () => {
     }])
     expect(invoker.calls[0]?.request.payload).not.toHaveProperty('userId')
     expect(invoker.calls[0]?.request.payload).not.toHaveProperty('sessionId')
+  })
+
+  it.each([
+    ['CAPTCHA_REQUIRED', '需要完成验证码验证'],
+    ['INVALID_STATUS', '已锁定'],
+    ['PASSWORD_NOT_SET', '尚未设置密码'],
+    ['LOGIN_DISABLED', '未开启密码登录'],
+  ])('shows a useful login message for %s', async (providerCode, expectedMessage) => {
+    configureRepositories({
+      mode: 'cloudbase',
+      invoker: new FakeInvoker(),
+      authentication: { signIn: async () => { throw { code: providerCode } } },
+      context: () => ({ sessionId: null }),
+    })
+    const result = await login('13800138001', 'test-password')
+    expect(result).toMatchObject({ ok: false, error: { message: expect.stringContaining(expectedMessage) } })
   })
 
   it('authenticates outside the business function and never sends a stale local token to bootstrap', async () => {
@@ -247,7 +296,7 @@ describe('repository factory and CloudBase request mapping', () => {
       taskId: 'task_1', title: '三类学习任务', description: null,
       startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-17T00:00:00.000Z',
       items: [
-        { id: 'item_reading', title: '阅读', type: 'reading', completionRule: { kind: 'reading_pages', requiredPageCount: 3 } },
+        { id: 'item_reading', resourceId: 'resource_reading', title: '阅读', type: 'reading', completionRule: { kind: 'reading_pages', requiredPageCount: 3 } },
         { id: 'item_words', title: '单词', type: 'vocabulary', completionRule: { kind: 'vocabulary_words', requiredWordCount: 8 } },
         { id: 'item_questions', title: '习题', type: 'exercise', completionRule: { kind: 'exercise_questions', requiredQuestionCount: 5 } },
       ], assignment: { status: 'not_started', submittedAt: null, redoCount: 0, redoDueAt: null, version: 1 },
@@ -265,7 +314,7 @@ describe('repository factory and CloudBase request mapping', () => {
       data: {
         assignment: { version: 1 },
         task: { items: [
-          { completionRuleData: { kind: 'reading_pages', requiredPageCount: 3 } },
+          { resourceId: 'resource_reading', completionRuleData: { kind: 'reading_pages', requiredPageCount: 3 } },
           { completionRuleData: { kind: 'vocabulary_words', requiredWordCount: 8 } },
           { completionRuleData: { kind: 'exercise_questions', requiredQuestionCount: 5 } },
         ] },
@@ -411,6 +460,8 @@ describe('repository factory and CloudBase request mapping', () => {
     ])
     expect(invoker.calls[0]?.request).toMatchObject({ operationId: 'op_publish_12345678' })
     expect(invoker.calls[0]?.request.payload).toMatchObject({
+      startsAt: structuredDraft.startsAt,
+      dueAt: structuredDraft.dueAt,
       itemRefs: [
         { completionRule: { kind: 'reading_pages', requiredPageCount: 3 }, scoringRule: { kind: 'manual', maxScore: 100 } },
         { completionRule: { kind: 'vocabulary_words', requiredWordCount: 8 }, scoringRule: { kind: 'manual', maxScore: 100 } },
@@ -447,6 +498,63 @@ describe('repository factory and CloudBase request mapping', () => {
       }),
       0,
       'op_publish_12345678',
+    )
+  })
+
+  it('continues a batched publication until every assignment is ready', async () => {
+    const invoker = new FakeInvoker()
+    invoker.enqueue(success({ taskId: 'task_500', status: 'draft', version: 1 }))
+    invoker.enqueue(success({ taskId: 'task_500', status: 'publishing', version: 5, assignmentCount: 60, totalCount: 500 }))
+    invoker.enqueue(success({ taskId: 'task_500', status: 'publishing', version: 8, assignmentCount: 120, totalCount: 500 }))
+    invoker.enqueue(success({ taskId: 'task_500', status: 'active', version: 27, assignmentCount: 500, totalCount: 500 }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'ses_teacher' }) })
+    const result = await publishClassroomTask('teacher', { operationId: 'op_publish_500', expectedVersion: 0, title: '虚构任务', description: '', structuredDraft })
+    expect(result).toMatchObject({ ok: true, data: { id: 'task_500', status: 'active', version: 27 } })
+    expect(invoker.calls.map((call) => call.request.action)).toEqual(['saveDraft', 'publishTask', 'publishTask', 'publishTask'])
+    expect(invoker.calls.slice(1).map((call) => call.request.operationId)).toEqual(['op_publish_500', 'op_publish_500', 'op_publish_500'])
+  })
+
+  it('resumes an interrupted publication without changing its draft', async () => {
+    const invoker = new FakeInvoker()
+    invoker.enqueue(success({ taskId: 'task_500', status: 'active', version: 27, assignmentCount: 500 }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'ses_teacher' }) })
+    const result = await publishClassroomTask('teacher', { taskId: 'task_500', operationId: 'op_publish_500', expectedVersion: 1, title: '虚构任务', description: '', resumePublication: true })
+    expect(result).toMatchObject({ ok: true, data: { id: 'task_500', status: 'active' } })
+    expect(invoker.calls.map((call) => call.request.action)).toEqual(['publishTask'])
+  })
+
+  it('keeps a single-student target through the cloud command boundary', async () => {
+    const invoker = new FakeInvoker()
+    invoker.enqueue(success({ taskId: 'task_personal', status: 'draft', version: 1 }))
+    invoker.enqueue(success({ taskId: 'task_personal', status: 'active', version: 2, assignmentCount: 1 }))
+    configureRepositories({
+      mode: 'cloudbase', invoker,
+      authentication: { signIn: async () => undefined },
+      context: () => ({ sessionId: 'ses_teacher' }),
+    })
+    const published = await publishClassroomTask('teacher', {
+      operationId: 'op_personal_publish', expectedVersion: 0, title: '个人阅读任务', description: '',
+      structuredDraft: { ...structuredDraft, target: { type: 'students', studentIds: ['user_student_xiaoyu'] } },
+    })
+    expect(published.ok).toBe(true)
+    expect(invoker.calls[0]?.request.payload).toMatchObject({ target: { type: 'students', studentIds: ['user_student_xiaoyu'] } })
+    const saveTaskDraft = vi.fn(async () => serverSuccess({ taskId: 'task_personal' }))
+    const taskMain = createTaskCommandFunction({
+      ...serverBoundary('task-command', 'teacher'),
+      handler: {
+        saveTaskDraft,
+        publishTask: vi.fn(async () => serverSuccess({ taskId: 'task_personal' })),
+        updatePublishedTask: vi.fn(async () => serverSuccess({ taskId: 'updated' })),
+        withdrawTask: vi.fn(async () => serverSuccess({ taskId: 'withdrawn' })),
+        recycleTask: vi.fn(async () => serverSuccess({ taskId: 'recycled' })),
+      },
+    })
+    expect(await taskMain(invoker.calls[0]?.request)).toMatchObject({ ok: true })
+    expect(saveTaskDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ actorRole: 'teacher' }),
+      expect.objectContaining({ targetType: 'students', targetClassIds: [], targetStudentIds: ['user_student_xiaoyu'] }),
+      0,
+      'op_personal_publish',
     )
   })
 

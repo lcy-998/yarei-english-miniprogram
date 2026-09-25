@@ -246,6 +246,7 @@ interface LearningResourceBase {
 
 export interface ReadingResourceEntity extends LearningResourceBase {
   readonly type: 'reading';
+  readonly taskOnly?: boolean;
   readonly category: 'original' | 'synchronized' | 'picture_book' | 'current_events' | 'chapter_book';
   readonly grade: string;
   readonly difficulty: string;
@@ -256,6 +257,7 @@ export interface ReadingResourceEntity extends LearningResourceBase {
 export interface VocabularyResourceEntity extends LearningResourceBase {
   readonly type: 'vocabulary';
   readonly grade: string;
+  readonly textbook?: string;
   readonly unit: string;
   readonly words: readonly VocabularyWordEntity[];
 }
@@ -383,6 +385,7 @@ export interface VocabularyPackView {
   readonly id: string;
   readonly title: string;
   readonly grade: string;
+  readonly textbook?: string;
   readonly unit: string;
   readonly contentVersion: string;
   readonly words: readonly VocabularyWordEntity[];

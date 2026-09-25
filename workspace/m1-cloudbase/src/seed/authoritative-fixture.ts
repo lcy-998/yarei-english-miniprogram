@@ -9,6 +9,7 @@ const TEACHER_ID = 'usr_teacher_demo_01';
 const PARENT_ID = 'usr_parent_demo_01';
 const ADMIN_ID = 'usr_admin_demo_01';
 const RESOURCE_ID = 'res_reading_zoo_demo';
+const VOCABULARY_RESOURCE_ID = 'res_vocabulary_animals_demo';
 const TASK_ID = 'tsk_animals_classroom_demo';
 const SEED_RUN_ID = 'seed_m1_authoritative_v4';
 const GENERATED_AT = '2026-09-17T08:00:00+08:00';
@@ -23,6 +24,7 @@ const REVIEWED_COUNT = SUBMITTED_COUNT - AWAITING_REVIEW_COUNT;
 interface FixtureUser {
   readonly id: string;
   readonly displayName: string;
+  readonly studentNumber?: string;
   readonly role: 'student' | 'parent' | 'teacher' | 'admin';
   readonly scopeType: 'self' | 'classes' | 'organization';
   readonly scopeIds: readonly string[];
@@ -70,7 +72,7 @@ export function createAuthoritativeM1SeedPackage(): SeedPackage {
       role: 'parent',
       scopeType: 'self',
       scopeIds: [PARENT_ID],
-      permissions: ['child.read'],
+      permissions: ['child.read', 'child.bind', 'child.unbind'],
     },
     {
       id: ADMIN_ID,
@@ -105,6 +107,7 @@ export function createAuthoritativeM1SeedPackage(): SeedPackage {
       organizationId: ORGANIZATION_ID,
       displayName: user.displayName,
       displayNameMasked: user.displayName,
+      ...(user.studentNumber === undefined ? {} : { studentNumber: user.studentNumber }),
       status: 'active',
       profileVersion: 1,
       authorizationVersion: 1,
@@ -161,20 +164,58 @@ export function createAuthoritativeM1SeedPackage(): SeedPackage {
       title: 'A Day at the Zoo',
       contentVersion: 1,
       status: 'published',
-      visibilityScope: { classIds: [GRADE_THREE_CLASS_ID, GRADE_FOUR_CLASS_ID] },
       allowedStudentIds: students.map((student) => student.id),
+      pages: [{ id: 'page_zoo_demo_01', chapterId: 'chapter_zoo_demo_01', pageNumber: 1 }],
+      wordIds: [],
+      visibility: { type: 'classes', classIds: [GRADE_THREE_CLASS_ID, GRADE_FOUR_CLASS_ID] },
       payload: {
-        demoOnly: true,
-        chapterCount: 3,
-        pages: [{
-          id: 'page_zoo_demo_01',
-          chapterId: 'chapter_zoo_demo_01',
-          pageNumber: 1,
-          thumbnailAssetKey: 'demo/reading/zoo/page-01-thumbnail',
-          imageAssetKey: 'demo/reading/zoo/page-01-image',
-          width: 1200,
-          height: 1600,
-          version: 1,
+        category: 'picture_book',
+        grade: '三年级',
+        difficulty: '基础',
+        chapters: [{
+          id: 'chapter_zoo_demo_01',
+          title: 'At the Zoo',
+          order: 1,
+          pages: [{
+            id: 'page_zoo_demo_01',
+            pageNumber: 1,
+            order: 1,
+            thumbnailAssetKey: 'demo/reading/zoo/page-01-thumbnail',
+            imageAssetKey: 'demo/reading/zoo/page-01-image',
+            width: 1200,
+            height: 1600,
+            assetVersion: '1',
+          }],
+        }],
+      },
+      copyrightStatus: 'demo',
+      ...commonDocument(),
+    }, {
+      _id: VOCABULARY_RESOURCE_ID,
+      organizationId: ORGANIZATION_ID,
+      type: 'vocabulary',
+      title: 'Animals Word Pack',
+      contentVersion: 1,
+      status: 'published',
+      allowedStudentIds: students.map((student) => student.id),
+      pages: [],
+      wordIds: ['word_animal_demo_01', 'word_zoo_demo_01'],
+      visibility: { type: 'classes', classIds: [GRADE_THREE_CLASS_ID, GRADE_FOUR_CLASS_ID] },
+      payload: {
+        grade: '三年级',
+        unit: 'Unit 3',
+        words: [{
+          id: 'word_animal_demo_01',
+          word: 'animal',
+          meaning: '动物',
+          example: 'The animal is at the zoo.',
+          syllables: ['an', 'i', 'mal'],
+        }, {
+          id: 'word_zoo_demo_01',
+          word: 'zoo',
+          meaning: '动物园',
+          example: 'We visit the zoo today.',
+          syllables: ['zoo'],
         }],
       },
       copyrightStatus: 'demo',
@@ -282,7 +323,8 @@ function createStudents(prefix: 'g3' | 'g4', grade: 3 | 4, count: number): reado
       role: 'student',
       scopeType: 'self',
       scopeIds: [id],
-      permissions: ['task.read.self', 'submission.write.self', 'learning.read.self'],
+      studentNumber: `STU-${prefix.toUpperCase()}-${sequence}`,
+      permissions: ['task.read.self', 'submission.write.self', 'learning.read.self', 'content.read'],
     };
   });
 }
@@ -318,7 +360,7 @@ function teacherGrantDocument(classId: string): JsonObject {
     organizationId: ORGANIZATION_ID,
     teacherId: TEACHER_ID,
     classId,
-    permissions: ['task.read', 'task.publish', 'submission.review', 'student.manage', 'content.read'],
+    permissions: ['task.read', 'task.publish', 'submission.review', 'student.manage', 'student.bind-code.issue', 'content.read'],
     status: 'active',
     grantedBy: ADMIN_ID,
     grantedAt: JOINED_AT,

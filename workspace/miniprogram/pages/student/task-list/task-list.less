@@ -117,3 +117,12 @@
 }
 
 .empty { margin-top: 16px; padding: 36px 20px; text-align: center; border: @yr-card-border; border-radius: @yr-radius-role-card; background: rgba(255, 249, 240, .95); color: @yr-text-secondary; }
+
+.range-row { display: flex; align-items: center; justify-content: flex-start; margin-top: 16px; color: @yr-text-secondary; font-size: 12px; }
+.range-row > view { display: flex; width: 100%; gap: 5px; padding: 3px; box-sizing: border-box; border-radius: 14px; background: rgba(255,255,255,.78); }
+.range-row button { flex: 1; min-width: 0; margin: 0; padding: 5px 8px; min-height: 30px; border-radius: 11px; background: transparent; color: @yr-text-secondary; font-size: 11px; white-space: nowrap; }
+.range-row button::after { border: 0; }
+.range-row button.selected { background: @yr-surface-blue; color: @yr-brand-primary; font-weight: 800; }
+.filters-scroll { width: 100%; }
+.filters { display: inline-flex; min-width: 100%; padding-bottom: 4px; white-space: nowrap; }
+.filter { flex: 0 0 auto; min-width: 90px; padding: 0 12px; box-sizing: border-box; }

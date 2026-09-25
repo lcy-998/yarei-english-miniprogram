@@ -1,8 +1,9 @@
-import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayTask, hasReachedRedoLimit, nextAssignmentStatusAfterSubmit } from '../domain/task-rules'
+import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayAssignments, getTodayTask, hasReachedRedoLimit, localTaskDate, nextAssignmentStatusAfterSubmit } from '../domain/task-rules'
 import { getState, mutateState } from '../repositories/memory/mock-state'
 import { addOperationReceipt, findOperation } from '../repositories/memory/write-operations'
 import { AppState, HomeView, ParentChildLinkView, ReadingListItem, ReadingProgress, ReadingResource, ReviewFeedback, Role, ServiceError, ServiceResult, Session, Submission, Task, TaskCompletionValue, TaskDetailView, TeacherStudentDetail, TeacherStudentPage, TeacherStudentStatusFilter, UserAccount, VocabularyPack, VocabularyProgress } from '../domain/types'
 import { getCloudAppService } from '../repositories/repository-factory'
+import type { TeacherReviewSubmissionView, TeacherStudentMutationView, TeacherStudentStatusCommand, TeacherStudentTransferCommand, TeacherStudentUpdateCommand, TeacherTaskEditView, TeacherTaskPreviewView, TeacherWorkbenchView } from './cloudbase-app-service'
 import { Clock, systemClock } from './clock'
 
 const id = (prefix: string): string => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
@@ -13,6 +14,10 @@ function fail<T>(code: ServiceError['code'], message: string, retryable = false)
 
 function normalizedText(value: string): string {
   return value.replace(/\r\n/g, '\n').trim()
+}
+
+function memoryTaskResourceId(item: Task['items'][number]): string {
+  return item.resourceId ?? (item.type === 'reading' ? 'book_zoo' : item.type === 'vocabulary' ? 'resource_vocabulary_demo' : 'resource_exercise_demo')
 }
 
 function fingerprint(value: object): string {
@@ -32,11 +37,13 @@ function hasValidOperation(operationId: string, expectedVersion: number): boolea
 }
 
 export interface PublishClassroomTaskCommand {
+  taskId?: string
   operationId: string
   expectedVersion: number
   title: string
   description: string
   structuredDraft?: StructuredTaskDraft
+  resumePublication?: boolean
 }
 
 export interface StructuredTaskDraft {
@@ -50,7 +57,8 @@ export interface StructuredTaskDraft {
 
 export interface TaskDraftOptionsView {
   selectedClassName: string
-  resources: Array<{ id: string; title: string; type: 'reading' | 'vocabulary' | 'exercise'; requiredCount: number }>
+  availableClasses?: Array<{ id: string; name: string }>
+  resources: Array<{ id: string; title: string; type: 'reading' | 'vocabulary' | 'exercise'; requiredCount: number; allowedClassIds?: string[] }>
   structuredDraft: StructuredTaskDraft
 }
 
@@ -87,7 +95,7 @@ export interface PublishReviewCommand {
   taskId: string
   assignmentId?: string
   decision: 'approved' | 'returned'
-  score: number
+  score?: number
   comment: string
 }
 
@@ -104,7 +112,10 @@ function buildTaskDetail(state: AppState, assignment: AppState['assignments'][nu
   if (!task) return null
   const submission = state.submissions.filter(item => item.assignmentId === assignment.id).sort((a, b) => b.version - a.version)[0]
   const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
-  const view: TaskDetailView = { task, assignment }
+  const view: TaskDetailView = { task, assignment, submissionHistory: state.submissions
+    .filter(item => item.assignmentId === assignment.id && item.submittedAt)
+    .sort((a, b) => b.version - a.version)
+    .map(item => ({ version: item.version, status: item.status, submittedAt: item.submittedAt! })) }
   if (submission) view.submission = submission
   if (feedback) view.feedback = feedback
   return view
@@ -166,9 +177,12 @@ export async function getHome(userId: string): Promise<ServiceResult<HomeView>> 
   const user = state.users.find(item => item.id === userId)
   if (!user) return fail('UNAUTHENTICATED', '登录状态已失效')
   if (user.role !== 'student') return ok({ user, task: null, assignment: null, completedCount: 0, totalCount: 0 })
-  const today = getTodayTask(state.tasks, state.assignments, user.id)
-  const totalCount = today.task?.items.length ?? 0
-  const completedCount = today.assignment && totalCount > 0 ? Math.min(totalCount, Math.floor(today.assignment.progressPercent * totalCount / 100)) : 0
+  const localDate = localTaskDate(new Date().toISOString())
+  const today = getTodayTask(state.tasks, state.assignments, user.id, localDate)
+  const todayAssignments = getTodayAssignments(state.tasks, state.assignments, user.id, localDate)
+    .filter(item => item.assignment.status !== 'overdue' && item.assignment.status !== 'redo_required' && !item.assignment.redoDueAt)
+  const totalCount = todayAssignments.length
+  const completedCount = todayAssignments.filter(item => item.assignment.status === 'awaiting_review' || item.assignment.status === 'completed').length
   return ok({ user, task: today.task, assignment: today.assignment, completedCount, totalCount })
 }
 
@@ -179,9 +193,7 @@ export async function getTaskDetail(userId: string, taskId: string): Promise<Ser
   const task = state.tasks.find(item => item.id === taskId)
   const assignment = state.assignments.find(item => item.taskId === taskId && item.studentId === userId)
   if (!task || !assignment) return fail('FORBIDDEN', '无权查看该任务')
-  const submission = state.submissions.filter(item => item.assignmentId === assignment.id).sort((a, b) => b.version - a.version)[0]
-  const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
-  return ok({ task, assignment, submission, feedback })
+  return ok(buildTaskDetail(state, assignment)!)
 }
 
 export async function listStudentTasks(userId: string): Promise<ServiceResult<TaskDetailView[]>> {
@@ -194,12 +206,8 @@ export async function listStudentTasks(userId: string): Promise<ServiceResult<Ta
   state.assignments.filter(item => item.studentId === userId).forEach(assignment => {
     const task = state.tasks.find(item => item.id === assignment.taskId)
     if (!task) return
-    const submission = state.submissions.filter(item => item.assignmentId === assignment.id).sort((a, b) => b.version - a.version)[0]
-    const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
-    const view: TaskDetailView = { task, assignment }
-    if (submission) view.submission = submission
-    if (feedback) view.feedback = feedback
-    items.push(view)
+    const view = buildTaskDetail(state, assignment)
+    if (view) items.push(view)
   })
   return ok(items)
 }
@@ -310,8 +318,71 @@ export async function getTeacherTasks(userId: string): Promise<ServiceResult<{ t
   return ok({ tasks: manageableTasks, pendingCount, progressByTask, pendingByTask })
 }
 
+export async function getTeacherWorkbench(userId: string, date: string, classId?: string): Promise<ServiceResult<TeacherWorkbenchView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.getTeacherWorkbench(userId, date, classId)
+  const tasks = await getTeacherTasks(userId)
+  if (!tasks.ok) return tasks
+  const scoped = tasks.data.tasks.filter(item => !classId || item.classId === classId).filter(item => item.status !== 'draft' && item.startsAt.slice(0, 10) <= date && item.dueAt.slice(0, 10) >= date)
+  const pending = scoped.reduce((sum, item) => sum + (tasks.data.pendingByTask[item.id] ?? 0), 0)
+  return ok({ activeTaskCount: scoped.length, pendingReviewCount: pending, pendingCommentCount: pending, recentTasks: scoped.slice(0, 5).map(item => ({ taskId: item.id })) })
+}
+
+export async function previewTeacherTask(userId: string, taskId: string, version: number): Promise<ServiceResult<TeacherTaskPreviewView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.previewTeacherTask(userId, taskId, version)
+  const state = getState()
+  const teacher = state.users.find(item => item.id === userId)
+  const task = state.tasks.find(item => item.id === taskId)
+  if (!teacher || !task || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权预览该任务')
+  if (task.version !== version) return versionConflict()
+  return ok({ taskId, title: task.title, description: task.description, startsAt: task.startsAt, dueAt: task.dueAt, classIds: [task.classId], version: task.version,
+    items: task.items.map(item => ({ id: item.id, resourceId: memoryTaskResourceId(item), title: item.title, type: item.type, completionRule: item.completionRuleData ?? {} })),
+  })
+}
+
+export async function getTeacherTaskForEdit(userId: string, taskId: string): Promise<ServiceResult<TeacherTaskEditView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.getTeacherTaskForEdit(userId, taskId)
+  const state = getState()
+  const teacher = state.users.find(item => item.id === userId)
+  const task = state.tasks.find(item => item.id === taskId)
+  if (!teacher || !task || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权编辑该任务')
+  return ok({ taskId, title: task.title, status: task.status, version: task.version, description: task.description, teacherNote: null,
+    startsAt: task.startsAt, dueAt: task.dueAt, latePolicy: { allowLate: true, lateDays: 7 },
+    target: { type: 'classes', classIds: [task.classId], studentIds: [] },
+    itemRefs: task.items.map((item, index) => ({ id: item.id, resourceId: memoryTaskResourceId(item), order: index + 1, completionRule: item.completionRuleData ?? {} })),
+    items: task.items.map(item => ({ resourceId: memoryTaskResourceId(item), title: item.title, type: item.type })),
+  })
+}
+
+export async function updatePublishedTeacherTask(userId: string, command: PublishClassroomTaskCommand, status: Task['status'], previousDueAt: string): Promise<ServiceResult<{ taskId: string; version: number }>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.updatePublishedTeacherTask(userId, command, status, previousDueAt)
+  return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持已发布任务编辑')
+}
+
+export async function updateTeacherTaskDescription(userId: string, taskId: string, version: number, description: string, operationId: string): Promise<ServiceResult<{ taskId: string; version: number }>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.updateTeacherTaskDescription(userId, taskId, version, description, operationId)
+  const state = getState()
+  const teacher = state.users.find(item => item.id === userId)
+  const task = state.tasks.find(item => item.id === taskId)
+  if (!teacher || !task || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权编辑该任务')
+  if (task.version !== version) return versionConflict()
+  const next = mutateState(draft => { const item = draft.tasks.find(candidate => candidate.id === taskId); if (item) { item.description = description; item.version += 1 } })
+  return ok({ taskId, version: next.tasks.find(item => item.id === taskId)!.version })
+}
+
+export async function recycleTeacherTask(userId: string, taskId: string, version: number, reason: string, operationId: string): Promise<ServiceResult<{ taskId: string }>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.recycleTeacherTask(userId, taskId, version, reason, operationId)
+  return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持回收任务')
+}
+
 export interface ReviewAssignmentView {
   studentName: string
+  classId?: string
   className?: string
   studentNumber?: string
   submittedAt?: string
@@ -335,9 +406,25 @@ export async function getCompletion(userId: string, taskId: string): Promise<Ser
     const student = state.users.find(item => item.id === assignment.studentId)
     const submission = assignment.latestSubmissionId ? state.submissions.find(item => item.id === assignment.latestSubmissionId) : undefined
     const feedback = submission ? state.feedback.find(item => item.submissionId === submission.id) : undefined
-    return { studentName: student?.displayName ?? '学生', className: '三年级 2 班', studentNumber: student?.id === 'usr_student_xiaoyu' ? '0321' : student?.id.replace(/\D/g, '').slice(-4).padStart(4, '0'), submittedAt: assignment.submittedAt, assignmentId: assignment.id, taskId, status: assignment.status, submissionId: submission?.id, submissionVersion: submission?.version, score: feedback?.score, comment: feedback?.textComment }
+    return { studentName: student?.displayName ?? '学生', classId: assignment.classId, className: '三年级 2 班', studentNumber: student?.id === 'usr_student_xiaoyu' ? '0321' : student?.id.replace(/\D/g, '').slice(-4).padStart(4, '0'), submittedAt: assignment.submittedAt, assignmentId: assignment.id, taskId, status: assignment.status, submissionId: submission?.id, submissionVersion: submission?.version, score: feedback?.score, comment: feedback?.textComment }
   })
   return ok(rows)
+}
+
+export async function getReviewSubmission(userId: string, submissionId: string): Promise<ServiceResult<TeacherReviewSubmissionView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.getReviewSubmission(userId, submissionId)
+  const state = getState()
+  const submission = state.submissions.find(item => item.id === submissionId)
+  const assignment = submission ? state.assignments.find(item => item.id === submission.assignmentId) : undefined
+  const task = assignment ? state.tasks.find(item => item.id === assignment.taskId) : undefined
+  const teacher = state.users.find(item => item.id === userId)
+  if (!submission || !task || !teacher || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权查看该提交')
+  const feedback = state.feedback.find(item => item.submissionId === submissionId)
+  return ok({ taskTitle: task.title, submittedAt: submission.submittedAt ?? '', submissionVersion: submission.version,
+    answers: submission.answers.map(item => ({ itemId: item.taskItemId, value: item.structuredValue ?? item.value })),
+    feedback: feedback ? { id: feedback.id, decision: feedback.decision, score: feedback.score ?? null, textComment: feedback.textComment ?? null, returnReason: feedback.returnReason ?? null, publishedAt: feedback.publishedAt } : null,
+  })
 }
 
 export function publishClassroomTask(userId: string, title: string, description: string): Promise<ServiceResult<Task>>
@@ -355,43 +442,99 @@ export async function publishClassroomTask(userId: string, titleOrCommand: strin
   const state = getState()
   const user = state.users.find(item => item.id === userId)
   if (!user || user.role !== 'teacher') return fail('FORBIDDEN', '仅教师可布置任务')
-  const commandFingerprint = command ? fingerprint({ title, description, expectedVersion: command.expectedVersion }) : ''
+  const commandFingerprint = command ? fingerprint({ taskId: command.taskId, title, description, expectedVersion: command.expectedVersion, structuredDraft: command.structuredDraft }) : ''
+  const existingDraft = command?.taskId ? state.tasks.find(item => item.id === command.taskId && item.creatorTeacherId === userId && item.status === 'draft') : undefined
   if (command) {
     if (!hasValidOperation(command.operationId, command.expectedVersion)) return fail('VALIDATION_ERROR', '操作标识或版本无效')
     const operation = findOperation<Task>(state, 'publish_task', userId, command.operationId.trim(), commandFingerprint)
     if (operation.status === 'conflict') return operationConflict()
     if (operation.status === 'replay') return ok(operation.result!)
-    if (command.expectedVersion !== 0) return versionConflict()
+    if (command.taskId && !existingDraft) return fail('NOT_FOUND', '任务草稿不存在')
+    if (command.expectedVersion !== (existingDraft?.version ?? 0)) return versionConflict()
   }
   if (!title) return fail('VALIDATION_ERROR', '请输入任务名称')
+  const structuredDraft = command?.structuredDraft
+  if (structuredDraft) {
+    const start = Date.parse(structuredDraft.startsAt)
+    const due = Date.parse(structuredDraft.dueAt)
+    if (!Number.isFinite(start) || !Number.isFinite(due) || due <= start) return fail('VALIDATION_ERROR', '截止时间必须晚于开始时间')
+    if (!structuredDraft.items.length) return fail('VALIDATION_ERROR', '任务内容至少包含一项')
+    if (structuredDraft.target.type === 'classes' && (structuredDraft.target.classIds.length !== 1 || structuredDraft.target.classIds[0] !== user.classId)) return fail('FORBIDDEN', '只能向授权班级布置任务')
+    if (structuredDraft.target.type === 'students' && (!structuredDraft.target.studentIds.length || structuredDraft.target.studentIds.some(studentId => !state.users.some(student => student.id === studentId && student.role === 'student' && student.classId === user.classId)))) return fail('FORBIDDEN', '只能向授权学员布置任务')
+  }
   let taskId = ''
   const nextState = mutateState(draft => {
-    const startsAt = clock.now()
-    const dueAt = new Date(startsAt)
-    dueAt.setHours(20, 0, 0, 0)
-    if (dueAt <= startsAt) dueAt.setDate(dueAt.getDate() + 1)
+    const startsAt = structuredDraft?.startsAt ?? clock.now().toISOString()
+    const dueAt = structuredDraft?.dueAt ?? new Date(Date.parse(startsAt) + 24 * 60 * 60 * 1000).toISOString()
+    const classId = user.classId ?? 'cls_grade3_2'
     const nextTask: Task = {
-      id: id('tsk'),
+      id: existingDraft?.id ?? id('tsk'),
       title,
       deliveryType: 'classroom',
       status: 'active',
       creatorTeacherId: user.id,
-      classId: 'cls_grade3_2',
-      startsAt: startsAt.toISOString(),
-      dueAt: dueAt.toISOString(),
+      classId,
+      startsAt,
+      dueAt,
       description,
-      items: [
-        { id: id('tki_reading'), type: 'reading', title: '阅读练习', completionRule: '完成指定阅读内容' },
+      items: structuredDraft ? structuredDraft.items.map(item => ({
+        id: item.id,
+        resourceId: item.resourceId,
+        type: item.type,
+        title: item.type === 'reading' ? '动物主题绘本' : item.type === 'vocabulary' ? '动物主题词包' : '动物主题习题',
+        completionRule: `完成 ${item.requiredCount} ${item.type === 'reading' ? '页' : item.type === 'vocabulary' ? '词' : '题'}`,
+        completionRuleData: item.type === 'reading' ? { kind: 'reading_pages' as const, requiredPageCount: item.requiredCount } : item.type === 'vocabulary' ? { kind: 'vocabulary_words' as const, requiredWordCount: item.requiredCount } : { kind: 'exercise_questions' as const, requiredQuestionCount: item.requiredCount },
+      })) : [
+        { id: id('tki_reading'), resourceId: 'book_zoo', type: 'reading', title: '阅读练习', completionRule: '完成指定阅读内容' },
         { id: id('tki_vocabulary'), type: 'vocabulary', title: '单词练习', completionRule: '完成指定词量' },
         { id: id('tki_exercise'), type: 'exercise', title: '习题练习', completionRule: '完成全部题目' },
       ],
-      version: 1,
+      version: (existingDraft?.version ?? 0) + 1,
     }
     taskId = nextTask.id
-    draft.tasks.push(nextTask)
-    const students = draft.users.filter(item => item.role === 'student' && item.classId === nextTask.classId)
+    if (existingDraft) {
+      const index = draft.tasks.findIndex(item => item.id === existingDraft.id)
+      draft.tasks[index] = nextTask
+    } else draft.tasks.push(nextTask)
+    const students = draft.users.filter(item => item.role === 'student' && item.classId === nextTask.classId && (structuredDraft?.target.type !== 'students' || structuredDraft.target.studentIds.includes(item.id)))
     draft.assignments.push(...students.map(student => ({ id: id('asn'), taskId: nextTask.id, studentId: student.id, classId: nextTask.classId, status: 'not_started' as const, progressPercent: 0, redoCount: 0 })))
     if (command) addOperationReceipt(draft, { kind: 'publish_task', actorUserId: userId, operationId: command.operationId.trim(), fingerprint: commandFingerprint, result: nextTask })
+  })
+  return ok(nextState.tasks.find(item => item.id === taskId)!)
+}
+
+export async function saveTeacherTaskDraft(userId: string, command: PublishClassroomTaskCommand): Promise<ServiceResult<Task>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.saveTeacherTaskDraft(userId, command)
+  const state = getState()
+  const teacher = state.users.find(item => item.id === userId && item.role === 'teacher')
+  if (!teacher) return fail('FORBIDDEN', '仅教师可保存任务草稿')
+  const title = normalizedText(command.title)
+  if (!title || !command.structuredDraft?.items.length || !hasValidOperation(command.operationId, command.expectedVersion)) return fail('VALIDATION_ERROR', '请补全任务名称和内容')
+  const target = command.structuredDraft.target
+  if (target.type === 'classes' && (target.classIds.length !== 1 || target.classIds[0] !== teacher.classId)) return fail('FORBIDDEN', '只能向授权班级保存草稿')
+  if (target.type === 'students' && (!target.studentIds.length || target.studentIds.some(studentId => !state.users.some(student => student.id === studentId && student.role === 'student' && student.classId === teacher.classId)))) return fail('FORBIDDEN', '只能选择授权学员')
+  const existingDraft = command.taskId ? state.tasks.find(item => item.id === command.taskId && item.creatorTeacherId === userId && item.status === 'draft') : undefined
+  const fingerprintValue = fingerprint({ taskId: command.taskId, expectedVersion: command.expectedVersion, title, description: command.description, structuredDraft: command.structuredDraft })
+  const prior = findOperation<Task>(state, 'save_teacher_draft', userId, command.operationId, fingerprintValue)
+  if (prior.status === 'conflict') return operationConflict()
+  if (prior.status === 'replay') return ok(prior.result!)
+  if (command.taskId && !existingDraft) return fail('NOT_FOUND', '任务草稿不存在')
+  if (command.expectedVersion !== (existingDraft?.version ?? 0)) return versionConflict()
+  let taskId = ''
+  const nextState = mutateState(next => {
+    const task: Task = {
+      id: existingDraft?.id ?? id('tsk'), title, deliveryType: 'classroom', status: 'draft', creatorTeacherId: userId,
+      classId: teacher.classId ?? '', startsAt: command.structuredDraft!.startsAt, dueAt: command.structuredDraft!.dueAt,
+      description: normalizedText(command.description), version: (existingDraft?.version ?? 0) + 1,
+      items: command.structuredDraft!.items.map(item => ({ id: item.id, resourceId: item.resourceId, type: item.type, title: item.resourceId, completionRule: `完成 ${item.requiredCount}` })),
+    }
+    taskId = task.id
+    if (existingDraft) {
+      const index = next.tasks.findIndex(item => item.id === existingDraft.id)
+      next.tasks[index] = task
+    } else next.tasks.push(task)
+    addOperationReceipt(next, { kind: 'save_teacher_draft', actorUserId: userId, operationId: command.operationId, fingerprint: fingerprintValue, result: task })
   })
   return ok(nextState.tasks.find(item => item.id === taskId)!)
 }
@@ -415,7 +558,7 @@ export async function reviewSubmission(
   }
   const taskId = command?.taskId ?? taskIdOrCommand as string
   const decision = command?.decision ?? decisionOrClock as 'approved' | 'returned'
-  const score = Math.max(0, Math.min(100, command?.score ?? legacyScore))
+  const score = command ? (command.score === undefined ? undefined : Math.max(0, Math.min(100, command.score))) : Math.max(0, Math.min(100, legacyScore))
   const comment = normalizedText(command?.comment ?? legacyComment)
   const assignmentId = command?.assignmentId ?? legacyAssignmentId
   const clock = command && typeof decisionOrClock !== 'string' ? decisionOrClock : legacyClock
@@ -502,16 +645,14 @@ export async function getDraftOptions(userId: string, clock: Clock = systemClock
   const teacher = getState().users.find(item => item.id === userId && item.role === 'teacher')
   if (!teacher) return fail('FORBIDDEN', '仅教师可布置任务')
   const startsAt = clock.now()
-  const dueAt = new Date(startsAt)
-  dueAt.setHours(20, 0, 0, 0)
-  if (dueAt <= startsAt) dueAt.setDate(dueAt.getDate() + 1)
+  const dueAt = new Date(startsAt.getTime() + 24 * 60 * 60 * 1000)
   const resources: TaskDraftOptionsView['resources'] = [
-    { id: 'resource_reading_demo', title: '动物主题绘本', type: 'reading', requiredCount: 3 },
-    { id: 'resource_vocabulary_demo', title: '动物主题词包', type: 'vocabulary', requiredCount: 8 },
-    { id: 'resource_exercise_demo', title: '动物主题习题', type: 'exercise', requiredCount: 5 },
+    { id: 'book_zoo', title: '动物主题绘本', type: 'reading', requiredCount: 3, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
+    { id: 'resource_vocabulary_demo', title: '动物主题词包', type: 'vocabulary', requiredCount: 8, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
+    { id: 'resource_exercise_demo', title: '动物主题习题', type: 'exercise', requiredCount: 5, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
   ]
   return ok({
-    selectedClassName: '三年级 2 班', resources,
+    selectedClassName: '三年级 2 班', availableClasses: [{ id: teacher.classId ?? 'cls_grade3_2', name: '三年级 2 班' }], resources,
     structuredDraft: {
       items: resources.map(item => ({ id: `item_${item.type}`, resourceId: item.id, type: item.type, requiredCount: item.requiredCount, maxScore: 100 })),
       target: { type: 'classes', classIds: [teacher.classId ?? 'cls_grade3_2'] },
@@ -557,6 +698,24 @@ export async function getTeacherStudent(userId: string, studentId: string): Prom
     parents: student.id === 'usr_student_xiaoyu' ? [{ linkId: 'rel_parent_xiaoyu', displayNameMasked: '小***', mobileMasked: '138****2046', confirmedAt: '2026-09-16T00:00:00.000Z' }] : [],
     performance: { assignedCount: 1, completedCount: 0, overdueCount: 0, redoCount: 0, completionRate: 0, averageScore: null }, recentTasks: [],
   })
+}
+
+export async function updateTeacherStudent(userId: string, command: TeacherStudentUpdateCommand): Promise<ServiceResult<TeacherStudentMutationView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.updateTeacherStudent(userId, command)
+  return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持修改学员资料')
+}
+
+export async function setTeacherStudentStatus(userId: string, command: TeacherStudentStatusCommand): Promise<ServiceResult<TeacherStudentMutationView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.setTeacherStudentStatus(userId, command)
+  return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持停用学员')
+}
+
+export async function transferTeacherStudent(userId: string, command: TeacherStudentTransferCommand): Promise<ServiceResult<TeacherStudentMutationView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.transferTeacherStudent(userId, command)
+  return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持学员转班')
 }
 
 export async function listParentChildren(userId: string): Promise<ServiceResult<ParentChildLinkView[]>> {

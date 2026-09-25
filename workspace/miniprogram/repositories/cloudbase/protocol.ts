@@ -14,6 +14,7 @@ export type FunctionName =
   | 'learning-progress-query'
   | 'learning-progress-command'
   | 'teacher-student-query'
+  | 'teacher-student-command'
 
 export interface FunctionRequest<TAction extends string, TPayload extends object> {
   apiVersion: 'm1.v1'

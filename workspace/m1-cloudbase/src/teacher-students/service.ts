@@ -92,12 +92,13 @@ export class TeacherStudentQueryService {
     const authorizedById = new Map(authorized.map((item) => [item.classEntity.id, item.classEntity]));
     const student = await this.dependencies.organizationRepository.findUser(actor.organizationId, studentId);
     let membership: ClassMembershipEntity | null = null;
+    const membershipVersions: Record<string, number> = {};
     for (const classId of authorizedById.keys()) {
       const candidate = await this.dependencies.organizationRepository.findMembership(actor.organizationId, studentId, classId);
+      membershipVersions[classId] = candidate?.version ?? 0;
       if (candidate !== null && candidate.status !== 'transferred'
-        && (candidate.status === 'active' || student?.status === 'disabled')) {
+        && (candidate.status === 'active' || student?.status === 'disabled') && membership === null) {
         membership = candidate;
-        break;
       }
     }
     if (membership === null) return failure('NOT_FOUND', this.meta());
@@ -123,6 +124,9 @@ export class TeacherStudentQueryService {
       parents,
       performance,
       recentTasks,
+      userVersion: student.version,
+      membershipVersion: membership.version,
+      membershipVersions,
     }, this.meta());
   }
 
@@ -237,6 +241,7 @@ function classOption(classEntity: ClassEntity): TeacherStudentClassOption {
     name: classEntity.name,
     grade: classEntity.grade,
     term: classEntity.term,
+    version: classEntity.version,
   };
 }
 

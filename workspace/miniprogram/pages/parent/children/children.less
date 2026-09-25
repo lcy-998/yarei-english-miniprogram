@@ -25,3 +25,7 @@
 .child-actions .remove { min-height: 38px; padding: 0 13px; justify-content: center; border: 1px solid #f2a99f; border-radius: 19px; background: #fff0ed; color: @yr-danger; font-size: 16px; line-height: 38px; box-shadow: 0 4px 10px rgba(217,52,43,.10); }
 .child-actions .remove::after { border: 0; }
 @media (max-width: 370px) { .child-actions { right: 18px; top: 43%; } .child-actions .remove { min-height: 36px; padding: 0 10px; border-radius: 18px; font-size: 15px; line-height: 36px; } }
+
+/* Keep the binding confirmation and cancel actions compact and non-overlapping. */
+.add-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; padding: 0; }
+.add-actions g0-button { display: block; width: 100%; min-width: 0; transform: scale(.92); transform-origin: center; }

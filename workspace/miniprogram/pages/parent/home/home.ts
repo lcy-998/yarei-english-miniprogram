@@ -1,12 +1,14 @@
 import { TaskDetailView } from '../../../domain/types'
-import { getParentHome } from '../../../services/app-service'
-import { getSession, setCurrentTaskId } from '../../../session/session'
+import { getParentHome, listParentChildren } from '../../../services/app-service'
+import { getSession, setCurrentChildId, setCurrentTaskId } from '../../../session/session'
 import { assignmentStatusLabel } from '../../../shared/assignment-status'
 import { summarizeAssignments } from '../../../shared/dashboard-summary'
+import { formatTaskDueAt } from '../../../shared/task-schedule'
 
 interface ParentTaskListItem extends TaskDetailView {
   key: string
   statusLabel: string
+  dueLabel: string
 }
 
 Component({
@@ -33,9 +35,17 @@ Component({
       const session = getSession()
       if (!session) { wx.redirectTo({ url: '/pages/auth/login/login' }); return }
       this.setData({ loading: true, error: '' })
-      const result = await getParentHome(session.user.id)
+      let result = await getParentHome(session.user.id)
+      if (!result.ok && result.error.code === 'VALIDATION_ERROR') {
+        const children = await listParentChildren(session.user.id)
+        const firstChild = children.ok ? children.data[0] : undefined
+        if (firstChild) {
+          setCurrentChildId(firstChild.childId)
+          result = await getParentHome(session.user.id)
+        }
+      }
       if (!result.ok) { this.setData({ loading: false, error: result.error.message }); return }
-      const tasks = result.data.tasks.map((item) => ({ ...item, key: item.task.id, statusLabel: assignmentStatusLabel(item.assignment.status, '待点评') }))
+      const tasks = result.data.tasks.map((item) => ({ ...item, key: item.task.id, statusLabel: assignmentStatusLabel(item.assignment.status, '待点评'), dueLabel: formatTaskDueAt(item.task.dueAt) }))
       const summary = summarizeAssignments(tasks.map((item) => item.assignment))
       const latestFeedbackTask = tasks.find((item) => Boolean(item.feedback))
       this.setData({

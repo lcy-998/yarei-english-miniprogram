@@ -43,12 +43,15 @@ export interface ReadingBookView {
 
 export interface ReadingProgressView {
   book: ReadingBookView
+  hasSavedProgress: boolean
   chapterNumber: number
   chapterCount: number
   pageNumber: number
   pageCount: number
   progressPercent: number
   pageImageUrl: string
+  thumbnailImageUrl: string
+  pages: Array<{ pageNumber: number; chapterNumber: number; imageUrl: string; thumbnailUrl: string }>
 }
 
 export interface ChildView {

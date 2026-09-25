@@ -80,7 +80,7 @@ export const initialState: AppState = {
     description: '完成听力、跟读和单词练习后提交。',
     items: [
       { id: 'tki_listening', type: 'exercise', title: '听力练习', completionRule: '完成全部题目' },
-      { id: 'tki_reading', type: 'reading', title: '跟读练习', completionRule: '提交有效录音' },
+      { id: 'tki_reading', resourceId: 'book_zoo', type: 'reading', title: '跟读练习', completionRule: '提交有效录音' },
       { id: 'tki_vocabulary', type: 'vocabulary', title: '单词练习', completionRule: '完成指定词量' },
     ],
     version: 1,

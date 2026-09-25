@@ -102,9 +102,11 @@ type ErrorCode =
 | `listTeacherTasks` | `filters, page` | `PageResult<TeacherTaskListItem>` | `TeacherTaskService.listTasks` / 当前 `getTeacherTasks` |
 | `getDraftOptions` | 空对象 | `TaskDraftOptions` | `TeacherTaskService.getDraftOptions` |
 | `previewTask` | 草稿字段或 `taskId, expectedVersion` | `StudentTaskPreview` | `TeacherTaskService.previewTask` |
+| `getTaskForEdit` | `taskId` | `TeacherTaskEditView`（仅创建者，含规则、对象与版本） | `TeacherTaskQueryService.getTaskForEdit` |
 | `getCompletion` | `taskId, filter, page` | `TaskCompletionView` | `ReviewService.getCompletion` / 当前 `getCompletion` |
 
 教师查询由当前 class grants 收敛；不接受客户端扩大班级范围。统计从 assignments/submissions/feedback 聚合，不维护页面独立计数副本。
+`getCompletion` 的每条学生任务返回真实提交时间和当前点评分数；没有正式点评时分数为 `null`。教师页面可在自身 `student.read` 授权范围内另行解析学生显示姓名、编号和班级，不得用演示分数填空。
 
 ### 3.3 `task-command`
 
@@ -116,7 +118,7 @@ type ErrorCode =
 | `withdrawTask` | `taskId, expectedVersion, reason`；operationId 必填 | receipt | 任务生命周期 command |
 | `recycleTask` | `taskId, expectedVersion, reason`；operationId 必填 | receipt | T-07 删除语义 |
 
-`saveDraft` 可引用资源 ID，但发布必须在服务端重新读取资源状态、复制内容/规则快照、解析目标名单，并在同一事务生成 task + assignments + 幂等结果 + 审计。发布规模受 OQ-09 决策门约束。
+`saveDraft` 可引用资源 ID，但发布必须在服务端重新读取资源状态、复制内容/规则快照、解析目标名单。50 人以内沿用单事务发布；51—500 人先冻结名单和任务快照，再分批建立 assignment，完成前任务保持草稿不可见；中断后用同一发布意图继续，最终批次提交可见状态与审计。超过 500 人明确返回字段错误；新方案的云端容量、恢复和事务预算待验证。
 
 ### 3.4 `student-task-query`
 
@@ -205,6 +207,7 @@ M1 只提供基础阅读/单词查询：`listReadingResources`、`getReadingReso
 | `getStudent` | `studentId` | `TeacherStudentDetail` | `TeacherStudentQueryService.getStudent` |
 
 查询范围由可信教师 actor、当前 `teacher_class_grant` 和 `student.read` 权限共同收敛；客户端班级筛选只能缩小范围。查询 action 禁止携带 `operationId` 或 `expectedVersion`。
+`getStudent` 在授权详情中另返回 `userVersion`、`membershipVersion`、目标授权班级的 `membershipVersions` 和 `classInfo.version`，供资料编辑、状态更新及转班命令做版本校验；列表仍只提供展示和绩效摘要。
 
 ### 3.13 `teacher-student-command`
 

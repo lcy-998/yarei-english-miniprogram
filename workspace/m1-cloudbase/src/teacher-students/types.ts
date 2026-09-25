@@ -18,6 +18,7 @@ export interface TeacherStudentClassOption {
   readonly name: string;
   readonly grade: string;
   readonly term: string;
+  readonly version?: number;
 }
 
 export interface TeacherStudentPerformanceSummary {
@@ -71,6 +72,9 @@ export interface TeacherStudentDetail {
   readonly parents: readonly TeacherStudentParentSummary[];
   readonly performance: TeacherStudentPerformanceSummary;
   readonly recentTasks: readonly TeacherStudentTaskItem[];
+  readonly userVersion?: number;
+  readonly membershipVersion?: number;
+  readonly membershipVersions?: Readonly<Record<string, number>>;
 }
 
 export interface UpdateTeacherStudentProfileCommand {

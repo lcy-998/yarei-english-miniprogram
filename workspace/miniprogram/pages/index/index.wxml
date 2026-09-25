@@ -1,17 +1,17 @@
 <g0-page-shell nature="{{true}}" tone="nature"><view class="home-page">
   <view class="nature-top" style="padding-top: {{topInset}}px; min-height: {{heroHeight}}px;">
     <view class="brand-row"><image src="/assets/g0/brand-logo.png" class="crest" mode="aspectFit"/><text>雅睿英语</text><view class="notice" bindtap="openNotice" aria-role="button" aria-label="通知"><view class="notice-bell"></view></view></view>
-    <view class="welcome"><view><text class="hello">嗨，{{home.user.displayName}}</text><text class="class-name">三年级 2 班 · {{dateLabel}}</text></view><image src="/assets/g0/mascot-learning-blue.png" class="mascot" mode="widthFix"/></view>
+    <view class="welcome"><view><text class="hello">嗨，{{home.user.displayName}}</text><text class="class-name">{{className || '班级待分配'}}　{{dateLabel}}</text></view><image src="/assets/g0/mascot-learning-blue.png" class="mascot" mode="widthFix"/></view>
   </view>
   <state-panel wx:if="{{loading}}" state="loading"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadHome"></state-panel>
   <block wx:elif="{{home}}">
     <view wx:if="{{home.task}}" class="task-card" bindtap="openTask" hover-class="task-card--pressed" aria-role="button" aria-label="打开今日任务">
       <view class="task-head"><view class="task-heading"><g0-icon name="calendar" size="{{48}}"></g0-icon><text>今日任务</text></view><text class="progress">完成 {{home.completedCount}}/{{home.totalCount}}</text></view>
-      <view class="thin-progress"><view class="thin-progress__done" style="width: {{home.assignment.progressPercent}}%;"></view></view>
-      <view class="task-body"><g0-icon name="publish" size="68"></g0-icon><view class="task-copy"><text class="task-title">{{home.task.title}}</text><view class="due"><view class="clock" aria-hidden="true"></view><text>今天 20:00 截止</text></view></view></view>
+      <view class="thin-progress"><view class="thin-progress__done" style="width: {{home.totalCount ? home.completedCount * 100 / home.totalCount : 0}}%;"></view></view>
+      <view class="task-body"><g0-icon name="publish" size="68"></g0-icon><view class="task-copy"><text class="task-title">{{home.task.title}}</text><view class="due"><view class="clock" aria-hidden="true"></view><text>{{dueLabel}} 截止</text></view></view></view>
     </view>
-    <view wx:else class="task-card complete"><view class="task-head"><text>今日任务</text><text class="progress">已完成</text></view><text class="complete-copy">今天没有待完成任务</text></view>
+    <view wx:else class="task-card complete"><view class="task-head"><text>今日任务</text><text class="progress">完成 {{home.completedCount}}/{{home.totalCount}}</text></view><text class="complete-copy">今日任务已完成</text></view>
     <view class="vocabulary-card" bindtap="openVocabulary" hover-class="vocabulary-card--pressed" aria-role="button" aria-label="进入单词练习"><g0-icon name="word" size="{{70}}" tone="warning"></g0-icon><view class="vocabulary-copy"><text class="vocabulary-title">单词练习</text><text class="vocabulary-sub">从今天的词包开始</text></view><view class="chevron chevron--round" aria-hidden="true"></view></view>
   </block>
   <g0-tab-bar role="student" active="home"></g0-tab-bar>

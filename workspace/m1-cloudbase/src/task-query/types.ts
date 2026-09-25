@@ -113,6 +113,23 @@ export interface StudentTaskPreview {
   readonly classIds: readonly string[];
   readonly items: readonly SafeTaskItemView[];
   readonly version: number;
+  readonly target?: Readonly<{ type: 'classes' | 'students'; classIds: readonly string[]; studentIds: readonly string[] }>;
+}
+
+export interface TeacherTaskEditView {
+  readonly taskId: string;
+  readonly title: string;
+  readonly status: TaskRecord['status'];
+  readonly version: number;
+  readonly description: string | null;
+  readonly teacherNote: string | null;
+  readonly startsAt: string;
+  readonly dueAt: string;
+  readonly latePolicy: TaskRecord['latePolicy'];
+  readonly target: Readonly<{ type: 'classes' | 'students'; classIds: readonly string[]; studentIds: readonly string[] }>;
+  readonly itemRefs: TaskRecord['itemRefs'];
+  readonly items: readonly Readonly<{ resourceId: string; title: string; type: QueryResourceOptionRecord['type'] }>[];
+  readonly publication?: Readonly<{ operationId: string; originalVersion: number; completedCount: number; totalCount: number }>;
 }
 
 export interface CompletionListItem {
@@ -125,6 +142,7 @@ export interface CompletionListItem {
   readonly latestSubmissionVersion: number;
   readonly isLate: boolean;
   readonly reviewedAt: string | null;
+  readonly score: number | null;
 }
 
 export interface TaskCompletionView {
@@ -233,6 +251,7 @@ export interface StudentTaskDetailView {
     recordVersion: number;
     assignmentVersion: number;
   }> | null;
+  readonly submissionHistory: readonly Readonly<{ version: number; status: SubmissionRecord['status']; submittedAt: string }>[];
   readonly feedback: Readonly<{
     id: string;
     decision: ReviewFeedbackRecord['decision'];

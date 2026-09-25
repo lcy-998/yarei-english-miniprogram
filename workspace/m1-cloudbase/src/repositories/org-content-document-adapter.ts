@@ -1437,12 +1437,13 @@ function decodeLearningResource(
   if (title === null || contentVersion === null || copyrightStatus === null || visibility === null) return null;
 
   if (document.type === 'reading') {
+    const legacyChapters = payload.demoOnly === true ? decodeLegacyReadingPages(payload.pages, title) : null;
     const category = readEnum(field(document, payload, 'category'), [
       'original', 'synchronized', 'picture_book', 'current_events', 'chapter_book',
-    ] as const);
-    const grade = readStringFrom(document, payload, 'grade');
-    const difficulty = readStringFrom(document, payload, 'difficulty');
-    const chapters = decodeChapters(field(document, payload, 'chapters'));
+    ] as const) ?? (legacyChapters === null ? null : 'picture_book');
+    const grade = readStringFrom(document, payload, 'grade') ?? (legacyChapters === null ? null : '未分级');
+    const difficulty = readStringFrom(document, payload, 'difficulty') ?? (legacyChapters === null ? null : '基础');
+    const chapters = decodeChapters(field(document, payload, 'chapters')) ?? legacyChapters;
     const searchText = readOptionalStringFrom(document, payload, 'searchText');
     if (category === null || grade === null || difficulty === null || chapters === null || searchText === false) return null;
     return {
@@ -1458,6 +1459,7 @@ function decodeLearningResource(
       grade,
       difficulty,
       chapters,
+      ...(legacyChapters === null ? {} : { taskOnly: true }),
       ...(searchText === undefined ? {} : { searchText }),
     };
   }
@@ -1513,6 +1515,28 @@ function decodeChapters(value: JsonValue | undefined): readonly ReadingChapterEn
     chapters.push({ id, title, order, pages });
   }
   return chapters;
+}
+
+function decodeLegacyReadingPages(value: JsonValue | undefined, title: string): readonly ReadingChapterEntity[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const groups = new Map<string, ReadingPageEntity[]>();
+  for (const [index, raw] of value.entries()) {
+    if (!isJsonObject(raw)) return null;
+    const chapterId = readString(raw, 'chapterId');
+    const id = readString(raw, 'id');
+    const pageNumber = readInteger(raw, 'pageNumber', 1);
+    const thumbnailAssetKey = readString(raw, 'thumbnailAssetKey');
+    const imageAssetKey = readString(raw, 'imageAssetKey');
+    const width = readInteger(raw, 'width', 1);
+    const height = readInteger(raw, 'height', 1);
+    const version = readStringOrNumber(raw, 'version');
+    if (chapterId === null || id === null || pageNumber === null || thumbnailAssetKey === null || imageAssetKey === null
+      || width === null || height === null || version === null) return null;
+    const pages = groups.get(chapterId) ?? [];
+    pages.push({ id, pageNumber, order: index + 1, thumbnailAssetKey, imageAssetKey, width, height, assetVersion: version });
+    groups.set(chapterId, pages);
+  }
+  return [...groups.entries()].map(([id, pages], index) => ({ id, title, order: index + 1, pages }));
 }
 
 function decodePage(value: JsonValue): ReadingPageEntity | null {

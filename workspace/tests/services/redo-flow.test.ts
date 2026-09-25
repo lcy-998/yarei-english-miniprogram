@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Clock } from '../../miniprogram/services/clock'
-import { getTaskDetail, reviewSubmission, submitTask } from '../../miniprogram/services/app-service'
+import { getTaskDetail, reviewSubmission, saveDraft, submitTask } from '../../miniprogram/services/app-service'
 import { getState, initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 
 const STUDENT_ID = 'usr_student_xiaoyu'
@@ -100,6 +100,15 @@ describe('M0 returned-work rules', () => {
     expect(submissions).toHaveLength(2)
     expect(submissions[0]).toMatchObject({ id: first.data.id, status: 'returned', answers: [{ value: '旧版本' }] })
     expect(submissions[1]).toMatchObject({ id: result.data.id, version: 2, status: 'submitted', answers: [{ value: '新版本' }] })
+  })
+
+  it('allows saving a redo draft before resubmission', async () => {
+    await submitAt('2026-09-14T01:00:00.000Z', '原提交')
+    await returnAt('2026-09-14T02:00:00.000Z', '请订正')
+    const draft = await saveDraft(STUDENT_ID, TASK_ID, '订正草稿')
+    expect(draft).toMatchObject({ ok: true, data: { status: 'draft' } })
+    const submitted = await submitAt('2026-09-17T02:00:00.000Z', '订正提交')
+    expect(submitted).toMatchObject({ ok: true, data: { status: 'submitted' } })
   })
 
   it('rejects resubmission after the redo deadline without changing state', async () => {

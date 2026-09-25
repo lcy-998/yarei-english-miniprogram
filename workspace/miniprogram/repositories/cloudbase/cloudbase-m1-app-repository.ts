@@ -5,6 +5,14 @@ import { CloudFunctionInvoker, M1FunctionName, M1FunctionRequest } from './cloud
 
 type JsonRecord = Record<string, unknown>
 type Guard<T> = (value: unknown) => value is T
+type RawReadingProgress = JsonRecord & Readonly<{
+  resourceId: string
+  chapterId: string
+  pageId: string
+  pageNumber: number
+  favorite: boolean
+  version: number
+}>
 
 export const M1_CLOUDBASE_ACTION_COVERAGE = {
   'P-03.requestPasswordCode': 'AuthV2AccountPort.requestPasswordCode',
@@ -13,15 +21,15 @@ export const M1_CLOUDBASE_ACTION_COVERAGE = {
   'P-04.saveProfile': 'auth-session.updateProfile',
   'S-02.getWordPractice': 'content-query.getVocabularyPack',
   'S-03.listReadingBooks': 'content-query.listReadingResources',
-  'S-03.toggleReadingFavorite': 'learning-progress-command.setReadingFavorite',
-  'S-04.getReadingProgress': 'content-query.getReadingResource',
+  'S-03.toggleReadingFavorite': 'learning-progress-command.saveReadingProgress',
+  'S-04.getReadingProgress': 'content-query.getReadingResource + learning-progress-query.getReadingProgress',
   'S-04.setReadingPage': 'learning-progress-command.saveReadingProgress',
   'G-02.listChildren': 'parent-query.listChildren',
   'G-02.bindChild': 'relationship-command.bindChild',
   'G-02.chooseChild': 'client-session-only',
   'G-02.unbindChild': 'relationship-command.unbindChild',
-  'T-02.listTeacherStudents': 'task-query.listTeacherStudents',
-  'T-03.getTeacherStudent': 'task-query.getTeacherStudent',
+  'T-02.listTeacherStudents': 'teacher-student-query.listStudents',
+  'T-03.getTeacherStudent': 'teacher-student-query.getStudent',
 } as const
 
 const ERROR_CODES: ReadonlySet<ServiceError['code']> = new Set([
@@ -72,13 +80,16 @@ function mapProfile(raw: JsonRecord): ProfileView {
 }
 
 function isRawVocabularyPack(value: unknown): value is JsonRecord {
-  if (!isRecord(value) || !isString(value.id) || !isString(value.title) || !isNumber(value.grade) || !Array.isArray(value.words) || value.words.length === 0) return false
-  return value.words.every(item => isRecord(item) && isString(item.id) && isString(item.word) && isString(item.meaning) && isString(item.syllableDisplay))
+  if (!isRecord(value) || !isString(value.id) || !isString(value.title) || !isString(value.grade) || !Array.isArray(value.words) || value.words.length === 0) return false
+  return value.words.every(item => isRecord(item) && isString(item.id) && isString(item.word) && isString(item.meaning)
+    && Array.isArray(item.syllables) && item.syllables.every(isString))
 }
 
 function mapVocabularyPack(raw: JsonRecord): WordPracticeView {
   const word = (raw.words as JsonRecord[])[0]
   const meaning = word.meaning as string
+  const fallbackOptions = ['动物', '动物园', '雨天', '森林']
+  const options = [meaning, ...fallbackOptions.filter((item) => item !== meaning)].slice(0, 3)
   return {
     packId: raw.id as string,
     packLabel: raw.title as string,
@@ -87,10 +98,10 @@ function mapVocabularyPack(raw: JsonRecord): WordPracticeView {
     masteredPercent: 0,
     wordId: word.id as string,
     word: word.word as string,
-    syllables: word.syllableDisplay as string,
+    syllables: (word.syllables as string[]).join('-'),
     meaning,
     example: isString(word.example) ? word.example : '',
-    options: [meaning],
+    options,
     correctOption: meaning,
     wrongCount: 0,
   }
@@ -101,17 +112,30 @@ function pageItems(value: unknown, itemGuard: Guard<JsonRecord>): JsonRecord[] |
   return value.items
 }
 
-const isRawResourceSummary: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.id) && isString(value.title) && isNumber(value.contentVersion)
+const isRawResourceSummary: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.id) && isString(value.title)
+  && (isString(value.contentVersion) || isNumber(value.contentVersion))
 
-function mapReadingList(raw: unknown, category: ReadingCategory): ReadingBookView[] | null {
-  const items = pageItems(raw, isRawResourceSummary)
-  if (!items) return null
+function readingCategory(value: unknown): ReadingCategory | null {
+  if (value === 'original') return 'original'
+  if (value === 'synchronized') return 'textbook'
+  if (value === 'picture_book') return 'picture'
+  if (value === 'current_events') return 'current'
+  if (value === 'chapter_book') return 'chapter'
+  return null
+}
+
+function mapReadingList(raw: unknown): ReadingBookView[] | null {
+  const items = Array.isArray(raw) && raw.every(isRawResourceSummary)
+    ? raw
+    : pageItems(raw, isRawResourceSummary)
+  if (items === null) return null
+  if (items.some(item => readingCategory(item.category) === null)) return null
   return items.map(item => ({
     id: item.id as string,
     title: item.title as string,
-    category,
-    grade: '已授权',
-    difficulty: '基础',
+    category: readingCategory(item.category)!,
+    grade: isString(item.grade) ? item.grade : '已授权',
+    difficulty: isString(item.difficulty) ? item.difficulty : '基础',
     theme: '英语',
     progressPercent: 0,
     favorite: false,
@@ -119,48 +143,74 @@ function mapReadingList(raw: unknown, category: ReadingCategory): ReadingBookVie
   }))
 }
 
-function isRawReadingResource(value: unknown): value is JsonRecord {
-  if (!isRawResourceSummary(value) || !Array.isArray(value.chapters) || !Array.isArray(value.pages) || value.pages.length === 0) return false
-  return value.pages.every(item => isRecord(item) && isString(item.id) && isRecord(item.highResolution) && isString(item.highResolution.assetKey))
+type ReadingPageReference = Readonly<{ id: string; chapterId: string; pageNumber: number; chapterNumber: number; imageUrl: string; thumbnailUrl: string }>
+
+function readingPageReferences(raw: JsonRecord): ReadingPageReference[] | null {
+  if (!Array.isArray(raw.chapters)) return null
+  const pages: ReadingPageReference[] = []
+  for (const [chapterIndex, chapter] of raw.chapters.entries()) {
+    if (!isRecord(chapter) || !isString(chapter.id) || !Array.isArray(chapter.pages)) return null
+    for (const page of chapter.pages) {
+      if (!isRecord(page) || !isString(page.id) || !isNumber(page.pageNumber) || !isString(page.imageAssetKey)) return null
+      pages.push({ id: page.id, chapterId: chapter.id, pageNumber: page.pageNumber, chapterNumber: chapterIndex + 1,
+        imageUrl: displayPageImageUrl(page.imageAssetKey), thumbnailUrl: displayPageImageUrl(isString(page.thumbnailAssetKey) ? page.thumbnailAssetKey : page.imageAssetKey) })
+    }
+  }
+  return pages.length === 0 ? null : pages.sort((left, right) => left.pageNumber - right.pageNumber)
 }
 
-function mapReadingResource(raw: JsonRecord, pageNumber: number): ReadingProgressView {
-  const pages = raw.pages as JsonRecord[]
+function isRawReadingResource(value: unknown): value is JsonRecord {
+  return isRawResourceSummary(value) && readingPageReferences(value) !== null
+}
+
+function isRawReadingProgress(value: unknown): value is RawReadingProgress {
+  return isRecord(value) && isString(value.resourceId) && isString(value.chapterId) && isString(value.pageId)
+    && isNumber(value.pageNumber) && isBoolean(value.favorite) && isNumber(value.version)
+}
+
+function mapReadingResource(raw: JsonRecord, pageNumber: number, favorite = false): ReadingProgressView {
+  const pages = readingPageReferences(raw)
+  if (pages === null) throw new Error('阅读资源页数据无效')
   const safePage = Math.max(1, Math.min(pageNumber, pages.length))
   const page = pages[safePage - 1]
-  const highResolution = page.highResolution as JsonRecord
+  if (!page) throw new Error('阅读资源页图无效')
   const chapterCount = (raw.chapters as unknown[]).length
   return {
-    book: { id: raw.id as string, title: raw.title as string, category: 'picture', grade: '已授权', difficulty: '基础', theme: '英语', progressPercent: Math.round(safePage * 100 / pages.length), favorite: false, pageCount: pages.length },
-    chapterNumber: 1,
+    book: { id: raw.id as string, title: raw.title as string, category: readingCategory(raw.category) ?? 'picture', grade: isString(raw.grade) ? raw.grade : '已授权', difficulty: isString(raw.difficulty) ? raw.difficulty : '基础', theme: '英语', progressPercent: Math.round(safePage * 100 / pages.length), favorite, pageCount: pages.length },
+    hasSavedProgress: false,
+    chapterNumber: page.chapterNumber,
     chapterCount,
     pageNumber: safePage,
     pageCount: pages.length,
     progressPercent: Math.round(safePage * 100 / pages.length),
-    pageImageUrl: highResolution.assetKey as string,
+    pageImageUrl: page.imageUrl,
+    thumbnailImageUrl: page.thumbnailUrl,
+    pages: pages.map(item => ({ pageNumber: item.pageNumber, chapterNumber: item.chapterNumber, imageUrl: item.imageUrl, thumbnailUrl: item.thumbnailUrl })),
   }
 }
 
-const isRawChild: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.id) && isString(value.displayName) && isNumber(value.linkVersion) && (value.class === null || (isRecord(value.class) && isString(value.class.name)))
+const isRawChild: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.childId) && isString(value.displayName) && isNumber(value.linkVersion)
 const isRawBoundChild: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.childId) && isString(value.displayName) && isNumber(value.version) && value.status === 'active'
 const isRawUnbound: Guard<JsonRecord> = (value): value is JsonRecord => isRecord(value) && isString(value.childId) && isNumber(value.version) && value.status === 'revoked'
 
 function isRawStudentSummary(value: unknown): value is JsonRecord {
-  return isRecord(value) && isString(value.id) && isString(value.displayName) && (value.studentNumber === null || isString(value.studentNumber))
-    && (value.status === 'active' || value.status === 'disabled') && (value.class === null || (isRecord(value.class) && isString(value.class.name)))
-    && isRecord(value.taskSummary) && isNumber(value.taskSummary.completedCount) && isNumber(value.taskSummary.totalCount)
+  return isRecord(value) && isString(value.studentId) && isString(value.displayName) && isString(value.studentNumber)
+    && (value.accountStatus === 'active' || value.accountStatus === 'disabled')
+    && isRecord(value.classInfo) && isString(value.classInfo.name)
+    && isRecord(value.performance) && isNumber(value.performance.completedCount) && isNumber(value.performance.assignedCount)
 }
 
 function mapStudentSummary(raw: JsonRecord): StudentListView {
-  const taskSummary = raw.taskSummary as JsonRecord
-  const completedCount = taskSummary.completedCount as number
-  const totalCount = taskSummary.totalCount as number
-  const status = raw.status === 'disabled' ? 'disabled' : 'active'
+  const performance = raw.performance as JsonRecord
+  const completedCount = performance.completedCount as number
+  const totalCount = performance.assignedCount as number
+  const status = raw.accountStatus === 'disabled' ? 'disabled' : 'active'
+  const classInfo = raw.classInfo as JsonRecord
   return {
-    id: raw.id as string,
+    id: raw.studentId as string,
     displayName: raw.displayName as string,
-    studentNumber: isString(raw.studentNumber) ? raw.studentNumber : '—',
-    className: isRecord(raw.class) && isString(raw.class.name) ? raw.class.name : '未分班',
+    studentNumber: raw.studentNumber as string,
+    className: classInfo.name as string,
     status,
     statusLabel: status === 'active' ? '正常' : '已停用',
     completedCount,
@@ -170,21 +220,21 @@ function mapStudentSummary(raw: JsonRecord): StudentListView {
 }
 
 function isRawStudentDetail(value: unknown): value is JsonRecord {
-  return isRawStudentSummary(value) && Array.isArray(value.parents) && value.parents.every(item => isRecord(item) && isString(item.displayName))
-    && Array.isArray(value.tasks) && value.tasks.every(item => isRecord(item) && isString(item.taskId) && isString(item.status))
+  return isRawStudentSummary(value) && Array.isArray(value.parents) && value.parents.every(item => isRecord(item) && isString(item.displayNameMasked))
+    && Array.isArray(value.recentTasks) && value.recentTasks.every(item => isRecord(item) && isString(item.taskId) && isString(item.status))
 }
 
 function mapStudentDetail(raw: JsonRecord): StudentDetailView {
   const base = mapStudentSummary(raw)
   const parents = raw.parents as JsonRecord[]
-  const tasks = raw.tasks as JsonRecord[]
+  const tasks = raw.recentTasks as JsonRecord[]
   return {
     ...base,
     maskedMobile: '未提供',
-    guardianName: parents[0] && isString(parents[0].displayName) ? parents[0].displayName : '暂无有效家长关系',
+    guardianName: parents[0] && isString(parents[0].displayNameMasked) ? parents[0].displayNameMasked : '暂无有效家长关系',
     guardianMaskedMobile: '未提供',
     averageScore: 0,
-    recentTasks: tasks.map(item => ({ id: item.taskId as string, title: '任务 ' + (item.taskId as string), statusLabel: item.status as string })),
+    recentTasks: tasks.map(item => ({ id: item.taskId as string, title: item.title as string, statusLabel: item.status as string, ...(isNumber(item.score) ? { score: item.score } : {}) })),
   }
 }
 
@@ -195,6 +245,7 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
   private readonly resourceVersions = new Map<string, number>()
   private readonly favoriteVersions = new Map<string, number>()
   private readonly progressVersions = new Map<string, number>()
+  private readonly readingPageReferences = new Map<string, readonly ReadingPageReference[]>()
   private readonly readingViews = new Map<string, ReadingProgressView>()
   private readonly children = new Map<string, ChildView>()
 
@@ -223,55 +274,98 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
   }
 
   getWordPractice(_userId: string): Promise<ServiceResult<WordPracticeView>> {
-    return this.invokeMapped('content-query', request('getVocabularyPack', { resourceId: 'res_vocab_animals' }), isRawVocabularyPack, mapVocabularyPack)
+    return this.invokeMapped('content-query', request('getVocabularyPack', { resourceId: 'res_vocabulary_animals_cloud_v1' }), isRawVocabularyPack, mapVocabularyPack)
   }
 
   async listReadingBooks(_userId: string, category: ReadingCategory = 'picture', onlyFavorites = false): Promise<ServiceResult<ReadingBookView[]>> {
-    if (onlyFavorites) return unavailable('阅读收藏尚无经评审的 m1.v1 action')
-    const response = await this.invokeRaw('content-query', request('listReadingResources', { filters: {}, page: { limit: 100 } }))
+    const response = await this.invokeRaw('content-query', request('listReadingResources', {}))
     if (!response.ok) return response
-    const mapped = mapReadingList(response.data, category)
+    const mapped = mapReadingList(response.data)
     if (mapped === null) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
-    const rawItems = (response.data as JsonRecord).items as JsonRecord[]
+    const rawItems = (Array.isArray(response.data) ? response.data : (response.data as JsonRecord).items) as JsonRecord[]
     mapped.forEach((book, index) => { this.readingBooks.set(book.id, book); this.resourceVersions.set(book.id, rawItems[index].contentVersion as number) })
-    return { ok: true, data: mapped, meta: response.meta }
+    const visible = mapped.filter(book => book.category === category)
+    const progress = await Promise.all(visible.map(book => this.getReadingProgress(_userId, book.id)))
+    const failed = progress.find((item): item is Extract<ServiceResult<ReadingProgressView>, { ok: false }> => !item.ok)
+    if (failed) return failed
+    const books = visible.map((book, index) => {
+      const saved = progress[index] as Extract<ServiceResult<ReadingProgressView>, { ok: true }>
+      return { ...book, progressPercent: saved.data.hasSavedProgress ? saved.data.progressPercent : 0,
+        favorite: saved.data.book.favorite, pageCount: saved.data.pageCount }
+    }).filter(book => !onlyFavorites || book.favorite)
+    return { ok: true, data: books, meta: response.meta }
   }
 
   async toggleReadingFavorite(_userId: string, bookId: string): Promise<ServiceResult<ReadingBookView>> {
-    const book = this.readingBooks.get(bookId) ?? this.readingViews.get(bookId)?.book
-    const resourceVersion = this.resourceVersions.get(bookId)
-    if (!book || resourceVersion === undefined) return unavailable('请先刷新阅读列表后再收藏')
-    const expectedVersion = this.favoriteVersions.get(bookId)
-    const favorite = !book.favorite
-    const result = await this.invokeRaw('learning-progress-command', request('setReadingFavorite', { resourceId: bookId, resourceVersion, favorite }, { operationId: `favorite_${bookId}_${favorite ? 'on' : 'off'}_${expectedVersion ?? 0}`, ...(expectedVersion === undefined ? {} : { expectedVersion }) }))
+    let current = this.readingViews.get(bookId)
+    if (!current) {
+      const loaded = await this.getReadingProgress(_userId, bookId)
+      if (!loaded.ok) return loaded
+      current = loaded.data
+    }
+    const page = this.readingPageReferences.get(bookId)?.find(item => item.pageNumber === current.pageNumber)
+    if (!page) return unavailable('阅读页信息尚未加载')
+    const expectedVersion = this.progressVersions.get(bookId) ?? 0
+    const favorite = !current.book.favorite
+    const result = await this.invokeRaw('learning-progress-command', request('saveReadingProgress', {
+      resourceId: bookId, chapterId: page.chapterId, pageId: page.id, pageNumber: page.pageNumber, favorite,
+    }, { operationId: `reading_favorite_${bookId}_${favorite ? 'on' : 'off'}_${expectedVersion}`, expectedVersion }))
     if (!result.ok) return result
-    if (!isRecord(result.data) || !isNumber(result.data.version)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
-    const updated = { ...book, favorite }
-    this.favoriteVersions.set(bookId, result.data.version)
+    const savedProgress = result.data
+    if (!isRawReadingProgress(savedProgress)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    const updated = { ...current.book, favorite }
+    this.favoriteVersions.set(bookId, savedProgress.version)
+    this.progressVersions.set(bookId, savedProgress.version)
     this.readingBooks.set(bookId, updated)
+    this.readingViews.set(bookId, { ...current, hasSavedProgress: true, book: updated })
     return { ok: true, data: updated, meta: result.meta }
   }
 
   async getReadingProgress(userId: string, bookId: string): Promise<ServiceResult<ReadingProgressView>> {
-    const pageNumber = this.readingPages.get(userId + ':' + bookId) ?? 1
-    const result = await this.invokeMapped('content-query', request('getReadingResource', { resourceId: bookId }), isRawReadingResource, raw => { this.resourceVersions.set(bookId, raw.contentVersion as number); return mapReadingResource(raw, pageNumber) })
-    if (result.ok) { this.readingViews.set(bookId, result.data); this.readingBooks.set(bookId, result.data.book) }
-    return result
+    const resource = await this.invokeRaw('content-query', request('getReadingResource', { resourceId: bookId }))
+    if (!resource.ok) return resource
+    if (!isRawReadingResource(resource.data)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    const pages = readingPageReferences(resource.data)
+    if (pages === null) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    this.resourceVersions.set(bookId, resource.data.contentVersion as number)
+    this.readingPageReferences.set(bookId, pages)
+    const progress = await this.invokeRaw('learning-progress-query', request('getReadingProgress', { resourceId: bookId }))
+    if (!progress.ok) return progress
+    const progressData = progress.data
+    if (progressData !== null && !isRawReadingProgress(progressData)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    const saved = progressData === null ? null : progressData
+    const pageNumber = saved?.pageNumber ?? this.readingPages.get(userId + ':' + bookId) ?? 1
+    const result = mapReadingResource(resource.data, pageNumber, saved?.favorite ?? false)
+    if (saved) {
+      this.progressVersions.set(bookId, saved.version)
+      this.favoriteVersions.set(bookId, saved.version)
+    }
+    const view = { ...result, hasSavedProgress: saved !== null }
+    this.readingPages.set(userId + ':' + bookId, view.pageNumber)
+    this.readingViews.set(bookId, view)
+    this.readingBooks.set(bookId, view.book)
+    return { ok: true, data: view, meta: resource.meta }
   }
 
   async setReadingPage(userId: string, bookId: string, pageNumber: number): Promise<ServiceResult<ReadingProgressView>> {
     let current = this.readingViews.get(bookId)
     if (!current) { const loaded = await this.getReadingProgress(userId, bookId); if (!loaded.ok) return loaded; current = loaded.data }
-    const resourceVersion = this.resourceVersions.get(bookId)
-    if (resourceVersion === undefined) return unavailable('阅读资源版本尚未加载')
     const savedPage = Math.max(1, Math.min(current.pageCount, Math.floor(pageNumber)))
-    const progressPercent = Math.round(savedPage * 100 / current.pageCount)
-    const expectedVersion = this.progressVersions.get(bookId)
-    const result = await this.invokeRaw('learning-progress-command', request('saveReadingProgress', { resourceId: bookId, resourceVersion, context: 'self', pageNumber: savedPage, progressPercent }, { operationId: `reading_${bookId}_${savedPage}_${expectedVersion ?? 0}`, ...(expectedVersion === undefined ? {} : { expectedVersion }) }))
+    const page = this.readingPageReferences.get(bookId)?.find(item => item.pageNumber === savedPage)
+    if (!page) return unavailable('阅读页信息尚未加载')
+    const expectedVersion = this.progressVersions.get(bookId) ?? 0
+    const favorite = current.book.favorite
+    const result = await this.invokeRaw('learning-progress-command', request('saveReadingProgress', {
+      resourceId: bookId, chapterId: page.chapterId, pageId: page.id, pageNumber: page.pageNumber, favorite,
+    }, { operationId: `reading_page_${bookId}_${savedPage}_${expectedVersion}`, expectedVersion }))
     if (!result.ok) return result
-    if (!isRecord(result.data) || !isNumber(result.data.version)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
-    const updated = { ...current, pageNumber: savedPage, progressPercent, book: { ...current.book, progressPercent } }
-    this.progressVersions.set(bookId, result.data.version)
+    const savedProgress = result.data
+    if (!isRawReadingProgress(savedProgress)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    const progressPercent = Math.round(savedPage * 100 / current.pageCount)
+    const updated = { ...current, hasSavedProgress: true, pageNumber: savedPage, chapterNumber: page.chapterNumber,
+      pageImageUrl: page.imageUrl, thumbnailImageUrl: page.thumbnailUrl, progressPercent,
+      book: { ...current.book, favorite: savedProgress.favorite, progressPercent } }
+    this.progressVersions.set(bookId, savedProgress.version)
     this.readingPages.set(userId + ':' + bookId, savedPage)
     this.readingViews.set(bookId, updated)
     this.readingBooks.set(bookId, updated.book)
@@ -279,12 +373,21 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
   }
 
   async listChildren(_parentId: string): Promise<ServiceResult<ChildView[]>> {
-    const response = await this.invokeRaw('parent-query', request('listChildren', { page: { limit: 100 } }))
+    const response = await this.invokeRaw('parent-query', request('listChildren', {}))
     if (!response.ok) return response
-    const items = pageItems(response.data, isRawChild)
+    const items = Array.isArray(response.data) && response.data.every(isRawChild)
+      ? response.data
+      : pageItems(response.data, isRawChild)
     if (!items) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
     const mapped = items.map((item, index): ChildView => {
-      const child = { id: item.id as string, displayName: item.displayName as string, className: isRecord(item.class) && isString(item.class.name) ? item.class.name : '未分班', studentNumber: '—', current: index === 0, linkVersion: item.linkVersion as number }
+      const child = {
+        id: item.childId as string,
+        displayName: item.displayName as string,
+        className: isString(item.className) ? item.className : '未分班',
+        studentNumber: isString(item.studentNumber) ? item.studentNumber : '—',
+        current: index === 0,
+        linkVersion: item.linkVersion as number,
+      }
       this.children.set(child.id, child)
       return child
     })
@@ -313,17 +416,17 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
   }
 
   async listTeacherStudents(_teacherId: string, keyword = '', status = 'all'): Promise<ServiceResult<StudentListView[]>> {
-    const filters: Record<string, unknown> = {}
-    if (keyword.trim()) filters.query = keyword.trim()
-    if (status !== 'all') filters.status = status
-    const response = await this.invokeRaw('task-query', request('listTeacherStudents', { filters, page: { limit: 100 } }))
+    const normalizedStatus = status === 'active' ? 'normal' : status === 'follow_up' ? 'attention' : status
+    const filters: Record<string, unknown> = { status: normalizedStatus }
+    if (keyword.trim()) filters.keyword = keyword.trim()
+    const response = await this.invokeRaw('teacher-student-query', request('listStudents', { filters, page: { limit: 50 } }))
     if (!response.ok) return response
     const items = pageItems(response.data, isRawStudentSummary)
     return items === null ? fail('INTERNAL_ERROR', '服务返回了无法识别的数据') : { ok: true, data: items.map(mapStudentSummary), meta: response.meta }
   }
 
   getTeacherStudent(_teacherId: string, studentId: string): Promise<ServiceResult<StudentDetailView>> {
-    return this.invokeMapped('task-query', request('getTeacherStudent', { studentId }), isRawStudentDetail, mapStudentDetail)
+    return this.invokeMapped('teacher-student-query', request('getStudent', { studentId }), isRawStudentDetail, mapStudentDetail)
   }
 
   private async invokeMapped<TInput, TOutput>(functionName: M1FunctionName, functionRequest: M1FunctionRequest, guard: Guard<TInput>, mapper: (value: TInput) => TOutput): Promise<ServiceResult<TOutput>> {
@@ -357,5 +460,13 @@ function request(action: string, payload: Record<string, unknown>, options: Read
 
 function unavailable<T>(message: string): Promise<ServiceResult<T>> {
   return Promise.resolve(fail('SERVICE_UNAVAILABLE', message))
+}
+
+function displayPageImageUrl(assetKey: string): string {
+  if (assetKey.startsWith('https://') || assetKey.startsWith('http://') || assetKey.startsWith('cloud://') || assetKey.startsWith('/')) {
+    return assetKey
+  }
+  if (assetKey.includes('page-01')) return '/assets/content/demo-zoo-picture-book-cover-v1.jpg'
+  return '/assets/content/demo-zoo-page-02-v1.jpg'
 }
 

@@ -11,11 +11,12 @@ const cli = [process.execPath, resolve('D:/app-cache/cloudbase-cli/node_modules/
 const sdk = require('@cloudbase/js-sdk'); const suffix = randomBytes(8).toString('base64url');
 const credentials = await prepare(['demo_teacher_01', 'demo_admin_01']);
 const teacher = await login('demo_teacher_01', 'teacher', credentials.demo_teacher_01); const admin = await login('demo_admin_01', 'admin', credentials.demo_admin_01);
-const revoked = await call(admin.app, 'organization-admin', 'revokeTeacherClass', { teacherId: 'usr_teacher_demo_01', classId: 'cls_grade3_2', reason: 'M1 撤权旧会话联调。' }, admin.token, { expectedVersion: 1, operationId: `op_revoke_smoke_${suffix}` });
-if (!revoked.ok && !['NOT_FOUND', 'CONFLICT'].includes(revoked.error?.code)) fail(`revoke_${revoked.error?.code ?? 'failed'}`);
+const grant = await readActiveTeacherGrant();
+const revoked = await call(admin.app, 'organization-admin', 'revokeTeacherClass', { teacherId: 'usr_teacher_demo_01', classId: 'cls_grade3_2', reason: 'M1 撤权旧会话联调。' }, admin.token, { expectedVersion: grant.version, operationId: `op_revoke_smoke_${suffix}` });
+if (!revoked.ok) fail(`revoke_${revoked.error?.code ?? 'failed'}`);
 const stale = await call(teacher.app, 'task-query', 'getTeacherWorkbench', { date: localDate() }, teacher.token);
 if (stale.ok || !['UNAUTHENTICATED', 'FORBIDDEN'].includes(stale.error?.code)) fail(`stale_${stale.ok ? 'allowed' : stale.error?.code ?? 'unknown'}`);
-const restored = await call(admin.app, 'organization-admin', 'grantTeacherClass', { teacherId: 'usr_teacher_demo_01', classId: 'cls_grade3_2', permissions: ['class.read', 'student.read', 'content.read', 'task.read', 'task.publish', 'submission.review', 'student.manage', 'student.bind-code.issue'], reason: 'M1 撤权旧会话联调恢复。' }, admin.token, { expectedVersion: 2, operationId: `op_restore_smoke_${suffix}` });
+const restored = await call(admin.app, 'organization-admin', 'grantTeacherClass', { teacherId: 'usr_teacher_demo_01', classId: 'cls_grade3_2', permissions: ['class.read', 'student.read', 'content.read', 'task.read', 'task.publish', 'submission.review', 'student.manage', 'student.bind-code.issue'], reason: 'M1 撤权旧会话联调恢复。' }, admin.token, { expectedVersion: numberValue(revoked.data?.version), operationId: `op_restore_smoke_${suffix}` });
 if (!restored.ok) fail(`restore_${restored.error?.code ?? 'failed'}`);
 process.stdout.write('revocation_smoke=passed\nstale_session=rejected\nauthorization_restored=true\n');
 
@@ -23,7 +24,27 @@ async function prepare(aliases) { const result = {}; for (const alias of aliases
 async function login(alias, role, password) { const app = sdk.init({ env: envId }); await app.auth({ persistence: 'local' }).signInWithPassword({ username: alias, password }); const fn = role === 'admin' ? 'admin-session' : 'auth-session'; const boot = await call(app, fn, 'bootstrap', {}, null); if (!boot.ok) fail(`bootstrap_${role}`); const token = role === 'admin' ? boot.data.token : boot.data.sessionId; if (role !== 'admin') { const selected = await call(app, 'auth-session', 'selectRole', { role }, token); if (!selected.ok) fail(`select_${role}`); } return { app, token }; }
 async function call(app, name, action, payload, token, extras = {}) { try { const response = await app.callFunction({ name, data: { apiVersion: 'm1.v1', action, payload, ...(token === null ? {} : { businessSessionToken: token }), ...extras }, parse: true }); return response?.result ?? { ok: false, error: { code: 'INVALID_RESPONSE' } }; } catch (error) { return { ok: false, error: { code: safe(error) } }; } }
 async function cliJson(args) { const { stdout } = await exec(cli[0], [...cli.slice(1), ...args], { cwd: root, encoding: 'utf8', windowsHide: true }); const start = Math.min(...[stdout.indexOf('{'), stdout.indexOf('[')].filter((value) => value >= 0)); return JSON.parse(stdout.slice(start)); }
+async function readActiveTeacherGrant() {
+  const command = JSON.stringify([{
+    TableName: 'teacher_class_grants',
+    CommandType: 'QUERY',
+    Command: JSON.stringify({
+      find: 'teacher_class_grants',
+      filter: { organizationId: 'org_qihang_demo', teacherId: 'usr_teacher_demo_01', classId: 'cls_grade3_2', deletedAt: null },
+      projection: { status: 1, version: 1 },
+      limit: 2,
+    }),
+  }]);
+  const rows = (await cliJson(['db', 'nosql', 'execute', '--command', command, '--json']))?.data?.results?.[0];
+  if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.status !== 'active') throw new Error('GRANT_UNAVAILABLE');
+  return { version: numberValue(rows[0]?.version) };
+}
 function localDate() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()); }
+function numberValue(value) {
+  const normalized = value !== null && typeof value === 'object' && '$numberInt' in value ? Number(value.$numberInt) : value;
+  if (!Number.isSafeInteger(normalized) || normalized < 1) throw new Error('INVALID_RESPONSE');
+  return normalized;
+}
 function required(value) { if (typeof value !== 'string' || value.trim().length === 0) throw new Error('CONFIG_UNAVAILABLE'); return value.trim(); }
 function safe(error) { return String(error?.message ?? 'UNKNOWN').replace(/[^A-Za-z0-9_-]/gu, '_').slice(0, 80); }
 function fail(code) { process.stdout.write(`revocation_smoke=failed:${code}\n`); process.exit(2); }

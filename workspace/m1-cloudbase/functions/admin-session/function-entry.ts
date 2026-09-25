@@ -1,6 +1,7 @@
 import type { AdminSessionHandler, AdminSessionView } from '../../src/auth/admin-session-handler';
 import type { PlatformIdentity } from '../../src/auth/trusted-actor';
 import { ADMIN_SESSION_ACTIONS, validateAdminSessionRequest } from '../../src/contracts/admin-session';
+import { DocumentDatabasePlatformError } from '../../src/repositories/document-database-port';
 import type { CloudBaseRuntimePort } from '../../src/runtime/ports';
 import type { ErrorCode, ServiceResult } from '../../src/shared/protocol';
 import { createMeta, failure, type RequestIdGenerator, type ResultClock } from '../../src/shared/result';
@@ -11,8 +12,10 @@ export interface AdminSessionFunctionDependencies {
   readonly handler: AdminSessionHandler;
   readonly clock: ResultClock;
   readonly requestIds: RequestIdGenerator;
-  readonly mapFailure?: (phase: 'runtime' | 'handler', error: unknown) => ErrorCode;
+  readonly mapFailure?: (phase: AdminSessionFailurePhase, error: unknown) => ErrorCode;
 }
+
+export type AdminSessionFailurePhase = 'runtime' | 'handler';
 
 export function createAdminSessionFunction(
   dependencies: AdminSessionFunctionDependencies,
@@ -35,12 +38,27 @@ export function createAdminSessionFunction(
         }),
       ]);
     } catch (error: unknown) {
-      return failure(dependencies.mapFailure?.('runtime', error) ?? 'SERVICE_UNAVAILABLE', meta);
+      return failure(mapFailure(dependencies, 'runtime', error), meta);
     }
     try {
       return await dependencies.handler.handle(validated.value, identity, sessionId, meta);
     } catch (error: unknown) {
-      return failure(dependencies.mapFailure?.('handler', error) ?? 'INTERNAL_ERROR', meta);
+      return failure(mapFailure(dependencies, 'handler', error), meta);
     }
   };
+}
+
+function mapFailure(
+  dependencies: AdminSessionFunctionDependencies,
+  phase: AdminSessionFailurePhase,
+  error: unknown,
+): ErrorCode {
+  const mapped = dependencies.mapFailure?.(phase, error);
+  if (mapped !== undefined) return mapped;
+  if (phase === 'handler' && error instanceof DocumentDatabasePlatformError) {
+    if (error.kind === 'unavailable') return 'SERVICE_UNAVAILABLE';
+    if (error.kind === 'conflict') return 'CONFLICT';
+    if (error.kind === 'invalid-data') return 'VALIDATION_ERROR';
+  }
+  return phase === 'runtime' ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR';
 }

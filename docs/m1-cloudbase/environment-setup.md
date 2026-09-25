@@ -2,7 +2,7 @@
 
 > 状态：M0 已于 2026-09-15 验收，当前主线为 M1；本文件同时作为开发环境复核门禁。
 > 适用范围：仅 M1 后端核心闭环的开发/测试环境；不包含生产、提审、体验版、付费资源开通或真实数据。  
-> 基线：`DOCUMENTATION.md` / `product-requirements-core.md` 0.18.0、`docs/architecture.md`、`docs/service-contracts.md`。
+> 基线：`DOCUMENTATION.md` / `product-requirements-core.md` 0.18.1、`docs/architecture.md`、`docs/service-contracts.md`。
 
 ## 1. 已确定的腾讯云方案
 
@@ -18,7 +18,7 @@
 - **微信身份**：M1 以 CloudBase UID 作为唯一认证 subject，不把 openid 当业务主键，也不在 M1 自动合并账号。微信 provider 绑定留到订阅消息/生产联调前单独验证。
 - **后台管理员**：使用同一 CloudBase 用户目录和默认 Auth client，但使用独立 Web 页面与业务 session audience；管理员不出现在小程序。管理员账号采用组织成员/internal user 和更短业务会话。任何真实管理员启用前必须使用支持 MFA 的套餐/配置；免费开发环境只放虚构管理员。
 - **租户**：M1 一个环境只服务一个试点学校，但每条业务数据仍保留 `organizationId`，不删除未来多学校扩展边界。
-- **事务上限**：M1 单次任务发布最多 50 名学生；超出返回 `VALIDATION_ERROR`，不得静默分批。该限制只用于 M1 核心闭环，后续扩容需重新评审事务方案。
+- **发布上限**：2026-09-25 起单次任务最多包含 500 名学生。超过原有 50 人事务预算时，服务端按每批 20 条学生任务记录分批提交；任务保持草稿且对学生不可见，直到全部记录完成。中断可用同一发布意图继续，超过 500 人返回 `VALIDATION_ERROR`。现有云端 50 人通过记录不代表此扩容已在云端验证，部署与验证仍须单独授权。
 
 详细控制台执行步骤见 `console-runbook.md`。2026-09-17 复核确认既有 17 个集合均为空；经用户单独授权后补建 `reading_progress`、`vocabulary_progress`，并将全部 19 个集合统一为 `ADMINONLY`。两个新增进度集合的三字段唯一索引已核验；`auth-session` 所需三类身份集合主查询索引也已复核。其他既有索引仍须按 `database-schema.md` 完成全量对账，不能沿用历史记录直接判定通过。真实个人信息与合规期限仍不是腾讯云技术可以代替决定的事项，继续列在 `open-questions.md`。
 

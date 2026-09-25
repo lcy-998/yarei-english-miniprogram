@@ -281,7 +281,9 @@ function decodeResource(document: VersionedDocument): LearningResourceAccessReco
   const type = requireEnum(document.type, ['reading', 'vocabulary'] as const);
   const status = requireEnum(document.status, ['published', 'offline'] as const);
   const allowedStudentIds = requireStringArray(document.allowedStudentIds);
-  const pages = requireObjectArray(document.pages).map((page) => ({
+  const legacyPayload = document.payload === undefined ? null : requireObject(document.payload);
+  const rawPages = document.pages ?? (legacyPayload?.demoOnly === true ? legacyPayload.pages : undefined);
+  const pages = requireObjectArray(rawPages).map((page) => ({
     id: requireString(page.id),
     chapterId: requireString(page.chapterId),
     pageNumber: requireNonNegativeInteger(page.pageNumber),
@@ -293,7 +295,7 @@ function decodeResource(document: VersionedDocument): LearningResourceAccessReco
     status,
     allowedStudentIds,
     pages,
-    wordIds: requireStringArray(document.wordIds),
+    wordIds: document.wordIds === undefined && type === 'reading' && legacyPayload?.demoOnly === true ? [] : requireStringArray(document.wordIds),
   };
 }
 

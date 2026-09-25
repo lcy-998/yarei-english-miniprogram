@@ -22,10 +22,14 @@ import type {
   VersionedDocument,
 } from './document-database-port';
 import { TaskCorePersistenceError, toTaskCorePersistenceError } from './persistence-error';
+import type { ReadingProgressRecord, VocabularyProgressRecord } from '../learning-progress/types';
+import { readingProgressDocumentId, vocabularyProgressDocumentId } from './learning-progress-document-adapter';
 
 export const TASK_CORE_COLLECTIONS = {
   classes: 'classes',
   resources: 'learning_resources',
+  readingProgress: 'reading_progress',
+  vocabularyProgress: 'vocabulary_progress',
   memberships: 'class_memberships',
   teacherGrants: 'teacher_class_grants',
   tasks: 'tasks',
@@ -45,6 +49,14 @@ class TaskCoreDocumentRepository implements TaskCoreUnitOfWork {
 
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     return this.read((reader) => new TaskCoreDocumentReader(reader).findResource(organizationId, resourceId));
+  }
+
+  public async findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null> {
+    return this.read((reader) => new TaskCoreDocumentReader(reader).findReadingProgress(organizationId, studentId, resourceId));
+  }
+
+  public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
+    return this.read((reader) => new TaskCoreDocumentReader(reader).findVocabularyProgress(organizationId, studentId, packId));
   }
 
   public async listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]> {
@@ -121,7 +133,21 @@ class TaskCoreDocumentReader implements TaskCoreReader {
 
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.resources, resourceId, organizationId);
-    return found === null ? null : decodeDocument<LearningResourceRecord>(found);
+    return found === null ? null : decodeLearningResource(found);
+  }
+
+  public async findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null> {
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.readingProgress, readingProgressDocumentId(organizationId, studentId, resourceId), organizationId);
+    if (found === null) return null;
+    const record = decodeDocument<ReadingProgressRecord>(found);
+    return record.studentId === studentId && record.resourceId === resourceId ? record : null;
+  }
+
+  public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.vocabularyProgress, vocabularyProgressDocumentId(organizationId, studentId, packId), organizationId);
+    if (found === null) return null;
+    const record = decodeDocument<VocabularyProgressRecord>(found);
+    return record.studentId === studentId && record.packId === packId ? record : null;
   }
 
   public async findIdempotencyRecord(recordId: string): Promise<IdempotencyRecord | null> {
@@ -233,6 +259,8 @@ class TaskCoreDocumentReader implements TaskCoreReader {
 }
 
 class TaskCoreDocumentTransaction implements TaskCoreTransaction {
+  private preparedGrants: Promise<readonly TeacherClassGrantRecord[]> | null = null;
+
   public constructor(
     private readonly transaction: DocumentDatabaseTransactionPort,
     private readonly scope: TaskCoreTransactionScope,
@@ -243,7 +271,21 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     if (!this.scope.resourceIds.includes(resourceId)) return null;
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.resources, resourceId, organizationId);
-    return found === null ? null : decodeDocument<LearningResourceRecord>(found);
+    return found === null ? null : decodeLearningResource(found);
+  }
+
+  public async findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null> {
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.readingProgress, readingProgressDocumentId(organizationId, studentId, resourceId), organizationId);
+    if (found === null) return null;
+    const record = decodeDocument<ReadingProgressRecord>(found);
+    return record.studentId === studentId && record.resourceId === resourceId ? record : null;
+  }
+
+  public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.vocabularyProgress, vocabularyProgressDocumentId(organizationId, studentId, packId), organizationId);
+    if (found === null) return null;
+    const record = decodeDocument<VocabularyProgressRecord>(found);
+    return record.studentId === studentId && record.packId === packId ? record : null;
   }
 
   public async listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]> {
@@ -491,14 +533,17 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
 
   private async readPreparedGrants(organizationId: string): Promise<readonly TeacherClassGrantRecord[]> {
     this.ensureScopeOrganization(organizationId);
-    const grants: TeacherClassGrantRecord[] = [];
-    for (const documentId of this.scope.teacherGrantIds) {
-      const found = await this.transaction.get(TASK_CORE_COLLECTIONS.teacherGrants, documentId);
-      if (!isVisibleInOrganization(found, organizationId)) continue;
-      const grant = decodeTeacherGrant(found);
-      if (grant.status === 'active') grants.push(grant);
-    }
-    return grants;
+    if (this.preparedGrants === null) this.preparedGrants = (async () => {
+      const grants: TeacherClassGrantRecord[] = [];
+      for (const documentId of this.scope.teacherGrantIds) {
+        const found = await this.transaction.get(TASK_CORE_COLLECTIONS.teacherGrants, documentId);
+        if (!isVisibleInOrganization(found, organizationId)) continue;
+        const grant = decodeTeacherGrant(found);
+        if (grant.status === 'active') grants.push(grant);
+      }
+      return grants;
+    })();
+    return this.preparedGrants;
   }
 
   private async validateClassMembershipGuards(organizationId: string, classIds: readonly string[]): Promise<void> {
@@ -588,6 +633,24 @@ function decodeDocument<T>(document: VersionedDocument, includeVersion = false):
   void ignoredDeletedAt;
   const decoded = includeVersion ? { ...record, version } : record;
   return cloneJson(decoded) as unknown as T;
+}
+
+function decodeLearningResource(document: VersionedDocument): LearningResourceRecord {
+  const resource = decodeDocument<LearningResourceRecord>(document);
+  const rawVisibility = document.visibility;
+  const classIds = rawVisibility !== null && typeof rawVisibility === 'object' && !Array.isArray(rawVisibility)
+    ? (rawVisibility as Record<string, unknown>).classIds : undefined;
+  const visibility = typeof rawVisibility === 'string' ? rawVisibility
+    : rawVisibility !== null && typeof rawVisibility === 'object' && !Array.isArray(rawVisibility)
+      ? (rawVisibility as Record<string, unknown>).type : undefined;
+  if (visibility !== 'organization' && visibility !== 'classes') throw new TaskCorePersistenceError('INTERNAL_ERROR');
+  const allowedClassIds = Array.isArray(document.allowedClassIds) ? document.allowedClassIds
+    : Array.isArray(classIds) ? classIds : visibility === 'organization' ? [] : null;
+  if (allowedClassIds === null || !allowedClassIds.every((value) => typeof value === 'string')) {
+    throw new TaskCorePersistenceError('INTERNAL_ERROR');
+  }
+  return { ...resource, id: typeof document.id === 'string' && document.id.length > 0 ? document.id : document._id,
+    visibility, allowedClassIds: [...allowedClassIds] };
 }
 
 function decodeTeacherGrant(document: VersionedDocument): TeacherClassGrantRecord {

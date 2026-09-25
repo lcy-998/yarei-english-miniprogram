@@ -1,5 +1,5 @@
 export type Role = 'student' | 'teacher' | 'parent'
-export type TaskStatus = 'draft' | 'scheduled' | 'active' | 'expired' | 'completed'
+export type TaskStatus = 'draft' | 'scheduled' | 'active' | 'expired' | 'withdrawn' | 'closed' | 'completed'
 export type AssignmentStatus = 'not_started' | 'in_progress' | 'awaiting_review' | 'completed' | 'redo_required' | 'overdue'
 export type SubmissionStatus = 'draft' | 'submitted' | 'reviewed' | 'returned'
 export type ReviewDecision = 'approved' | 'returned'
@@ -23,6 +23,7 @@ export interface ParentStudentLink {
 
 export interface TaskItem {
   id: string
+  resourceId?: string
   type: 'reading' | 'vocabulary' | 'exercise'
   title: string
   completionRule: string
@@ -46,6 +47,7 @@ export interface Task {
   status: TaskStatus
   creatorTeacherId: string
   classId: string
+  classIds?: string[]
   startsAt: string
   dueAt: string
   description: string
@@ -98,7 +100,7 @@ export interface ReviewFeedback {
   publishedAt: string
 }
 
-export type WriteOperationKind = 'publish_task' | 'save_submission_draft' | 'submit_task' | 'publish_review'
+export type WriteOperationKind = 'publish_task' | 'save_teacher_draft' | 'save_submission_draft' | 'submit_task' | 'publish_review'
 
 export interface WriteOperationReceipt {
   operationId: string
@@ -193,6 +195,7 @@ export interface VocabularyPack {
   id: string
   title: string
   grade: string
+  textbook?: string
   unit: string
   contentVersion: string
   words: VocabularyWord[]
@@ -221,7 +224,7 @@ export interface VocabularyProgress {
 }
 
 export type TeacherStudentStatusFilter = 'all' | 'normal' | 'attention' | 'disabled'
-export interface TeacherStudentClassOption { id: string; name: string; grade: string; term: string }
+export interface TeacherStudentClassOption { id: string; name: string; grade: string; term: string; version?: number }
 export interface TeacherStudentPerformanceSummary {
   assignedCount: number; completedCount: number; overdueCount: number; redoCount: number
   completionRate: number; averageScore: number | null
@@ -241,6 +244,7 @@ export interface TeacherStudentDetail {
   accountStatus: 'active' | 'disabled'; needsAttention: boolean
   classInfo: TeacherStudentClassOption; parents: TeacherStudentParentSummary[]
   performance: TeacherStudentPerformanceSummary; recentTasks: TeacherStudentTaskItem[]
+  userVersion?: number; membershipVersion?: number; membershipVersions?: Record<string, number>
 }
 
 export interface HomeView {
@@ -255,5 +259,6 @@ export interface TaskDetailView {
   task: Task
   assignment: TaskAssignment
   submission?: Submission
+  submissionHistory?: Array<{ version: number; status: SubmissionStatus; submittedAt: string }>
   feedback?: ReviewFeedback
 }

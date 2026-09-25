@@ -66,7 +66,9 @@ function createHarness(options: Readonly<{
   failAudit?: boolean;
   studentCount?: number;
   resourceType?: LearningResourceType;
+  withLearningProgress?: boolean;
   batchReviewPreviewCodec?: BatchReviewPreviewCodec;
+  nowIso?: () => string;
 }> = {}): TestHarness {
   const teacherGrants: TeacherClassGrantRecord[] = [{
     _id: 'grant_teacher_class',
@@ -101,6 +103,16 @@ function createHarness(options: Readonly<{
   };
   const repository = new InMemoryTaskCoreRepository({
     teacherGrants,
+    readingProgress: options.resourceType === 'reading' && options.withLearningProgress !== false ? [{
+      id: 'reading_progress_demo', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID,
+      resourceId: 'resource_demo_exercise', chapterId: 'chapter_demo', pageId: 'page_demo_03', pageNumber: 3,
+      favorite: false, version: 1, updatedAt: '2026-09-16T01:00:00.000Z',
+    }] : [],
+    vocabularyProgress: options.resourceType === 'vocabulary' && options.withLearningProgress !== false ? [{
+      id: 'vocabulary_progress_demo', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID,
+      packId: 'resource_demo_exercise', completedCount: 5, correctCount: 4, correctRate: 80,
+      wrongWordIds: [], version: 1, updatedAt: '2026-09-16T01:00:00.000Z',
+    }] : [],
     resources: [{
       id: 'resource_demo_exercise',
       organizationId: ORGANIZATION_ID,
@@ -124,7 +136,7 @@ function createHarness(options: Readonly<{
   if (options.failAudit === true) repository.failNext('audit.append');
   let sequence = 0;
   const ids = { next: (prefix: string): string => `${prefix}_${++sequence}` };
-  const clock = { nowIso: (): string => '2026-09-16T02:00:00.000Z' };
+  const clock = { nowIso: options.nowIso ?? ((): string => '2026-09-16T02:00:00.000Z') };
   const service = new TaskCoreService(
     repository,
     identityRepository,
@@ -234,6 +246,19 @@ describe('M1 本地任务持久化闭环', () => {
       ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { targetStudentIds: expect.any(String) } },
     });
     expect(await harness.repository.findTask(ORGANIZATION_ID, draft.data.taskId)).toMatchObject({ status: 'draft', version: 1 });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(0);
+  });
+
+  it('未发布草稿可回收且不会生成学生任务', async () => {
+    const harness = createHarness();
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '待回收虚构草稿', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_draft_for_recycle');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    const result = await harness.service.recycleTask(teacher, draft.data.taskId, '教师删除未发布草稿', 1, 'operation_recycle_draft');
+    expect(result).toMatchObject({ ok: true, data: { visibility: 'recycled', version: 2 } });
     expect(harness.repository.debugSnapshot().assignments).toHaveLength(0);
   });
 
@@ -604,8 +629,8 @@ describe('M1 本地任务持久化闭环', () => {
     expect(await harness.repository.findTask(ORGANIZATION_ID, draft.data.taskId)).toMatchObject({ status: 'draft', version: 1 });
   });
 
-  it('单次发布严格限制为 1—50 名学生', async () => {
-    const harness = createHarness({ studentCount: 51 });
+  it('500 人发布分批创建记录，完成前任务保持草稿，重复请求不会重复创建', async () => {
+    const harness = createHarness({ studentCount: 500 });
     const draft = await harness.service.saveTaskDraft(teacher, {
       title: '发布规模上限演示任务',
       itemRefs: [{
@@ -621,12 +646,95 @@ describe('M1 本地任务持久化闭环', () => {
       latePolicy: { allowLate: true, lateDays: 7 },
     }, 0, 'operation_save_oversized_target');
     if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
-    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_oversized_target')).toMatchObject({
-      ok: false,
-      error: { code: 'VALIDATION_ERROR', fieldErrors: { targetClassIds: expect.any(String) } },
+    let result = await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_oversized_target');
+    expect(result).toMatchObject({ ok: true, data: { status: 'publishing', assignmentCount: 60, totalCount: 500 } });
+    expect(await harness.repository.findTask(ORGANIZATION_ID, draft.data.taskId)).toMatchObject({ status: 'draft' });
+    for (let attempt = 0; attempt < 9 && result.ok && result.data.status === 'publishing'; attempt += 1) {
+      result = await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_oversized_target');
+    }
+    expect(result).toMatchObject({ ok: true, data: { status: 'active', assignmentCount: 500 } });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(500);
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_oversized_target')).toMatchObject({ ok: true, data: { assignmentCount: 500 } });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(500);
+  });
+
+  it('发布目标超过 500 人时拒绝且不产生部分记录', async () => {
+    const harness = createHarness({ studentCount: 501 });
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '超出上限的虚构任务', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_501_target');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_501_target')).toMatchObject({
+      ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { targetClassIds: expect.stringContaining('500') } },
     });
     expect(harness.repository.debugSnapshot().assignments).toHaveLength(0);
-    expect(await harness.repository.findTask(ORGANIZATION_ID, draft.data.taskId)).toMatchObject({ status: 'draft' });
+  });
+
+  it('按学员选择超过 50 人时也能保存草稿并分批发布', async () => {
+    const harness = createHarness({ studentCount: 68 });
+    const studentIds = Array.from({ length: 68 }, (_, index) => index === 0 ? STUDENT_ID : `user_student_demo_${index + 1}`);
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '按学员发布的虚构任务', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetType: 'students', targetClassIds: [], targetStudentIds: studentIds,
+      startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_68_students');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    const first = await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_68_students');
+    expect(first).toMatchObject({ ok: true, data: { status: 'publishing', assignmentCount: 60, totalCount: 68 } });
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_68_students')).toMatchObject({ ok: true, data: { assignmentCount: 68 } });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(68);
+  });
+
+  it('分批期间班级成员变化不改写已经冻结的发布名单', async () => {
+    const harness = createHarness({ studentCount: 68 });
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '冻结名单的虚构任务', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_frozen_roster');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_frozen_roster')).toMatchObject({ ok: true, data: { status: 'publishing', assignmentCount: 60 } });
+    harness.repository.upsertMembership({ id: 'membership_68', organizationId: ORGANIZATION_ID, classId: CLASS_ID, studentId: 'user_student_demo_68', status: 'inactive' });
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_frozen_roster')).toMatchObject({ ok: true, data: { status: 'active', assignmentCount: 68 } });
+  });
+
+  it('500 人待开始任务可修改说明而不重建学生任务', async () => {
+    const harness = createHarness({ studentCount: 500 });
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '待开始的虚构任务', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-17T00:00:00.000Z', dueAt: '2026-09-18T00:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_scheduled_500');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    let result = await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_scheduled_500');
+    for (let attempt = 0; attempt < 9 && result.ok && result.data.status === 'publishing'; attempt += 1) {
+      result = await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_scheduled_500');
+    }
+    if (!result.ok || typeof result.data.version !== 'number') throw new Error('publish expected');
+    const updated = await harness.service.updatePublishedTask(teacher, {
+      taskId: draft.data.taskId, targetType: 'classes', targetClassIds: [CLASS_ID], targetStudentIds: [], description: '更新完成要求',
+    }, result.data.version, 'operation_update_scheduled_500');
+    expect(updated).toMatchObject({ ok: true });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(500);
+  });
+
+  it('最后一批审计写入失败时保持不可见，重试后完整发布', async () => {
+    const harness = createHarness({ studentCount: 68 });
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '可恢复的虚构任务', itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_save_recoverable_68');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_recoverable_68')).toMatchObject({ ok: true, data: { status: 'publishing', assignmentCount: 60 } });
+    harness.repository.failNext('audit.append');
+    await expect(harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_recoverable_68')).rejects.toThrow();
+    expect(await harness.repository.findTask(ORGANIZATION_ID, draft.data.taskId)).toMatchObject({ status: 'draft', publication: { nextIndex: 60 } });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(60);
+    expect(await harness.service.publishTask(teacher, draft.data.taskId, 1, 'operation_publish_recoverable_68')).toMatchObject({ ok: true, data: { status: 'active', assignmentCount: 68 } });
+    expect(harness.repository.debugSnapshot().assignments).toHaveLength(68);
   });
 
   it('草稿可乐观锁更新，正式提交后答案不可修改；同幂等键重放返回同一提交', async () => {
@@ -727,6 +835,9 @@ describe('M1 本地任务持久化闭环', () => {
       itemId: 'item_exercise', value: { kind: 'reading', completedPageCount: 2 },
     }], 1, undefined, 'operation_reading_incomplete')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await reading.service.submit(student, readingTaskId, [{
+      itemId: 'item_exercise', value: { kind: 'reading', completedPageCount: 4 },
+    }], 1, undefined, 'operation_reading_overstated')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(await reading.service.submit(student, readingTaskId, [{
       itemId: 'item_exercise', value: { kind: 'reading', completedPageCount: 3 },
     }], 1, undefined, 'operation_reading_complete')).toMatchObject({ ok: true });
 
@@ -735,6 +846,9 @@ describe('M1 本地任务持久化闭环', () => {
     expect(await vocabulary.service.submit(student, vocabularyTaskId, [{
       itemId: 'item_exercise', value: { kind: 'vocabulary', completedWordCount: 5, correctWordCount: 6 },
     }], 1, undefined, 'operation_vocabulary_invalid')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(await vocabulary.service.submit(student, vocabularyTaskId, [{
+      itemId: 'item_exercise', value: { kind: 'vocabulary', completedWordCount: 5, correctWordCount: 3 },
+    }], 1, undefined, 'operation_vocabulary_overstated')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await vocabulary.service.submit(student, vocabularyTaskId, [{
       itemId: 'item_exercise', value: { kind: 'vocabulary', completedWordCount: 5, correctWordCount: 4 },
     }], 1, undefined, 'operation_vocabulary_complete')).toMatchObject({ ok: true });
@@ -747,6 +861,17 @@ describe('M1 本地任务持久化闭环', () => {
     expect(await exercise.service.submit(student, exerciseTaskId, [{
       itemId: 'item_exercise', value: { kind: 'exercise', answeredQuestionCount: 2 },
     }], 1, undefined, 'operation_exercise_complete')).toMatchObject({ ok: true });
+  });
+
+  it('拒绝仅靠客户端数字声称已完成阅读或单词练习', async () => {
+    const reading = createHarness({ resourceType: 'reading', withLearningProgress: false });
+    const readingTaskId = await publishSingleStudentTask(reading, { kind: 'reading_pages', requiredPageCount: 3 });
+    expect(await reading.service.submit(student, readingTaskId, [{ itemId: 'item_exercise', value: { kind: 'reading', completedPageCount: 3 } }], 1, undefined, 'operation_reading_forged'))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    const vocabulary = createHarness({ resourceType: 'vocabulary', withLearningProgress: false });
+    const vocabularyTaskId = await publishSingleStudentTask(vocabulary, { kind: 'vocabulary_words', requiredWordCount: 5 });
+    expect(await vocabulary.service.submit(student, vocabularyTaskId, [{ itemId: 'item_exercise', value: { kind: 'vocabulary', completedWordCount: 5, correctWordCount: 4 } }], 1, undefined, 'operation_vocabulary_forged'))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
   });
 
   it('限制任务说明、教师备注、点评和退回原因长度', async () => {
@@ -1026,6 +1151,30 @@ describe('M1 本地任务持久化闭环', () => {
       expectedSubmissionVersion: 3,
     }, 6, 'operation_return_v3')).toMatchObject({ ok: false, error: { code: 'REDO_LIMIT_REACHED' } });
     expect(await harness.repository.findFeedbackBySubmission(ORGANIZATION_ID, submitV3.data.submissionId)).toBeNull();
+  });
+
+  it('退回重做保存草稿后仍可在三天重做期内提交，即使原任务补交期已结束', async () => {
+    let now = '2026-09-16T02:00:00.000Z';
+    const harness = createHarness({ nowIso: () => now });
+    const taskId = await publishSingleStudentTask(harness);
+    const first = await harness.service.submit(student, taskId, [{ itemId: 'item_exercise', value: exerciseResult('first') }], 1, undefined, 'operation_redo_draft_first');
+    if (!first.ok || typeof first.data.submissionId !== 'string') throw new Error('first submission expected');
+
+    now = '2026-09-24T02:00:00.000Z';
+    expect(await harness.service.publishReview(teacher, {
+      submissionId: first.data.submissionId, decision: 'returned', returnReason: '请订正后重交', expectedSubmissionVersion: 1,
+    }, 2, 'operation_redo_draft_return')).toMatchObject({ ok: true, data: { assignmentVersion: 3 } });
+
+    const draft = await harness.service.saveSubmissionDraft(student, taskId, [{ itemId: 'item_exercise', value: '订正草稿' }], 3, undefined, 'operation_redo_draft_save');
+    expect(draft).toMatchObject({ ok: true, data: { submissionVersion: 2, recordVersion: 1, assignmentVersion: 4 } });
+    expect(harness.repository.debugSnapshot().assignments[0]).toMatchObject({ status: 'in_progress', redoDueAt: '2026-09-27T02:00:00.000Z' });
+
+    now = '2026-09-27T02:00:00.001Z';
+    expect(await harness.service.submit(student, taskId, [{ itemId: 'item_exercise', value: exerciseResult('too-late') }], 4, 1, 'operation_redo_draft_expired')).toMatchObject({ ok: false, error: { code: 'TASK_NOT_SUBMITTABLE' } });
+    now = '2026-09-27T02:00:00.000Z';
+    const submitted = await harness.service.submit(student, taskId, [{ itemId: 'item_exercise', value: exerciseResult('corrected') }], 4, 1, 'operation_redo_draft_submit');
+    expect(submitted).toMatchObject({ ok: true, data: { submissionVersion: 2, assignmentVersion: 5 } });
+    expect(harness.repository.debugSnapshot().assignments[0]).toMatchObject({ status: 'awaiting_review', redoDueAt: null });
   });
 
   it('教师撤权后立即不能点评；家长解绑后立即不能读取历史结果', async () => {

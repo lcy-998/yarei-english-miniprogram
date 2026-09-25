@@ -97,7 +97,8 @@ evidence.push(await runChild({ YAREI_AUTH_SMOKE_CHILD: 'database-deny' }));
 
 const failures = evidence.filter((item) => item.outcome !== 'passed');
 for (const item of evidence) {
-  process.stdout.write(`${item.scenarioId}=${item.outcome}${item.errorCode === null ? '' : `:${item.errorCode}`}\n`);
+  const stages = item.stages === undefined ? '' : `; stages=${Object.values(item.stages).join(',')}`;
+  process.stdout.write(`${item.scenarioId}=${item.outcome}${item.errorCode === null ? '' : `:${item.errorCode}`}${stages}\n`);
 }
 process.stdout.write(`authenticated_cloud_smoke_passed=${failures.length === 0 ? 'true' : 'false'}; scenario_count=${evidence.length}\n`);
 process.exit(failures.length === 0 ? 0 : 2);
@@ -132,6 +133,11 @@ async function runScenario(scenario) {
       { checkId: 'role-or-admin-session', passed: selected.ok },
       { checkId: 'authorized-read-smoke', passed: smoke.ok },
     ],
+    stages: {
+      bootstrap: bootstrap.ok ? 'passed' : bootstrap.error?.code ?? 'failed',
+      roleOrAdminSession: selected.ok ? 'passed' : selected.error?.code ?? 'failed',
+      authorizedRead: smoke.ok ? 'passed' : smoke.error?.code ?? 'failed',
+    },
     counts: {
       roles: bootstrap.ok && Array.isArray(bootstrap.data?.roles) ? bootstrap.data.roles.length : null,
     },
@@ -262,7 +268,7 @@ function requirePrivateValue(value) {
 
 function registerNodeAdapter() {
   try {
-    require('@cloudbase/adapter-node');
+    require('@cloudbase/js-sdk').useAdapters(require('@cloudbase/adapter-node').default);
   } catch {
     // The current SDK also works in some Node versions without explicit registration.
   }

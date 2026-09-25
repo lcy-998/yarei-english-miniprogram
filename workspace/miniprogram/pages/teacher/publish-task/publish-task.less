@@ -28,8 +28,49 @@
 .summary-title text:last-child { color: @yr-text-secondary; font-size: 11px; }
 .summary-row { margin-top: 14px; display: grid; grid-template-columns: 78px 1fr; gap: 10px; color: @yr-text-secondary; font-size: 13px; }
 .summary-row text:first-child { color: @yr-text-primary; font-weight: 800; }
+.summary-row--schedule { align-items: center; }
+.schedule-fields { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.schedule-fields picker { flex: 1 1 92px; min-width: 0; }
+.schedule-value { min-height: 40px; padding: 0 10px; display: flex; align-items: center; justify-content: center; border: 1px solid @yr-border-subtle; border-radius: 12px; background: @yr-surface-blue-100; color: @yr-brand-primary; font-size: 13px; font-weight: 800; white-space: nowrap; }
 .preview > text:nth-child(2) { display: block; margin-top: 12px; color: @yr-text-primary; font-size: 16px; font-weight: 800; }
 .preview > text:last-child { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 12px; line-height: 1.6; }
-.error { display: block; margin: 12px 4px 0; color: @yr-warning; }
-.action-bar { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); box-sizing: border-box; border-top: 1px solid @yr-border-subtle; background: rgba(255, 255, 255, .96); box-shadow: 0 -8px 24px rgba(7,30,73,.09); }
-.primary { width: 100%; height: 52px; margin: 0; border-radius: 26px; .yr-primary-action(); .yr-control-content-center(); font-weight: 900; }
+.error { display: block; margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: rgba(255,232,229,.96); color: @yr-danger; font-size: 13px; font-weight: 800; line-height: 1.5; }
+.action-bar { position: relative; z-index: 2; width: 100%; padding: 12px 18px 0; box-sizing: border-box; background: transparent; border: 0; box-shadow: none; }
+.primary { width: 100%; min-width: 0; max-width: 100%; height: 52px; margin: 0; padding: 0 8px; border-radius: 26px; .yr-primary-action(); .yr-control-content-center(); font-weight: 900; }
+
+/* The target summary opens an inline editor for authorized classes or students. */
+.summary-row--target { align-items: center; }
+.target-trigger { min-width: 0; min-height: 44px; margin: 0; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid @yr-border-subtle; border-radius: 12px; background: @yr-surface-blue-100; color: @yr-text-primary; font-size: 13px; font-weight: 800; line-height: 1.4; text-align: left; }
+.target-trigger::after,.target-mode button::after,.target-editor-footer button::after { border: 0; }
+.target-trigger text:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.target-trigger text:last-child { flex: none; color: @yr-brand-primary; white-space: nowrap; }
+.target-editor { margin-top: 14px; padding: 12px; border: 1px solid @yr-border-subtle; border-radius: 16px; background: #fff; }
+.target-mode { display: flex; gap: 8px; }
+.target-mode button { flex: 1; min-width: 0; height: 40px; min-height: 40px; margin: 0; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: @yr-surface-blue-100; color: @yr-text-secondary; font-size: 14px; font-weight: 800; line-height: 1.2; text-align: center; }
+.target-mode button text { display: block; line-height: 1.2; }
+.target-mode button.active { background: @yr-brand-primary; color: #fff; }
+.target-search { height: 42px; margin-top: 10px; padding: 0 12px; border: 1px solid @yr-border-subtle; border-radius: 12px; background: #f7fbff; font-size: 14px; }
+.target-options { height: 220px; margin-top: 10px; }
+.target-option { min-height: 52px; padding: 8px 4px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid @yr-border-light; }
+.target-option > view:last-child { flex: 1; min-width: 0; }
+.target-option text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.target-option text:first-child { color: @yr-text-primary; font-size: 14px; font-weight: 800; }
+.target-option text:last-child { margin-top: 3px; color: @yr-text-secondary; font-size: 11px; }
+.target-check { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border: 2px solid @yr-border-subtle; border-radius: 6px; color: #fff; font-size: 15px; font-weight: 900; }
+.target-check.selected { border-color: @yr-brand-primary; background: @yr-brand-primary; }
+.target-empty { display: block; padding: 32px 8px; color: @yr-text-secondary; text-align: center; }
+.target-editor-footer { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; color: @yr-text-secondary; font-size: 13px; font-weight: 800; }
+.target-editor-footer button { min-width: 72px; height: 38px; margin: 0; padding: 0 12px; border-radius: 12px; background: @yr-surface-blue-100; color: @yr-brand-primary; font-size: 13px; font-weight: 900; line-height: 38px; }
+.target-over-limit { display: block; margin-top: 8px; color: @yr-danger; font-size: 12px; font-weight: 800; line-height: 1.45; }
+.preview > text:nth-child(3) { display: block; margin-top: 8px; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.resource-trigger{width:100%;height:44px;margin:14px 0 0;padding:0 12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:1px solid @yr-brand-primary;border-radius:14px;background:#fff;color:@yr-brand-primary;font-size:14px;font-weight:900;line-height:1.2;text-align:center}
+.resource-trigger::after,.resource-choice::after,.draft-action::after{border:0}
+.resource-list{display:grid;gap:8px;margin-top:10px}
+.resource-choice{min-height:50px;margin:0;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid @yr-border-subtle;border-radius:14px;background:#fff;color:@yr-text-primary;font-size:14px;text-align:left}
+.resource-choice text:first-child{flex:1;min-width:0}
+.resource-choice text:last-child{color:@yr-brand-primary;font-size:12px;font-weight:800}
+.resource-choice.selected{border-color:@yr-success;background:@yr-surface-green}
+.teacher-note{height:76px!important}
+.action-bar{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:10px;align-items:center}
+.draft-action{width:100%;min-width:0;max-width:100%;height:52px;margin:0;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:1px solid @yr-brand-primary;border-radius:18px;background:#fff;color:@yr-brand-primary;font-size:14px;font-weight:900;line-height:1.2;white-space:nowrap}
+.action-bar--single{grid-template-columns:minmax(0,1fr)}

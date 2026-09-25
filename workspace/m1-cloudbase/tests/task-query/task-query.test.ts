@@ -110,6 +110,14 @@ describe('M1 本地只读任务查询', () => {
     });
   });
 
+  it('编辑详情仅向任务创建者返回原始配置与版本', async () => {
+    const service = new TeacherTaskQueryService({ repository: fixture(), clock, requestIds });
+    expect(await service.getTaskForEdit(teacher, 'task_a')).toMatchObject({
+      ok: true, data: { taskId: 'task_a', version: 2, teacherNote: '教师私密备注不得返回', target: { type: 'classes', classIds: ['class_a'] } },
+    });
+    expect(await service.getTaskForEdit(teacher, 'task_b')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+  });
+
   it('未授权筛选只能收窄为空，分页游标不能跨筛选或授权版本复用', async () => {
     let cursorSequence = 0;
     const cursorCodec = new InMemoryOpaqueCursorCodec({ next: () => `test_cursor_${++cursorSequence}` });
@@ -173,11 +181,25 @@ describe('M1 本地只读任务查询', () => {
     const list = await service.listMyTasks(studentA, {}, { limit: 10 });
     expect(list).toMatchObject({ ok: true, data: { total: 1, items: [{ taskId: 'task_a', status: 'awaiting_review' }] } });
     const detail = await service.getMyTask(studentA, 'task_a');
-    expect(detail).toMatchObject({ ok: true, data: { taskId: 'task_a', submission: { id: 'submission_a1' } } });
+    expect(detail).toMatchObject({ ok: true, data: { taskId: 'task_a', submission: { id: 'submission_a1' }, submissionHistory: [{ version: 1, status: 'submitted' }] } });
     expect(JSON.stringify(detail)).not.toContain('teacherNote');
     expect(JSON.stringify(detail)).not.toContain('student_a2');
     expect(await service.getMyTask(studentA, 'task_b')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     expect(await service.listMyTasks({ ...studentA, actorRole: 'parent' }, {}, { limit: 10 })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+  });
+
+  it('历史任务快照缺少资源标识时从已发布的引用恢复学生阅读入口', async () => {
+    const legacy = task('task_legacy', 'class_a');
+    const repository = new InMemoryTaskQueryRepository({
+      teacherGrants: grants,
+      resources: [],
+      tasks: [{ ...legacy, itemRefs: [{ id: 'item_task_legacy', resourceId: 'resource_reading', order: 1 }],
+        items: legacy.items.map(({ resourceId: _resourceId, ...item }) => item as TaskRecord['items'][number]) }],
+      assignments: [assignment('assign_legacy', 'task_legacy', 'student_a', 'class_a', 'not_started', null)],
+      submissions: [], feedback: [],
+    });
+    const service = new StudentTaskQueryService({ repository, clock, requestIds });
+    expect(await service.getMyTask(studentA, 'task_legacy')).toMatchObject({ ok: true, data: { items: [{ resourceId: 'resource_reading' }] } });
   });
 
   it('学生详情优先恢复当前 assignment 下一版本草稿，且教师点评入口和其他学生均不可见', async () => {
@@ -297,11 +319,14 @@ describe('M1 只读查询函数边界', () => {
       listTeacherTasks: vi.fn(async () => ok({ action: 'tasks' })),
       getDraftOptions: vi.fn(async () => ok({ action: 'options' })),
       previewTask: vi.fn(async () => ok({ action: 'preview' })),
+      getTaskForEdit: vi.fn(async () => ok({ action: 'edit' })),
       getCompletion: vi.fn(async () => ok({ action: 'completion' })),
     };
     const taskMain = createTaskQueryFunction({ ...boundary('task-query', teacher), handler: taskHandler });
     expect(await taskMain({ apiVersion: 'm1.v1', action: 'getTeacherWorkbench', payload: { date: '2026-09-16' } })).toMatchObject({ ok: true, data: { action: 'workbench' } });
     expect(taskHandler.getTeacherWorkbench).toHaveBeenCalledWith(teacher, '2026-09-16', undefined);
+    expect(await taskMain({ apiVersion: 'm1.v1', action: 'getTaskForEdit', payload: { taskId: 'task_a' } })).toMatchObject({ ok: true, data: { action: 'edit' } });
+    expect(taskHandler.getTaskForEdit).toHaveBeenCalledWith(teacher, 'task_a');
     expect(await taskMain({ apiVersion: 'm1.v1', action: 'listTeacherTasks', payload: { filters: { classId: 'class_a', actorRole: 'admin' }, page: { limit: 20 } } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { 'filters.actorRole': expect.any(String) } } });
     expect(await taskMain({ apiVersion: 'm1.v1', action: 'getDraftOptions', payload: { organizationId: 'org_other' } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await taskMain({ apiVersion: 'm1.v1', action: 'getDraftOptions', payload: {}, operationId: 'operation_query_0001' })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { operationId: expect.any(String) } } });

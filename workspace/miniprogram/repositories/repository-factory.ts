@@ -1,4 +1,6 @@
 import { CloudAppService, createCloudAppService } from '../services/cloudbase-app-service'
+import { configureM1AppRepository, useMemoryM1AppRepository } from '../services/m1-app-service'
+import { createCloudBaseM1AppRepository } from './cloudbase/cloudbase-m1-app-repository'
 import { getCurrentChildId } from '../session/session'
 import {
   CloudAuthenticationPort,
@@ -25,6 +27,7 @@ let cloudService: CloudAppService | null = null
 export function configureRepositories(configuration: RepositoryConfiguration): void {
   if (configuration.mode === 'memory') {
     cloudService = null
+    useMemoryM1AppRepository()
     return
   }
   const context: CloudClientContextProvider = () => {
@@ -37,6 +40,13 @@ export function configureRepositories(configuration: RepositoryConfiguration): v
     configuration.authentication,
     context,
   )
+  configureM1AppRepository(createCloudBaseM1AppRepository({
+    invoker: {
+      invoke: (functionName, request) => configuration.invoker.call(functionName, request, {
+        businessSessionToken: context().sessionId,
+      }),
+    },
+  }))
 }
 
 export function getCloudAppService(): CloudAppService | null {

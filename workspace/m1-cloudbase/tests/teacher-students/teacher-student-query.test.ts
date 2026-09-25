@@ -116,6 +116,7 @@ describe('M1 教师学员目录查询', () => {
       },
     });
     if (!result.ok) throw new Error('expected student detail');
+    expect(result.data).toMatchObject({ userVersion: expect.any(Number), membershipVersion: expect.any(Number), membershipVersions: { class_a: expect.any(Number) }, classInfo: { version: expect.any(Number) } });
     expect(result.data.recentTasks).toEqual(expect.arrayContaining([expect.objectContaining({ taskId: 'task_1', score: 86 })]));
     expect(JSON.stringify(result)).not.toContain('parent_a');
     expect(await service.getStudent(teacher, 'student_hidden')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });

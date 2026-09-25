@@ -28,6 +28,9 @@ import type {
 
 const REDO_DAYS = 3;
 const MAX_REDO_COUNT = 2;
+const MAX_TASK_TARGET_STUDENTS = 500;
+const PUBLISH_ASSIGNMENT_BATCH_SIZE = 20;
+const PUBLISH_BATCHES_PER_CALL = 3;
 
 /** Pure business slice whose command writes are committed through one unit of work. */
 export class TaskCoreService {
@@ -55,9 +58,13 @@ export class TaskCoreService {
     const initialTarget = await resolveTargetMemberships(this.repository, actor.organizationId, input);
     if (!initialTarget.ok) return this.fail('VALIDATION_ERROR', initialTarget.fieldErrors);
     if (!(await this.canTeacherAccessAll(actor, initialTarget.classIds, 'task.publish'))) return this.fail('FORBIDDEN');
+    const classMembershipGuards = (input.targetType ?? 'classes') === 'classes'
+      ? await this.prepareClassMembershipGuards(actor.organizationId, initialTarget.classIds)
+      : [];
     const scope = await this.prepareScope(actor, {
       classIds: initialTarget.classIds,
       memberships: initialTarget.memberships,
+      classMembershipGuards,
     });
 
     return this.executeAtomic({
@@ -69,12 +76,15 @@ export class TaskCoreService {
       payload: taskDraftPayload(input),
       scope,
       perform: async (transaction) => {
-        const resolvedTarget = await resolveTargetMemberships(transaction, actor.organizationId, input);
+        const resolvedTarget = (input.targetType ?? 'classes') === 'classes' || initialTarget.memberships.length > 50
+          ? { ok: true as const, classIds: initialTarget.classIds, memberships: [] as readonly ClassMembershipRecord[] }
+          : await resolveTargetMemberships(transaction, actor.organizationId, input);
         if (!resolvedTarget.ok) return this.fail('VALIDATION_ERROR', resolvedTarget.fieldErrors);
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, resolvedTarget.classIds, 'task.publish'))) return this.fail('FORBIDDEN');
         const current = input.taskId === undefined ? null : await transaction.findTask(actor.organizationId, input.taskId);
         if (input.taskId !== undefined && current === null) return this.fail('NOT_FOUND');
         if (current !== null && (current.creatorTeacherId !== actor.actorUserId || current.status !== 'draft')) return this.fail('FORBIDDEN');
+        if (current?.publication) return this.fail('CONFLICT');
         const currentVersion = current?.version ?? 0;
         if (currentVersion !== expectedVersion) return this.fail('CONFLICT');
 
@@ -124,14 +134,22 @@ export class TaskCoreService {
     operationId: string,
   ): Promise<ServiceResult<JsonObject>> {
     const preparedTask = await this.repository.findTask(actor.organizationId, taskId);
-    const preparedMembershipGuards = preparedTask?.targetType === 'classes'
-      ? await this.prepareClassMembershipGuards(actor.organizationId, preparedTask.targetClassIds)
-      : [];
     const preparedMemberships = preparedTask === null
       ? []
       : preparedTask.targetType === 'classes'
         ? await this.repository.listActiveClassMemberships(actor.organizationId, preparedTask.targetClassIds)
         : await this.repository.listActiveStudentMemberships(actor.organizationId, preparedTask.targetStudentIds);
+    const preparedMembershipGuards = preparedTask === null ? [] : await this.prepareClassMembershipGuards(
+      actor.organizationId,
+      preparedTask.targetType === 'classes' ? preparedTask.targetClassIds : preparedMemberships.map((membership) => membership.classId),
+    );
+    if (preparedTask?.publishOperationId === operationId && preparedTask.status !== 'draft') {
+      if (preparedTask.creatorTeacherId !== actor.actorUserId || !(await this.canTeacherAccessAll(actor, preparedTask.targetClassIds, 'task.publish'))) return this.fail('FORBIDDEN');
+      return success<JsonObject>({ taskId, status: preparedTask.status, version: preparedTask.version, assignmentCount: preparedTask.targetStudentIds.length, publishedAt: preparedTask.publishedAt }, createMeta(this.clock, this.requestIds));
+    }
+    if (preparedTask && (preparedTask.publication || new Set(preparedMemberships.map((membership) => membership.studentId)).size > 50)) {
+      return this.publishLargeTask(actor, preparedTask, preparedMembershipGuards, expectedVersion, operationId);
+    }
     const preparedClassIds = preparedTask?.targetType === 'students'
       ? unique(preparedMemberships.map((membership) => membership.classId))
       : preparedTask?.targetClassIds ?? [];
@@ -186,7 +204,7 @@ export class TaskCoreService {
         const memberships = resolvedTarget.memberships;
         const byStudent = new Map(memberships.map((membership) => [membership.studentId, membership]));
         if (byStudent.size === 0) return this.fail('VALIDATION_ERROR', { targetClassIds: '布置对象中没有有效学生。' });
-        if (byStudent.size > 50) return this.fail('VALIDATION_ERROR', { targetClassIds: '单次发布最多包含 50 名学生。' });
+        if (byStudent.size > 50) return this.fail('CONFLICT');
         for (const membership of byStudent.values()) {
           if (await transaction.findAssignment(actor.organizationId, taskId, membership.studentId) !== null) return this.fail('CONFLICT');
         }
@@ -221,6 +239,7 @@ export class TaskCoreService {
         }
         const result = success<JsonObject>({
           taskId,
+          status: published.status,
           version: published.version,
           assignmentCount: byStudent.size,
           publishedAt: now,
@@ -237,6 +256,108 @@ export class TaskCoreService {
         return result;
       },
     });
+  }
+
+  private async publishLargeTask(
+    actor: TrustedActorContext,
+    preparedTask: TaskRecord,
+    preparedMembershipGuards: TaskCoreTransactionScope['classMembershipGuards'],
+    expectedVersion: number,
+    operationId: string,
+  ): Promise<ServiceResult<JsonObject>> {
+    const taskId = preparedTask.id;
+    if (preparedTask.creatorTeacherId !== actor.actorUserId || preparedTask.status !== 'draft') return this.fail('FORBIDDEN');
+    if (preparedTask.publication && (preparedTask.publication.operationId !== operationId || preparedTask.publication.originalVersion !== expectedVersion)) return this.fail('CONFLICT');
+
+    if (!preparedTask.publication) {
+      if (preparedTask.version !== expectedVersion) return this.fail('CONFLICT');
+      const target = await resolveStoredTargetMemberships(this.repository, actor.organizationId, preparedTask);
+      if (!target.ok) return this.fail('VALIDATION_ERROR', target.fieldErrors);
+      const byStudent = new Map(target.memberships.map((membership) => [membership.studentId, membership]));
+      if (!byStudent.size || byStudent.size > MAX_TASK_TARGET_STUDENTS) return this.fail('VALIDATION_ERROR', { targetClassIds: '单次发布最多包含 500 名学生。' });
+      if (!(await this.canTeacherAccessAll(actor, target.classIds, 'task.publish'))) return this.fail('FORBIDDEN');
+      if (!(await this.canTeacherAccessAll(actor, target.classIds, 'content.read'))) return this.fail('FORBIDDEN');
+      const scope = await this.prepareScope(actor, { classIds: target.classIds, resourceIds: preparedTask.itemRefs.map((item) => item.resourceId), classMembershipGuards: preparedMembershipGuards });
+      const prepared = await this.executeAtomic<JsonObject>({
+        actor, functionName: 'task-command', action: 'prepareLargeTaskPublication', operationId: `${operationId}:prepare`, expectedVersion,
+        payload: { taskId }, scope,
+        perform: async (transaction) => {
+          const current = await transaction.findTask(actor.organizationId, taskId);
+          if (!current || current.status !== 'draft' || current.creatorTeacherId !== actor.actorUserId || current.version !== expectedVersion || current.publication) return this.fail('CONFLICT');
+          for (const guard of preparedMembershipGuards) {
+            const found = await transaction.findClassMembershipGuard(actor.organizationId, guard.classId);
+            if (!found || found.version !== guard.expectedVersion) return this.fail('CONFLICT');
+          }
+          const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, target.classIds);
+          if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
+          const entries = [...byStudent.values()].sort((left, right) => left.studentId.localeCompare(right.studentId))
+            .map((membership) => ({ studentId: membership.studentId, classId: membership.classId }));
+          await transaction.saveTask({
+            ...current, targetClassIds: target.classIds, targetStudentIds: entries.map((entry) => entry.studentId),
+            items: frozen.items, version: current.version + 1,
+            publication: { operationId, originalVersion: expectedVersion, nextIndex: 0, entries, classMembershipGuards: preparedMembershipGuards },
+          });
+          return success<JsonObject>({ taskId, status: 'publishing', assignmentCount: 0, totalCount: entries.length }, createMeta(this.clock, this.requestIds));
+        },
+      });
+      if (!prepared.ok) return prepared;
+    }
+
+    for (let batch = 0; batch < PUBLISH_BATCHES_PER_CALL; batch += 1) {
+      const task = await this.repository.findTask(actor.organizationId, taskId);
+      if (!task) return this.fail('NOT_FOUND');
+      if (!task.publication) {
+        if (task.publishOperationId !== operationId || task.status === 'draft') return this.fail('CONFLICT');
+        return success<JsonObject>({ taskId, status: task.status, version: task.version, assignmentCount: task.targetStudentIds.length, publishedAt: task.publishedAt }, createMeta(this.clock, this.requestIds));
+      }
+      const publication = task.publication;
+      if (publication.operationId !== operationId || publication.originalVersion !== expectedVersion || task.status !== 'draft') return this.fail('CONFLICT');
+      const nextIndex = publication.nextIndex;
+      const entries = publication.entries.slice(nextIndex, nextIndex + PUBLISH_ASSIGNMENT_BATCH_SIZE);
+      if (!entries.length) return this.fail('CONFLICT');
+      const classIds = [...new Set(entries.map((entry) => entry.classId))];
+      const scope = await this.prepareScope(actor, { classIds: nextIndex + entries.length === publication.entries.length ? task.targetClassIds : classIds });
+      const advanced = await this.executeAtomic<JsonObject>({
+        actor, functionName: 'task-command', action: 'publishTaskRosterBatch', operationId: this.ids.next('publish_batch'), expectedVersion: task.version,
+        payload: { taskId, nextIndex }, scope,
+        perform: async (transaction) => {
+          const current = await transaction.findTask(actor.organizationId, taskId);
+          if (!current?.publication || current.publication.operationId !== operationId || current.publication.nextIndex !== nextIndex || current.version !== task.version) return this.fail('CONFLICT');
+          if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, classIds, 'task.publish'))) return this.fail('FORBIDDEN');
+          if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, classIds, 'content.read'))) return this.fail('FORBIDDEN');
+          for (const entry of entries) {
+            if (await transaction.findAssignment(actor.organizationId, taskId, entry.studentId)) return this.fail('CONFLICT');
+          }
+          const completedCount = nextIndex + entries.length;
+          const done = completedCount === publication.entries.length;
+          if (done && (!(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish'))
+            || !(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'content.read')))) return this.fail('FORBIDDEN');
+          const now = this.clock.nowIso();
+          const next: TaskRecord = {
+            ...current, version: current.version + 1,
+            ...(done ? {
+              status: Date.parse(current.startsAt) > Date.parse(now) ? 'scheduled' as const : 'active' as const,
+              publishedAt: now, publication: null, publishOperationId: operationId,
+            } : { publication: { ...publication, nextIndex: completedCount } }),
+          };
+          await transaction.saveTask(next);
+          for (const entry of entries) {
+            await transaction.saveAssignment({
+              id: `assignment_${taskId}_${entry.studentId}`, organizationId: actor.organizationId, taskId,
+              studentId: entry.studentId, classId: entry.classId, status: 'not_started', latestSubmissionId: null,
+              latestSubmissionVersion: 0, redoCount: 0, redoDueAt: null, isLate: false, submittedAt: null, reviewedAt: null, version: 1,
+            });
+          }
+          const result = success<JsonObject>({ taskId, status: done ? next.status : 'publishing', version: next.version, assignmentCount: completedCount, totalCount: publication.entries.length, ...(done ? { publishedAt: now } : {}) }, createMeta(this.clock, this.requestIds));
+          if (done) await this.appendAudit(transaction, { actor, requestId: result.meta.requestId, action: 'task.publish', targetType: 'task', targetId: taskId, result: 'succeeded', metadata: { taskVersion: next.version, assignmentCount: completedCount } });
+          return result;
+        },
+      });
+      if (!advanced.ok || advanced.data.status !== 'publishing') return advanced;
+    }
+    const latest = await this.repository.findTask(actor.organizationId, taskId);
+    if (!latest?.publication) return this.fail('CONFLICT');
+    return success<JsonObject>({ taskId, status: 'publishing', version: latest.version, assignmentCount: latest.publication.nextIndex, totalCount: latest.publication.entries.length }, createMeta(this.clock, this.requestIds));
   }
 
   public async updatePublishedTask(
@@ -262,6 +383,8 @@ export class TaskCoreService {
               ? this.repository.listActiveStudentMemberships(actor.organizationId, input.targetStudentIds ?? [])
               : Promise.resolve([]),
         ]);
+    const largeUnchangedRoster = preparedTask !== null && preparedTask.targetStudentIds.length > 50
+      && !publishedTargetChanged(preparedTask, input);
     const preparedClassIds = preparedTask === null
       ? []
       : unique(preparedTask.targetClassIds.concat(preparedMemberships.map((membership) => membership.classId)));
@@ -322,13 +445,13 @@ export class TaskCoreService {
         let assignmentCount: number | null = null;
         let nextMembershipsForReconciliation: readonly ClassMembershipRecord[] | null = null;
         if (lifecycle === 'scheduled') {
-          const existingAssignments = await transaction.listTaskAssignments(actor.organizationId, current.id);
-          const existingSubmissions = await transaction.listTaskSubmissions(actor.organizationId, current.id);
+          const existingAssignments = largeUnchangedRoster ? preparedAssignments : await transaction.listTaskAssignments(actor.organizationId, current.id);
+          const existingSubmissions = largeUnchangedRoster ? preparedSubmissions : await transaction.listTaskSubmissions(actor.organizationId, current.id);
           if (existingSubmissions.length > 0 || existingAssignments.some((assignment) => assignment.latestSubmissionId !== null)) {
             return this.fail('CONFLICT');
           }
 
-          const targetChanged = input.targetType !== undefined;
+          const targetChanged = publishedTargetChanged(current, input);
           if (targetChanged) {
             const targetInput: SaveTaskDraftInput = {
               title: input.title ?? current.title,
@@ -480,7 +603,7 @@ export class TaskCoreService {
       perform: async (transaction) => {
         const current = await transaction.findTask(actor.organizationId, taskId);
         if (current === null || current.visibility === 'recycled') return this.fail('NOT_FOUND');
-        if (current.creatorTeacherId !== actor.actorUserId || current.status === 'draft') return this.fail('FORBIDDEN');
+        if (current.creatorTeacherId !== actor.actorUserId) return this.fail('FORBIDDEN');
         if (current.version !== expectedVersion) return this.fail('CONFLICT');
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish'))) return this.fail('FORBIDDEN');
         const now = this.clock.nowIso();
@@ -854,6 +977,24 @@ export class TaskCoreService {
             if (answer === undefined || !satisfiesCompletionRule(item, answer.value)) {
               return this.fail('VALIDATION_ERROR', { answers: '任务完成结果不符合已发布的完成规则。' });
             }
+            if (item.resourceSnapshot.type === 'reading') {
+              const resourceId = item.resourceId || task.itemRefs.find((reference) => reference.id === item.id)?.resourceId;
+              if (!resourceId) return this.fail('VALIDATION_ERROR', { answers: '任务阅读资源引用无效。' });
+              const progress = await transaction.findReadingProgress(actor.organizationId, actor.actorUserId, resourceId);
+              const requested = isJsonObject(answer.value) ? answer.value.completedPageCount : null;
+              if (progress === null || typeof requested !== 'number' || progress.pageNumber < requested) {
+                return this.fail('VALIDATION_ERROR', { answers: '请先完成并保存本任务的阅读进度。' });
+              }
+            }
+            if (item.resourceSnapshot.type === 'vocabulary') {
+              const resourceId = item.resourceId || task.itemRefs.find((reference) => reference.id === item.id)?.resourceId;
+              if (!resourceId) return this.fail('VALIDATION_ERROR', { answers: '任务单词资源引用无效。' });
+              const progress = await transaction.findVocabularyProgress(actor.organizationId, actor.actorUserId, resourceId);
+              const requested = isJsonObject(answer.value) ? answer.value : null;
+              if (progress === null || requested === null || progress.completedCount !== requested.completedWordCount || progress.correctCount !== requested.correctWordCount) {
+                return this.fail('VALIDATION_ERROR', { answers: '请先完成并同步本任务的单词练习。' });
+              }
+            }
           }
         }
 
@@ -881,6 +1022,7 @@ export class TaskCoreService {
         const nextAssignment: TaskAssignmentRecord = {
           ...assignment,
           status: action === 'submit' ? 'awaiting_review' : 'in_progress',
+          redoDueAt: action === 'submit' ? null : assignment.redoDueAt,
           latestSubmissionId: action === 'submit' ? submission.id : assignment.latestSubmissionId,
           latestSubmissionVersion: action === 'submit' ? submission.submissionVersion : assignment.latestSubmissionVersion,
           isLate: action === 'submit' ? late : assignment.isLate,
@@ -1142,6 +1284,15 @@ function sameEligibleBatch(
   return JSON.stringify(normalize(current)) === JSON.stringify(normalize(previewed));
 }
 
+function publishedTargetChanged(task: TaskRecord, input: UpdatePublishedTaskInput): boolean {
+  if (input.targetType === undefined) return false;
+  if (input.targetType !== task.targetType) return true;
+  const requested = input.targetType === 'classes' ? input.targetClassIds ?? [] : input.targetStudentIds ?? [];
+  const current = input.targetType === 'classes' ? task.targetClassIds : task.targetStudentIds;
+  const expected = new Set(current);
+  return requested.length !== expected.size || requested.some((id) => !expected.has(id));
+}
+
 function validateTaskDraft(input: SaveTaskDraftInput): Readonly<Record<string, string>> | null {
   const errors: Record<string, string> = {};
   if (input.title.trim().length < 1 || input.title.trim().length > 50) errors.title = '任务名称须为 1—50 字。';
@@ -1156,7 +1307,7 @@ function validateTaskDraft(input: SaveTaskDraftInput): Readonly<Record<string, s
     if ((input.targetStudentIds?.length ?? 0) === 0) errors.targetStudentIds = '至少选择一个学员。';
     if (input.targetClassIds.length > 0) errors.targetClassIds = '按学员布置时不能同时指定班级。';
     if (new Set(input.targetStudentIds ?? []).size !== (input.targetStudentIds?.length ?? 0)) errors.targetStudentIds = '学员标识不能重复。';
-    if ((input.targetStudentIds?.length ?? 0) > 50) errors.targetStudentIds = '单次发布最多包含 50 名学生。';
+    if ((input.targetStudentIds?.length ?? 0) > MAX_TASK_TARGET_STUDENTS) errors.targetStudentIds = '单次发布最多包含 500 名学生。';
   }
   if (!isZonedIso(input.startsAt)) errors.startsAt = '开始时间必须为带时区的 ISO 8601 时间。';
   if (!isZonedIso(input.dueAt) || Date.parse(input.dueAt) <= Date.parse(input.startsAt)) errors.dueAt = '截止时间必须晚于开始时间。';
@@ -1539,7 +1690,8 @@ function isSubmittable(task: TaskRecord, assignment: TaskAssignmentRecord, now: 
   if (lifecycle !== 'active' && lifecycle !== 'expired') return false;
   if (current < Date.parse(task.startsAt)) return false;
   if (assignment.status === 'awaiting_review' || assignment.status === 'completed') return false;
-  if (assignment.status === 'redo_required') return assignment.redoDueAt !== null && current <= Date.parse(assignment.redoDueAt);
+  // Saving a redo draft moves the assignment to in_progress; its redo window still applies.
+  if (assignment.status === 'redo_required' || assignment.redoDueAt !== null) return assignment.redoDueAt !== null && current <= Date.parse(assignment.redoDueAt);
   if (current <= Date.parse(task.dueAt)) return true;
   if (!task.latePolicy.allowLate) return false;
   return current <= Date.parse(task.dueAt) + task.latePolicy.lateDays * 24 * 60 * 60 * 1000;

@@ -4,7 +4,7 @@
   <state-panel wx:if="{{loading}}" state="loading" message="正在加载教师工作台"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWorkbench"></state-panel>
   <view wx:else class="content">
-    <view class="greeting-row"><text>林老师，上午好</text><view class="workbench-class-filter"><button bindtap="toggleClassFilter">{{selectedClass}}<view class="filter-arrow {{classFilterOpen ? 'is-open' : ''}}" aria-hidden="true"></view></button><view wx:if="{{classFilterOpen}}" class="workbench-class-menu"><view wx:for="{{classOptions}}" wx:key="*this" class="workbench-class-option {{selectedClass === item ? 'selected' : ''}}" data-class-name="{{item}}" bindtap="selectClass">{{item}}</view></view></view></view>
+    <view class="greeting-row"><text>{{teacherName}}，你好</text><view class="workbench-class-filter"><button bindtap="toggleClassFilter">{{selectedClass}}<view class="filter-arrow {{classFilterOpen ? 'is-open' : ''}}" aria-hidden="true"></view></button><view wx:if="{{classFilterOpen}}" class="workbench-class-menu"><view wx:for="{{classOptions}}" wx:key="id" class="workbench-class-option {{selectedClassId === item.id ? 'selected' : ''}}" data-class-id="{{item.id}}" bindtap="selectClass">{{item.name}}</view></view></view></view>
 
     <view class="quick-grid">
       <view class="quick quick--blue" bindtap="goPublish" aria-role="button"><g0-icon name="publish" size="{{54}}"></g0-icon><text>布置任务</text></view>
@@ -15,7 +15,7 @@
     <view class="today-card">
       <view class="card-title"><g0-icon name="calendar" size="{{42}}"></g0-icon><text>今日待办</text></view>
       <view class="todo-grid"><view><g0-icon name="check" tone="success" size="{{46}}"></g0-icon><view><text>待检查</text><text>{{pendingCount}}</text></view></view><view><g0-icon name="review" tone="warning" size="{{46}}"></g0-icon><view><text>待点评</text><text>{{pendingCommentCount}}</text></view></view></view>
-      <view class="task-row" bindtap="goReview" aria-role="button"><g0-icon name="task" size="{{44}}"></g0-icon><view><text>{{recentTaskTitle}}</text><text>三年级 2 班</text></view><text><text>{{submittedCount}}</text>/{{authorizedStudentCount}} 已提交</text><view class="row-arrow" aria-hidden="true"></view></view>
+      <view class="task-row" bindtap="goRecentTask" aria-role="button"><g0-icon name="task" size="{{44}}"></g0-icon><view><text>{{recentTaskTitle}}</text><text>{{recentTaskClassName}}</text></view><text><text>{{submittedCount}}</text>/{{authorizedStudentCount}} 已提交</text><view class="row-arrow" aria-hidden="true"></view></view>
     </view>
 
     <view class="ongoing-card">
@@ -23,7 +23,7 @@
       <view class="ongoing-grid"><button bindtap="goCenter"><g0-icon name="task" size="{{46}}"></g0-icon><view><text>课堂任务</text><text>{{activeClassroomCount}}</text></view></button><button data-label="打卡活动" bindtap="openFuture"><g0-icon name="check" tone="success" size="{{46}}"></g0-icon><view><text>打卡活动</text><text>{{activityCount}}</text></view></button></view>
     </view>
 
-    <view class="class-update" data-label="学员统计" bindtap="openFuture" aria-role="button"><g0-icon name="review" tone="ai" size="{{40}}"></g0-icon><view><text>班级动态</text><text>三年级 2 班已有 {{submittedCount}} 条提交</text></view><text>学员统计</text><view class="row-arrow" aria-hidden="true"></view></view>
+    <view class="class-update" data-label="学员统计" bindtap="openFuture" aria-role="button"><g0-icon name="review" tone="ai" size="{{40}}"></g0-icon><view><text>班级动态</text><text>{{recentTaskClassName}}已有 {{submittedCount}} 条提交</text></view><text>学员统计</text><view class="row-arrow" aria-hidden="true"></view></view>
   </view>
   <g0-tab-bar role="teacher" active="workbench"></g0-tab-bar>
 </view></g0-page-shell>

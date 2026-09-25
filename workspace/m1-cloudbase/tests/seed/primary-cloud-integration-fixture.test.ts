@@ -35,7 +35,7 @@ describe('主组织云联调 seed 派生器', () => {
     expect(first.manifest.expectedCounts.auth_identities).toBe(4);
     expect(first.manifest.contentHash).toBe(computeSeedContentHash(first));
     expect(first.manifest.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(totalDocuments(first)).toBe(306);
+    expect(totalDocuments(first)).toBe(307);
     expect(validateSeedPackage(first)).toMatchObject({ ok: true, issues: [] });
   });
 
@@ -78,13 +78,13 @@ describe('主组织云联调 seed 派生器', () => {
     const repository = new MemorySeedRepository();
 
     await expect(applySeedPackage(repository, seed, OPTIONS)).resolves.toMatchObject({
-      status: 'applied', createdCount: 306, skippedCount: 0,
+      status: 'applied', createdCount: 307, skippedCount: 0,
     });
     await expect(verifySeedPackage(repository, seed)).resolves.toMatchObject({
-      ok: true, expectedCount: 306, matchedCount: 306, issues: [],
+      ok: true, expectedCount: 307, matchedCount: 307, issues: [],
     });
     await expect(rollbackSeedRun(repository, seed.manifest.seedRunId, OPTIONS)).resolves.toMatchObject({
-      status: 'rolled_back', deletedCount: 306,
+      status: 'rolled_back', deletedCount: 307,
     });
     expect(repository.listDocuments()).toHaveLength(0);
   });
@@ -108,13 +108,13 @@ describe('主组织云联调 seed 派生器', () => {
     expect(validateSeedPackage(result.seed, { identityProfile: 'runtime' })).toMatchObject({ ok: true, issues: [] });
   });
 
-  it('权威生成器仍保持 373 条文档和 71 条身份，不被派生器改写', () => {
+  it('权威生成器仍保持 374 条文档和 71 条身份，不被派生器改写', () => {
     createPrimaryCloudIntegrationSeedPackage();
     const authoritative = createAuthoritativeM1SeedPackage();
 
-    expect(totalDocuments(authoritative)).toBe(373);
+    expect(totalDocuments(authoritative)).toBe(374);
     expect(authoritative.collections.auth_identities).toHaveLength(71);
-    expect(summarizeAuthoritativeM1Seed(authoritative).totalDocuments).toBe(373);
+    expect(summarizeAuthoritativeM1Seed(authoritative).totalDocuments).toBe(374);
   });
 });
 

@@ -27,7 +27,7 @@ export const IDENTITY_SESSION_COLLECTIONS = {
   sessionSlots: 'business_session_slots',
 } as const;
 
-export function createIdentityDocumentRepository(database: DocumentDatabasePort): IdentityRepository {
+export function createIdentityDocumentRepository(database: DocumentDatabasePort): IdentityDocumentRepository {
   return new IdentityDocumentRepository(database);
 }
 
@@ -35,7 +35,16 @@ export function createBusinessSessionDocumentRepository(database: DocumentDataba
   return new BusinessSessionDocumentRepository(database);
 }
 
-class IdentityDocumentRepository implements IdentityRepository {
+export interface ProfileDisplayNameMutation {
+  updateDisplayName(
+    userId: string,
+    organizationId: string,
+    expectedProfileVersion: number,
+    displayName: string,
+  ): Promise<Readonly<{ kind: 'updated'; user: UserRecord }> | Readonly<{ kind: 'conflict' | 'not_found' }>>;
+}
+
+export class IdentityDocumentRepository implements IdentityRepository, ProfileDisplayNameMutation {
   public constructor(private readonly database: DocumentDatabasePort) {}
 
   public async findIdentityByDigest(digest: string): Promise<AuthIdentityRecord | null> {
@@ -119,6 +128,33 @@ class IdentityDocumentRepository implements IdentityRepository {
     });
     return rows.map(decodeParentLink).filter((item): item is ParentStudentLinkRecord => item !== null);
   }
+
+  public async updateDisplayName(
+    userId: string,
+    organizationId: string,
+    expectedProfileVersion: number,
+    displayName: string,
+  ): Promise<Readonly<{ kind: 'updated'; user: UserRecord }> | Readonly<{ kind: 'conflict' | 'not_found' }>> {
+    return this.database.runTransaction(async (transaction) => {
+      const current = await transaction.get(IDENTITY_SESSION_COLLECTIONS.users, userId);
+      const user = current === null ? null : decodeScoped(current, organizationId, decodeUser);
+      if (current === null || user === null || user.status !== 'active') return { kind: 'not_found' as const };
+      const profileVersion = user.profileVersion ?? 1;
+      if (profileVersion !== expectedProfileVersion) return { kind: 'conflict' as const };
+      const next: VersionedDocument = {
+        ...current,
+        displayName,
+        displayNameMasked: displayName,
+        profileVersion: profileVersion + 1,
+        version: current.version + 1,
+      };
+      if (!await transaction.replace(IDENTITY_SESSION_COLLECTIONS.users, userId, current.version, next)) {
+        return { kind: 'conflict' as const };
+      }
+      const updated = decodeUser(next);
+      return updated === null ? { kind: 'conflict' as const } : { kind: 'updated' as const, user: updated };
+    });
+  }
 }
 
 interface SessionSlot {
@@ -161,26 +197,22 @@ class BusinessSessionDocumentRepository implements BusinessSessionRepository {
         ...(slot === null ? [] : [slot.activeSessionId]),
         ...preparedIds,
       ]);
-      const currentSessions = (await Promise.all(sessionIds.map(async (sessionId) => decodeSession(
-        await transaction.get(IDENTITY_SESSION_COLLECTIONS.sessions, sessionId),
-      )))).filter((session): session is BusinessSessionRecord => session !== null)
-        .filter((session) => samePrincipal(session, candidate));
+      // CloudBase document transactions reject overlapping reads as busy. Keep
+      // session history lookup ordered so stale admin sessions can be resumed
+      // or replaced without being misreported as a CAS conflict.
+      const currentSessions: BusinessSessionRecord[] = [];
+      for (const sessionId of sessionIds) {
+        const session = decodeSession(await transaction.get(IDENTITY_SESSION_COLLECTIONS.sessions, sessionId));
+        if (session !== null && samePrincipal(session, candidate)) currentSessions.push(session);
+      }
       const preferred = slot === null
         ? null
         : currentSessions.find((session) => session.id === slot.activeSessionId) ?? null;
       const resumable = [preferred, ...currentSessions]
         .filter((session): session is BusinessSessionRecord => session !== null)
         .find((session) => isResumable(session, candidate.authzVersion, nowIso)) ?? null;
-
-      for (const session of currentSessions) {
-        if (session.id !== resumable?.id && session.revokedAt === null) {
-          await replaceSession(transaction, {
-            ...session,
-            revokedAt: nowIso,
-            recordVersion: session.recordVersion + 1,
-          }, session.recordVersion);
-        }
-      }
+      const staleSlot = slotDocument !== null && (slot === null || preferred === null
+        || !isResumable(preferred, candidate.authzVersion, nowIso));
 
       if (resumable !== null) {
         if (slot !== null && slot.activeSessionId === resumable.id && slot.authzVersion === resumable.authzVersion) {
@@ -195,7 +227,13 @@ class BusinessSessionDocumentRepository implements BusinessSessionRepository {
         sessionDocument(candidate),
       );
       if (!created) throw new Error('Business session id collision.');
-      await saveSlot(transaction, slotId, slotDocument, candidate, candidate.id, candidate.authzVersion);
+      // A legacy or expired slot can be impossible to CAS-update on some
+      // CloudBase transaction histories. The new session remains the single
+      // resumable record and is found before slot resolution on the next
+      // bootstrap. Do not let that obsolete pointer block a fresh login.
+      if (!staleSlot) {
+        await saveSlot(transaction, slotId, slotDocument, candidate, candidate.id, candidate.authzVersion);
+      }
       return cloneSession(candidate);
     });
   }
@@ -219,20 +257,6 @@ class BusinessSessionDocumentRepository implements BusinessSessionRepository {
       );
     });
   }
-}
-
-async function replaceSession(
-  transaction: DocumentDatabaseTransactionPort,
-  session: BusinessSessionRecord,
-  expectedRecordVersion: number,
-): Promise<void> {
-  const current = await transaction.get(IDENTITY_SESSION_COLLECTIONS.sessions, session.id);
-  if (current === null || current.version !== expectedRecordVersion || !(await transaction.replace(
-    IDENTITY_SESSION_COLLECTIONS.sessions,
-    session.id,
-    current.version,
-    sessionDocument(session),
-  ))) throw new Error('Business session changed concurrently.');
 }
 
 async function saveSlot(
@@ -327,9 +351,10 @@ function decodeIdentity(document: VersionedDocument): AuthIdentityRecord | null 
 function decodeUser(document: VersionedDocument): UserRecord | null {
   if (!hasBase(document) || (document.status !== 'active' && document.status !== 'disabled')) return null;
   const authorizationVersion = readInteger(document, 'authorizationVersion', 1);
+  const profileVersion = document.profileVersion === undefined ? 1 : readInteger(document, 'profileVersion', 1);
   const displayName = readString(document, 'displayName');
   const displayNameMasked = readString(document, 'displayNameMasked');
-  if (authorizationVersion === null || displayName === null || displayNameMasked === null) return null;
+  if (authorizationVersion === null || profileVersion === null || displayName === null || displayNameMasked === null) return null;
   const studentNumber = readOptionalString(document, 'studentNumber');
   const classId = readOptionalString(document, 'classId');
   const className = readOptionalString(document, 'className');
@@ -337,6 +362,7 @@ function decodeUser(document: VersionedDocument): UserRecord | null {
   return {
     ...baseRecord(document),
     authorizationVersion,
+    profileVersion,
     displayName,
     displayNameMasked,
     status: document.status,

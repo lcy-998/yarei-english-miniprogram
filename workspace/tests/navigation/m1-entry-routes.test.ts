@@ -8,8 +8,8 @@ const app = JSON.parse(readFileSync(resolve(root, 'miniprogram/app.json'), 'utf8
 describe('M1 已批准页面入口', () => {
   it('学生首页单词练习指向已注册的 S-02 页面', () => {
     const source = readFileSync(resolve(root, 'miniprogram/pages/index/index.ts'), 'utf8')
-    expect(source).toContain("/pages/student/word-practice/word-practice")
-    expect(app.pages).toContain('pages/student/word-practice/word-practice')
+    expect(source).toContain("/pages/student/vocabulary/vocabulary")
+    expect(app.pages).toContain('pages/student/vocabulary/vocabulary')
   })
 
   it('教师底栏学员入口指向已注册的 T-02 页面', () => {

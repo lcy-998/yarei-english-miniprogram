@@ -1,10 +1,12 @@
 <view class="completion-page">
+  <view class="completion-background" aria-hidden="true"></view>
+  <view class="completion-foreground">
   <app-header title="完成情况" back="{{true}}"></app-header>
   <state-panel wx:if="{{loading}}" state="loading" message="正在加载任务完成情况"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadCompletion"></state-panel>
   <view wx:else class="completion-content">
     <view class="summary-card">
-      <view class="summary-head"><view class="task-icon"><view></view><view></view><view></view></view><view><text class="task-title">{{taskTitle}}</text><text class="task-meta">{{className}} · {{rows.length}} 人</text></view></view>
+      <view class="summary-head"><view class="task-icon"><view></view><view></view><view></view></view><view><text class="task-title">{{taskTitle}}</text><text class="task-meta">{{className}}　{{rows.length}} 人</text></view></view>
       <view class="metric-grid"><view class="metric metric--blue"><text>{{completedCount}}</text><text>人已完成</text></view><view class="metric metric--orange"><text>{{incompleteCount}}</text><text>人未完成</text></view><view class="metric metric--green"><text>{{pendingReviewCount}}</text><text>人待点评</text></view></view>
       <view class="summary-progress"><text>{{completionPercent}}%</text><view><view style="width: {{completionPercent}}%"></view></view></view>
     </view>
@@ -12,7 +14,7 @@
     <view class="search-box"><view class="search-icon"></view><input value="{{keyword}}" bindinput="onSearch" placeholder="搜索学生"/></view>
     <view class="student-list">
       <view wx:for="{{visibleRows}}" wx:key="assignmentId" class="student-row">
-        <view class="check-box {{item.selected ? 'checked' : ''}} {{item.status !== 'awaiting_review' ? 'disabled' : ''}}" data-id="{{item.assignmentId}}" bindtap="toggleSelected"><view wx:if="{{item.selected}}"></view></view>
+        <view class="check-box {{item.selected ? 'checked' : ''}}" data-id="{{item.assignmentId}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="{{item.selected ? '取消选择' : '选择'}}{{item.studentName}}" bindtap="toggleSelected"><view class="check-indicator"><view wx:if="{{item.selected}}"></view></view></view>
         <view class="student-copy"><text class="student-name">{{item.studentName}}</text><text>学号 {{item.studentNumber}}</text><text>{{item.submittedLabel}}</text></view>
         <view class="score-card"><text>{{item.scoreLabel}}<text wx:if="{{item.scoreLabel !== '--'}}"> 分</text></text><text class="status status--{{item.statusTone}}">{{item.statusLabel}}</text></view>
         <button class="inspect" data-id="{{item.assignmentId}}" bindtap="openReview">{{item.status === 'awaiting_review' ? '检查' : '查看'}}</button>
@@ -20,5 +22,7 @@
       <state-panel wx:if="{{!visibleRows.length}}" state="empty" message="当前筛选下暂无学生"></state-panel>
     </view>
   </view>
+  <view wx:if="{{batchPreviewOpen}}" class="batch-preview"><view class="batch-preview-head"><text>一键点评预览　{{batchEligibleCount}} 人</text><button bindtap="closeBatchPreview">关闭</button></view><textarea maxlength="200" value="{{batchComment}}" bindinput="onBatchComment" placeholder="输入给所选学生的统一评语"></textarea><text>仅发布评语，不修改已有评分；未完成和已点评学生不会参与。</text><button class="batch-confirm" loading="{{batchReviewing}}" bindtap="confirmBatchReview"><text>核对后发布</text></button></view>
   <view wx:if="{{!loading && !error}}" class="bottom-actions"><text>已选 <text>{{selectedCount}}</text> 人</text><button class="secondary" bindtap="reviewSelected">逐人检查</button><button class="primary" loading="{{batchReviewing}}" bindtap="batchReview">一键点评</button></view>
+  </view>
 </view>

@@ -9,7 +9,7 @@ import type {
   TeacherTaskFilters,
 } from '../task-query/types';
 
-export const TASK_QUERY_ACTIONS = ['getTeacherWorkbench', 'listTeacherTasks', 'getDraftOptions', 'previewTask', 'getCompletion'] as const;
+export const TASK_QUERY_ACTIONS = ['getTeacherWorkbench', 'listTeacherTasks', 'getDraftOptions', 'previewTask', 'getTaskForEdit', 'getCompletion'] as const;
 export type TaskQueryAction = (typeof TASK_QUERY_ACTIONS)[number];
 export const STUDENT_TASK_QUERY_ACTIONS = ['getHome', 'listMyTasks', 'getMyTask'] as const;
 export type StudentTaskQueryAction = (typeof STUDENT_TASK_QUERY_ACTIONS)[number];
@@ -23,6 +23,7 @@ export type TaskQueryInput =
   | Readonly<{ action: 'listTeacherTasks'; filters: TeacherTaskFilters; page: PageRequest }>
   | Readonly<{ action: 'getDraftOptions' }>
   | Readonly<{ action: 'previewTask'; preview: Readonly<{ taskId: string; expectedVersion: number }> | Readonly<{ draft: DraftPreviewInput }> }>
+  | Readonly<{ action: 'getTaskForEdit'; taskId: string }>
   | Readonly<{ action: 'getCompletion'; taskId: string; filter: CompletionFilters; page: PageRequest }>;
 
 export type StudentTaskQueryInput =
@@ -78,6 +79,12 @@ export function validateTaskQueryRequest(request: FunctionRequest<TaskQueryActio
     if (request.expectedVersion !== undefined) return invalid('expectedVersion', '预览未保存草稿不应提供版本号。');
     const draft = draftPreview(request.payload);
     return draft.ok ? { ok: true, value: { action: request.action, preview: { draft: draft.value } } } : draft;
+  }
+  if (request.action === 'getTaskForEdit') {
+    const exact = parseExactObject(request.payload, ['taskId']);
+    if (!exact.ok) return exact;
+    const taskId = requiredId(exact.value.taskId, 'taskId');
+    return taskId.ok ? { ok: true, value: { action: request.action, taskId: taskId.value } } : taskId;
   }
   const exact = parseExactObject(request.payload, ['taskId', 'filter', 'page']);
   if (!exact.ok) return exact;

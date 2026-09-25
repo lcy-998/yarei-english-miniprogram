@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import cloudbase from '@cloudbase/js-sdk';
 import { AdminShell, type PageKey } from './components/admin-shell';
 import { ErrorState, LoadingState } from './components/ui';
 import type { AdminSnapshot } from './domain/models';
@@ -33,9 +34,10 @@ function configuredRuntime(): CloudBaseAdminRuntime | undefined {
   const currentWindow = window as RuntimeWindow;
   if (currentWindow.__YAREI_ADMIN_RUNTIME__) return currentWindow.__YAREI_ADMIN_RUNTIME__;
   const environmentId = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_CLOUDBASE_ENV_ID;
-  if (!environmentId || !currentWindow.cloudbase) return undefined;
+  if (!environmentId) return undefined;
   try {
-    const runtime = createCloudBaseAdminRuntime({ sdk: currentWindow.cloudbase, environmentId });
+    const sdk = currentWindow.cloudbase ?? { init: cloudbase.init } as CloudBaseBrowserSdk;
+    const runtime = createCloudBaseAdminRuntime({ sdk, environmentId });
     currentWindow.__YAREI_ADMIN_RUNTIME__ = runtime;
     return runtime;
   } catch {

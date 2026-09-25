@@ -30,6 +30,38 @@ const ASSIGNMENT_ID = `assignment_${TASK_ID}_${STUDENT_ID}`;
 const SUBMISSION_ID = deterministicSubmissionId(ASSIGNMENT_ID, 1);
 
 describe('TaskCore document database adapter contract', () => {
+  it('decodes current content resources with document ids and class visibility before task snapshotting', async () => {
+    const resourceId = 'res_reading_zoo_cloud_v2';
+    const database = new FakeDocumentDatabase({
+      [TASK_CORE_COLLECTIONS.resources]: [createDocument(resourceId, ORGANIZATION_ID, 1, {
+        organizationId: ORGANIZATION_ID, type: 'reading', title: '虚构绘本', contentVersion: 1, status: 'published',
+        visibility: { type: 'classes', classIds: [CLASS_ID] }, payload: { chapters: [] },
+      })],
+    });
+    const repository = createTaskCoreDocumentRepository(database);
+    expect(await repository.findResource(ORGANIZATION_ID, resourceId)).toMatchObject({ id: resourceId, visibility: 'classes', allowedClassIds: [CLASS_ID] });
+    await repository.runTransaction(scope({ resourceIds: [resourceId] }), async (transaction) => {
+      expect(await transaction.findResource(ORGANIZATION_ID, resourceId)).toMatchObject({ id: resourceId, visibility: 'classes', allowedClassIds: [CLASS_ID] });
+    });
+  });
+
+  it('reads only the current student learning progress inside the submission transaction', async () => {
+    const reading = { id: 'reading_demo', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID, resourceId: 'resource_reading',
+      chapterId: 'chapter_demo', pageId: 'page_2', pageNumber: 2, favorite: false, version: 1, updatedAt: '2026-09-16T01:00:00.000Z' };
+    const vocabulary = { id: 'vocabulary_demo', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID, packId: 'pack_demo',
+      completedCount: 3, correctCount: 2, correctRate: 67, wrongWordIds: ['word_1'], version: 1, updatedAt: '2026-09-16T01:00:00.000Z' };
+    const database = new FakeDocumentDatabase({
+      [TASK_CORE_COLLECTIONS.readingProgress]: [createDocument(`reading-progress:${ORGANIZATION_ID}:${STUDENT_ID}:resource_reading`, ORGANIZATION_ID, 1, reading)],
+      [TASK_CORE_COLLECTIONS.vocabularyProgress]: [createDocument(`vocabulary-progress:${ORGANIZATION_ID}:${STUDENT_ID}:pack_demo`, ORGANIZATION_ID, 1, vocabulary)],
+    });
+    const repository = createTaskCoreDocumentRepository(database);
+    await repository.runTransaction(scope(), async (transaction) => {
+      expect(await transaction.findReadingProgress(ORGANIZATION_ID, STUDENT_ID, 'resource_reading')).toMatchObject({ pageNumber: 2 });
+      expect(await transaction.findVocabularyProgress(ORGANIZATION_ID, STUDENT_ID, 'pack_demo')).toMatchObject({ completedCount: 3, correctCount: 2 });
+      expect(await transaction.findVocabularyProgress(ORGANIZATION_ID, 'another_student', 'pack_demo')).toBeNull();
+    });
+  });
+
   it('rolls task, assignment, submission, feedback, idempotency and audit back when finalization fails after grant recheck', async () => {
     const database = createDatabaseWithGrant();
     const repository = createTaskCoreDocumentRepository(database);

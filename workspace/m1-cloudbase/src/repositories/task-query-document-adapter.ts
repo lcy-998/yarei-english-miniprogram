@@ -120,6 +120,14 @@ class TaskQueryDocumentRepository implements TaskQueryRepository {
     })).map((document) => decodeDocument<SubmissionRecord>(document)));
   }
 
+  public async listTaskSubmissions(organizationId: string, taskId: string): Promise<readonly SubmissionRecord[]> {
+    return this.read(async (reader) => (await reader.find(TASK_CORE_COLLECTIONS.submissions, {
+      organizationId,
+      taskId,
+      deletedAt: null,
+    })).map((document) => decodeDocument<SubmissionRecord>(document)));
+  }
+
   public async findDraftSubmission(
     organizationId: string,
     assignmentId: string,
@@ -184,7 +192,7 @@ class TaskQueryDocumentRepository implements TaskQueryRepository {
       title: readString(document, 'title'),
       type: readResourceType(document),
       status: 'published' as const,
-      allowedClassIds: readStringArray(document, 'allowedClassIds'),
+      allowedClassIds: readAllowedClassIds(document),
     })));
   }
 
@@ -235,6 +243,20 @@ function readStringArray(document: VersionedDocument, field: string): readonly s
     throw new TaskCorePersistenceError('INTERNAL_ERROR');
   }
   return [...value] as string[];
+}
+
+function readAllowedClassIds(document: VersionedDocument): readonly string[] {
+  if (Array.isArray(document.allowedClassIds)) return readStringArray(document, 'allowedClassIds');
+  for (const visibility of [document.visibility, document.visibilityScope]) {
+    if (visibility !== null && typeof visibility === 'object' && !Array.isArray(visibility)) {
+      const candidate = visibility as Readonly<Record<string, JsonValue>>;
+      if ((candidate.type === undefined || candidate.type === 'classes')
+        && Array.isArray(candidate.classIds) && candidate.classIds.every((item) => typeof item === 'string')) {
+        return [...candidate.classIds] as string[];
+      }
+    }
+  }
+  throw new TaskCorePersistenceError('INTERNAL_ERROR');
 }
 
 function readResourceType(document: VersionedDocument): QueryResourceOptionRecord['type'] {

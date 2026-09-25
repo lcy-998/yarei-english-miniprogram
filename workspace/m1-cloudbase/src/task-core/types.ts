@@ -78,6 +78,15 @@ export interface TaskRecord {
   readonly recycleReason: string | null;
   readonly recoverableUntil: string | null;
   readonly version: number;
+  /** A hidden, resumable roster materialization; draft tasks remain invisible to students. */
+  readonly publication?: Readonly<{
+    operationId: string;
+    originalVersion: number;
+    nextIndex: number;
+    entries: readonly Readonly<{ studentId: string; classId: string }>[];
+    classMembershipGuards: readonly Readonly<{ classId: string; expectedVersion: number }>[];
+  }> | null;
+  readonly publishOperationId?: string | null;
 }
 
 export type AssignmentStatus =

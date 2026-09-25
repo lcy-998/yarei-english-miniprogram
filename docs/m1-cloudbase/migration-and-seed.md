@@ -136,7 +136,7 @@ npm run seed:hash
 
 `DocumentDatabasePort` 适配器现已提供最多 25 条/批的可恢复协调器，持久化 `planned → applying → verifying → succeeded` 和 `rolling_back → rolled_back` 状态；单批失败会记录 `failedFromStatus`、批次游标和安全错误码，显式恢复时从最后完整提交点继续。373 条权威虚构种子必须完成全部候选文档校验和 run 归属集合校验后才可标记 `succeeded`；回滚按 `createdDocumentIds` 逆序分批，任一文档被外部修改时当前批次零删除并保留现场。
 
-该流程是可恢复的多事务流程，不是全局原子事务。实际启用前，所有业务读取必须屏蔽尚未 `succeeded` 的 seed run，且仍需在目标 CloudBase 环境验证单批操作预算和事务证据。当前没有 CLI/云 SDK 导入入口，也没有执行任何云端写入。
+该流程是可恢复的多事务流程，不是全局原子事务。实际启用前，所有业务读取必须屏蔽尚未 `succeeded` 的 seed run，且仍需在目标 CloudBase 环境验证单批操作预算和事务证据。受控 CLI/云 SDK 导入入口及仅含虚构数据的非生产导入、verify 和精确回滚已获单独授权并完成；当前 run 状态和后续操作门禁以 `manual-operation-gates.md` 为准，任何新的导入仍须单独授权。
 
 ## 8. 清理策略
 

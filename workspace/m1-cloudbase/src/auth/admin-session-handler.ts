@@ -1,5 +1,6 @@
 import { isTrustedPlatformIdentity, type PlatformIdentity } from './trusted-actor';
 import type { AdminSessionInput } from '../contracts/admin-session';
+import { DocumentDatabasePlatformError } from '../repositories/document-database-port';
 import type { TrustedBusinessSessionTokenCodec } from '../runtime/cloudbase-runtime-adapter';
 import type { BusinessSessionRepository, Clock, IdentifierGenerator, IdentityRepository, SubjectDigestPort } from '../runtime/ports';
 import type { BusinessSessionRecord } from '../runtime/records';
@@ -7,6 +8,7 @@ import type { ResponseMeta, ServiceResult } from '../shared/protocol';
 import { failure, success } from '../shared/result';
 
 const ADMIN_SESSION_HOURS = 2;
+const MAX_BOOTSTRAP_CONFLICT_ATTEMPTS = 3;
 
 export interface AdminSessionView {
   readonly audience: 'admin-console';
@@ -57,9 +59,22 @@ export class AdminSessionHandler {
       expiresAt: addHours(now, ADMIN_SESSION_HOURS),
       revokedAt: null,
     };
-    const session = await this.sessions.startOrResume(candidate, now);
+    const session = await this.startOrResume(candidate, now);
     if (!isMatchingAdminSession(session, principal, now)) return failure('UNAUTHENTICATED', meta);
     return success(this.toView(session), meta);
+  }
+
+  private async startOrResume(candidate: BusinessSessionRecord, now: string): Promise<BusinessSessionRecord> {
+    let lastConflict: DocumentDatabasePlatformError | null = null;
+    for (let attempt = 1; attempt <= MAX_BOOTSTRAP_CONFLICT_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.sessions.startOrResume(candidate, now);
+      } catch (error: unknown) {
+        if (!(error instanceof DocumentDatabasePlatformError) || error.kind !== 'conflict') throw error;
+        lastConflict = error;
+      }
+    }
+    throw lastConflict;
   }
 
   private async refresh(

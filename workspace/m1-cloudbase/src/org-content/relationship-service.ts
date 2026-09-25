@@ -101,11 +101,11 @@ export class RelationshipService {
     const now = this.clock.nowIso();
     const expiresAt = expiresIn24Hours(now);
     await this.runTransaction(providedTransaction, async (transaction) => {
-      const [student, membership, activeCode] = await Promise.all([
-        transaction.findUser(actor.organizationId, studentId),
-        transaction.findActiveMembershipForStudent(actor.organizationId, studentId),
-        transaction.findActiveBindingCodeForStudent(actor.organizationId, studentId),
-      ]);
+      // CloudBase transactions serialize reads. Parallel reads may be rejected as
+      // transaction-busy, which otherwise becomes an indistinguishable conflict.
+      const student = await transaction.findUser(actor.organizationId, studentId);
+      const membership = await transaction.findActiveMembershipForStudent(actor.organizationId, studentId);
+      const activeCode = await transaction.findActiveBindingCodeForStudent(actor.organizationId, studentId);
       if (student === null || student.status !== 'active' || !student.roles.includes('student') || membership === null) throw new OrgContentError('NOT_FOUND');
       if (actor.actorRole === 'teacher') {
         const grant = await transaction.findActiveTeacherGrant(actor.organizationId, actor.actorUserId, membership.classId);
@@ -242,12 +242,11 @@ export class RelationshipService {
 
   private async bindInTransaction(transaction: OrgContentTransaction, actor: Actor, studentId: string, code: string): Promise<BindOutcome> {
     const now = this.clock.nowIso();
-    const [student, parent, membership, bindingCode] = await Promise.all([
-      transaction.findUser(actor.organizationId, studentId),
-      transaction.findUser(actor.organizationId, actor.actorUserId),
-      transaction.findActiveMembershipForStudent(actor.organizationId, studentId),
-      transaction.findActiveBindingCodeForStudent(actor.organizationId, studentId),
-    ]);
+    // Keep transaction reads sequential for the CloudBase document adapter.
+    const student = await transaction.findUser(actor.organizationId, studentId);
+    const parent = await transaction.findUser(actor.organizationId, actor.actorUserId);
+    const membership = await transaction.findActiveMembershipForStudent(actor.organizationId, studentId);
+    const bindingCode = await transaction.findActiveBindingCodeForStudent(actor.organizationId, studentId);
     if (student === null || student.status !== 'active' || !student.roles.includes('student') || membership === null
       || parent === null || parent.status !== 'active' || !parent.roles.includes('parent')) {
       return { kind: 'failure', code: parent === null || parent.status !== 'active' || !parent.roles.includes('parent') ? 'FORBIDDEN' : 'VALIDATION_ERROR', audited: false };
@@ -272,11 +271,9 @@ export class RelationshipService {
       await transaction.appendRelationshipAudit(this.audit(actor, 'binding_code.rejected', studentId, 'denied', actor.actorUserId, attemptCount >= 5 ? 'locked' : 'mismatch'));
       return { kind: 'failure', code: 'VALIDATION_ERROR', audited: true };
     }
-    const [existing, childCount, parentCount] = await Promise.all([
-      transaction.findActiveParentLink(actor.organizationId, actor.actorUserId, studentId),
-      transaction.countActiveChildren(actor.organizationId, actor.actorUserId),
-      transaction.countActiveParents(actor.organizationId, studentId),
-    ]);
+    const existing = await transaction.findActiveParentLink(actor.organizationId, actor.actorUserId, studentId);
+    const childCount = await transaction.countActiveChildren(actor.organizationId, actor.actorUserId);
+    const parentCount = await transaction.countActiveParents(actor.organizationId, studentId);
     if (existing !== null || childCount >= 5 || parentCount >= 3) {
       const reason = existing !== null ? 'already_bound' : childCount >= 5 ? 'parent_limit' : 'student_limit';
       await transaction.appendRelationshipAudit(this.audit(actor, 'binding_code.rejected', studentId, 'denied', actor.actorUserId, reason));

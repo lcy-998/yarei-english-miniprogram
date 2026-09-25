@@ -1,30 +1,32 @@
 <g0-page-shell nature="{{true}}" tone="teacher">
   <view class="task-review-page" bindtap="closeMenus">
+    <view class="task-review-background" aria-hidden="true"></view>
+    <view class="task-review-foreground">
     <app-header title="检查任务" showBell="{{true}}"></app-header>
     <view class="teacher-brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
     <state-panel wx:if="{{loading}}" state="loading"></state-panel>
     <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTasks"></state-panel>
     <view wx:else class="task-review-content">
-      <view class="page-title-row"><text class="page-title">检查任务</text><view class="class-preview">全部负责班级 <text class="filter-arrow"></text></view></view>
+      <view class="page-title-row"><text class="page-title">检查任务</text><view class="class-preview">当前授权任务</view></view>
       <view class="filters">
         <view class="filter-control"><button data-key="type" bindtap="toggleFilter">{{typeFilter}}<text class="filter-arrow"></text></button><view wx:if="{{filterOpen === 'type'}}" class="filter-menu"><view wx:for="{{typeOptions}}" wx:key="*this" data-key="type" data-value="{{item}}" bindtap="chooseFilter">{{item}}</view></view></view>
-        <view class="filter-control"><button data-key="status" bindtap="toggleFilter">{{statusFilter}}<text class="filter-arrow"></text></button><view wx:if="{{filterOpen === 'status'}}" class="filter-menu"><view wx:for="{{statusOptions}}" wx:key="*this" data-key="status" data-value="{{item}}" bindtap="chooseFilter">{{item}}</view></view></view>
+        <view class="filter-control"><button data-key="status" bindtap="toggleFilter">{{statusFilter}}<text class="filter-arrow"></text></button><view wx:if="{{filterOpen === 'status'}}" class="filter-menu"><view wx:for="{{statusOptions}}" wx:key="value" data-key="status" data-value="{{item.label}}" bindtap="chooseFilter">{{item.label}}</view></view></view>
         <view class="filter-control"><button data-key="date" bindtap="toggleFilter">{{dateFilter}}<text class="filter-arrow"></text></button><view wx:if="{{filterOpen === 'date'}}" class="filter-menu"><view wx:for="{{dateOptions}}" wx:key="*this" data-key="date" data-value="{{item}}" bindtap="chooseFilter">{{item}}</view></view></view>
-        <view class="search-button">⌕</view>
+        <input class="task-search" value="{{keyword}}" bindinput="onSearch" placeholder="搜索任务"/>
       </view>
       <view wx:for="{{rows}}" wx:key="id" class="task-card">
         <view class="task-card-head">
           <g0-icon name="task" size="56"></g0-icon>
           <view class="task-copy"><text class="task-title">{{item.title}}</text></view>
           <button class="more-button" data-id="{{item.id}}" bindtap="toggleMenu">更多</button>
-          <view class="task-info"><view class="tag-row"><text class="tag tag--blue">课堂任务</text><text class="tag tag--green">{{item.status === 'active' ? '进行中' : item.status}}</text></view><text class="task-meta">三年级 2 班 · 今日 20:00 截止</text></view>
-          <view wx:if="{{item.menuOpen}}" class="more-menu"><view data-id="{{item.id}}" data-action="review" bindtap="moreAction">检查/点评</view><view data-id="{{item.id}}" data-action="edit" bindtap="moreAction">编辑</view><view data-id="{{item.id}}" data-action="preview" bindtap="moreAction">预览</view><view data-id="{{item.id}}" data-action="copy" bindtap="moreAction">再次布置</view><view class="danger" data-id="{{item.id}}" data-action="delete" bindtap="moreAction">删除</view></view>
+          <view class="task-info"><view class="tag-row"><text class="tag tag--blue">课堂任务</text><text class="tag tag--green">{{item.statusLabel}}</text></view><text class="task-meta">截止 {{item.dueLabel}}</text></view>
+          <view wx:if="{{item.menuOpen}}" class="more-menu"><view wx:if="{{item.status !== 'draft'}}" data-id="{{item.id}}" data-action="review" bindtap="moreAction">检查/点评</view><view wx:if="{{item.status !== 'withdrawn' && item.status !== 'closed' && item.status !== 'completed'}}" data-id="{{item.id}}" data-action="edit" bindtap="moreAction">编辑</view><view data-id="{{item.id}}" data-action="preview" bindtap="moreAction">预览</view><view data-id="{{item.id}}" data-action="copy" bindtap="moreAction">再次布置</view><view class="danger" data-id="{{item.id}}" data-action="delete" bindtap="moreAction">回收任务</view></view>
         </view>
         <view class="task-card-foot"><view><text><text class="count">{{item.progressPercent}}</text>% 已完成</text><view class="progress"><view style="width: {{item.progressPercent}}%"></view></view></view><view class="pending"><text>待点评</text><text>{{item.pendingReviewCount}}</text></view></view>
       </view>
       <view wx:if="{{!rows.length}}" class="empty">暂无符合条件的任务，可调整筛选条件。</view>
     </view>
     <g0-tab-bar role="teacher" active="tasks"></g0-tab-bar>
+    </view>
   </view>
 </g0-page-shell>
-

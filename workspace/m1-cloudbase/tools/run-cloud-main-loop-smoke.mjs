@@ -13,23 +13,31 @@ const env = Object.fromEntries((await readFile(resolve(root, '.env.local'), 'utf
 }));
 const envId = required(env.TCB_ENV_ID);
 const require = createRequire(import.meta.url);
-try { require('@cloudbase/adapter-node'); } catch { /* Supported runtimes may not need it. */ }
 const sdk = require('@cloudbase/js-sdk');
+sdk.useAdapters(require('@cloudbase/adapter-node').default);
 const cli = { command: process.execPath, arguments: [resolve('D:/app-cache/cloudbase-cli/node_modules/@cloudbase/cli/bin/tcb')] };
 const testId = randomBytes(12).toString('base64url');
 let publishedTask = null;
 let publishedVersion = null;
 let lastRequestId = null;
+let credentials = null;
+const reviewDecision = process.env.YAREI_REVIEW_DECISION === 'returned' ? 'returned' : 'approved';
+const reviewComment = reviewDecision === 'returned' ? '请补充完整阅读记录后重新提交。' : '虚构联调点评。';
+const readingResourceId = 'res_reading_zoo_cloud_v2';
+const vocabularyResourceId = 'res_vocabulary_animals_cloud_v1';
 
 try {
-  const credentials = await prepareCredentials(['demo_parent_01', 'demo_student_01', 'demo_teacher_01']);
+  credentials = await prepareCredentials(['demo_parent_01', 'demo_student_01', 'demo_teacher_01']);
   process.stdout.write('stage=teacher-login\n');
   const teacher = await loginWithPassword('demo_teacher_01', 'teacher', credentials.demo_teacher_01);
   const now = Date.now();
   process.stdout.write('stage=save-draft\n');
   const draft = await call(teacher.app, 'task-command', 'saveDraft', {
     title: `M1 虚构闭环 ${testId}`,
-    itemRefs: [{ id: `item_${testId}`, resourceId: 'res_reading_zoo_demo', completionRule: { kind: 'reading_pages', requiredPageCount: 1 }, scoringRule: { kind: 'completion_only' }, order: 1 }],
+    itemRefs: [
+      { id: `item_${testId}`, resourceId: readingResourceId, completionRule: { kind: 'reading_pages', requiredPageCount: 1 }, scoringRule: { kind: 'completion_only' }, order: 1 },
+      { id: `word_${testId}`, resourceId: vocabularyResourceId, completionRule: { kind: 'vocabulary_words', requiredWordCount: 1 }, scoringRule: { kind: 'completion_only' }, order: 2 },
+    ],
     target: { type: 'students', studentIds: ['usr_student_g3_01'] },
     startsAt: new Date(now - 60_000).toISOString(), dueAt: new Date(now + 86_400_000).toISOString(),
     latePolicy: { allowLate: true, lateDays: 7 }, description: '仅用于 M1 虚构联调。',
@@ -43,16 +51,57 @@ try {
 
   process.stdout.write('stage=student-login\n');
   const student = await loginWithPassword('demo_student_01', 'student', credentials.demo_student_01);
+  process.stdout.write('stage=student-reading-progress\n');
+  const resource = await call(student.app, 'content-query', 'getReadingResource', { resourceId: readingResourceId }, student.token);
+  assertOk(resource, 'student-read-resource');
+  const chapter = resource.data.chapters?.[0];
+  const page = chapter?.pages?.[0];
+  if (typeof chapter?.id !== 'string' || typeof page?.id !== 'string' || !Number.isSafeInteger(page?.pageNumber)) throw new Error('READING_PAGE_UNAVAILABLE');
+  const progress = await call(student.app, 'learning-progress-query', 'getReadingProgress', { resourceId: readingResourceId }, student.token);
+  assertOk(progress, 'student-read-progress');
+  if (progress.data === null) {
+    const saved = await call(student.app, 'learning-progress-command', 'saveReadingProgress', {
+      resourceId: readingResourceId, chapterId: chapter.id, pageId: page.id, pageNumber: page.pageNumber, favorite: false,
+    }, student.token, { expectedVersion: 0, operationId: `op_loop_reading_${testId}` });
+    assertOk(saved, 'student-save-progress');
+  }
+  const savedPageNumber = progress.data?.pageNumber ?? page.pageNumber;
+  process.stdout.write('stage=student-vocabulary-progress\n');
+  const vocabularyProgress = await call(student.app, 'learning-progress-query', 'getVocabularyProgress', { packId: vocabularyResourceId }, student.token);
+  assertOk(vocabularyProgress, 'student-read-vocabulary-progress');
+  let savedVocabulary = vocabularyProgress.data;
+  if (savedVocabulary === null || savedVocabulary.completedCount < 1) {
+    const saved = await call(student.app, 'learning-progress-command', 'saveVocabularyProgress', {
+      packId: vocabularyResourceId, completedCount: 1, correctCount: 1, wrongWordIds: [],
+    }, student.token, { expectedVersion: savedVocabulary?.version ?? 0, operationId: `op_loop_vocabulary_${testId}` });
+    assertOk(saved, 'student-save-vocabulary-progress');
+    savedVocabulary = saved.data;
+  }
   const detail = await call(student.app, 'student-task-query', 'getMyTask', { taskId: publishedTask }, student.token);
   assertOk(detail, 'student-read-task');
+  process.stdout.write(`reading_page=${savedPageNumber}; task_item_count=${detail.data.items?.length ?? -1}; resources_match=${detail.data.items?.[0]?.resourceId === readingResourceId && detail.data.items?.[1]?.resourceId === vocabularyResourceId}\n`);
+  if (detail.data.items?.[0]?.resourceId !== readingResourceId || detail.data.items?.[1]?.resourceId !== vocabularyResourceId) throw new Error('TASK_RESOURCE_SNAPSHOT_MISSING');
   const assignmentVersion = numberValue(detail.data.assignment?.version);
-  const submitPayload = { taskId: publishedTask, answers: [{ itemId: `item_${testId}`, value: { kind: 'reading', completedPageCount: 1 } }] };
+  const vocabularyAnswer = { itemId: `word_${testId}`, value: { kind: 'vocabulary', completedWordCount: savedVocabulary.completedCount, correctWordCount: savedVocabulary.correctCount } };
+  const submitPayload = { taskId: publishedTask, answers: [{ itemId: `item_${testId}`, value: { kind: 'reading', completedPageCount: 1 } }, vocabularyAnswer] };
   const submitOptions = { expectedVersion: assignmentVersion, operationId: `op_loop_submit_${testId}` };
+  const overstated = await call(student.app, 'submission-command', 'submit', {
+    taskId: publishedTask, answers: [{ itemId: `item_${testId}`, value: { kind: 'reading', completedPageCount: savedPageNumber + 1 } }, vocabularyAnswer],
+  }, student.token, { expectedVersion: assignmentVersion, operationId: `op_loop_overstated_${testId}` });
+  if (overstated.ok || overstated.error?.code !== 'VALIDATION_ERROR') throw new Error('OVERSTATED_PROGRESS_ACCEPTED');
+  const overstatedVocabulary = await call(student.app, 'submission-command', 'submit', {
+    taskId: publishedTask, answers: [{ itemId: `item_${testId}`, value: { kind: 'reading', completedPageCount: 1 } },
+      { itemId: `word_${testId}`, value: { kind: 'vocabulary', completedWordCount: savedVocabulary.completedCount + 1, correctWordCount: savedVocabulary.correctCount } }],
+  }, student.token, { expectedVersion: assignmentVersion, operationId: `op_loop_overstated_word_${testId}` });
+  if (overstatedVocabulary.ok || overstatedVocabulary.error?.code !== 'VALIDATION_ERROR') throw new Error('OVERSTATED_VOCABULARY_ACCEPTED');
   process.stdout.write('stage=student-submit\n');
   const firstSubmit = await call(student.app, 'submission-command', 'submit', submitPayload, student.token, submitOptions);
   const retrySubmit = await call(student.app, 'submission-command', 'submit', submitPayload, student.token, submitOptions);
   assertOk(firstSubmit, 'student-submit'); assertOk(retrySubmit, 'student-submit-retry');
   if (stringValue(firstSubmit.data.submissionId) !== stringValue(retrySubmit.data.submissionId)) throw new Error('IDEMPOTENCY_FAILURE');
+  const submittedDetail = await call(student.app, 'student-task-query', 'getMyTask', { taskId: publishedTask }, student.token);
+  assertOk(submittedDetail, 'student-read-submission-history');
+  if (!Array.isArray(submittedDetail.data.submissionHistory) || !submittedDetail.data.submissionHistory.some((item) => item.version === 1 && item.status === 'submitted')) throw new Error('SUBMISSION_HISTORY_MISSING');
 
   process.stdout.write('stage=reviewer-login\n');
   const reviewer = await loginWithPassword('demo_teacher_01', 'teacher', credentials.demo_teacher_01);
@@ -61,8 +110,10 @@ try {
   assertOk(reviewView, 'teacher-read-submission');
   process.stdout.write('stage=publish-review\n');
   const review = await call(reviewer.app, 'review-command', 'publishReview', {
-    submissionId: stringValue(firstSubmit.data.submissionId), decision: 'approved', score: 88,
-    textComment: '虚构联调点评。', expectedSubmissionVersion: numberValue(reviewView.data.submissionVersion),
+    submissionId: stringValue(firstSubmit.data.submissionId), decision: reviewDecision, score: 88,
+    textComment: reviewComment,
+    ...(reviewDecision === 'returned' ? { returnReason: reviewComment } : {}),
+    expectedSubmissionVersion: numberValue(reviewView.data.submissionVersion),
   }, reviewer.token, { expectedVersion: numberValue(reviewView.data.assignmentVersion), operationId: `op_loop_review_${testId}` });
   assertOk(review, 'teacher-review');
   process.stdout.write('stage=review-complete\n');
@@ -77,11 +128,23 @@ try {
   const cleanupReviewer = await loginWithPassword('demo_teacher_01', 'teacher', credentials.demo_teacher_01);
   const cleanup = await call(cleanupReviewer.app, 'task-command', 'recycleTask', { taskId: publishedTask, reason: 'M1 虚构联调结束回收。' }, cleanupReviewer.token, { expectedVersion: publishedVersion, operationId: `op_loop_recycle_${testId}` });
   assertOk(cleanup, 'recycle-task');
-  process.stdout.write('main_loop=passed\nsubmission_retry=single-write\ncleanup=recycled\n');
+  process.stdout.write(`main_loop=passed\nreview_decision=${reviewDecision}\nsubmission_retry=single-write\ncleanup=recycled\n`);
 } catch (error) {
-  process.stdout.write(`main_loop=failed:${safe(error)}; log_category=${await logCategory()}\n`);
+  let cleanup = 'not-needed';
+  if (publishedTask !== null && publishedVersion !== null && credentials?.demo_teacher_01) {
+    cleanup = 'failed';
+    try {
+      const teacher = await loginWithPassword('demo_teacher_01', 'teacher', credentials.demo_teacher_01);
+      const result = await call(teacher.app, 'task-command', 'recycleTask', { taskId: publishedTask, reason: 'M1 虚构联调失败后回收。' }, teacher.token,
+        { expectedVersion: publishedVersion, operationId: `op_loop_failure_recycle_${testId}` });
+      if (result.ok) cleanup = 'recycled';
+    } catch { /* The failure is reported with its cleanup state below. */ }
+  }
+  process.stdout.write(`main_loop=failed:${safe(error)}; cleanup=${cleanup}; log_category=${await logCategory()}\n`);
   process.exitCode = 2;
 }
+await new Promise((resolve) => process.stdout.write('', resolve));
+process.exit(process.exitCode ?? 0);
 
 async function prepareCredentials(aliases) {
   const credentials = {};
@@ -111,7 +174,14 @@ async function call(app, name, action, payload, token, extras = {}) {
   catch (error) { return { ok: false, error: { code: safe(error) } }; }
 }
 async function cliJson(args) { const { stdout } = await exec(cli.command, [...cli.arguments, ...args], { cwd: root, encoding: 'utf8', windowsHide: true }); const i = Math.min(...[stdout.indexOf('{'), stdout.indexOf('[')].filter((v) => v >= 0)); return JSON.parse(stdout.slice(i)); }
-function assertOk(result, step) { if (!result?.ok) throw new Error(`${step}_${result?.error?.code ?? 'FAILED'}`); }
+function assertOk(result, step) {
+  if (result?.ok) return;
+  const details = Object.values(result?.error?.fieldErrors ?? {}).join(' ');
+  const category = details.includes('阅读进度') ? 'reading-progress'
+    : details.includes('完成规则') ? 'completion-rule'
+      : details.includes('单词') ? 'vocabulary-progress' : 'other';
+  throw new Error(`${step}_${result?.error?.code ?? 'FAILED'}_${category}`);
+}
 function stringValue(value) { if (typeof value !== 'string' || value.length === 0) throw new Error('INVALID_RESPONSE'); return value; }
 function numberValue(value) { if (!Number.isSafeInteger(value) || value < 1) throw new Error('INVALID_RESPONSE'); return value; }
 function required(value) { if (typeof value !== 'string' || value.trim().length === 0) throw new Error('CONFIG_UNAVAILABLE'); return value.trim(); }

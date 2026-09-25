@@ -37,7 +37,7 @@ describe('M1 权威规模虚构 seed fixture', () => {
       class_memberships: 68,
       teacher_class_grants: 2,
       parent_student_links: 1,
-      learning_resources: 1,
+      learning_resources: 2,
       tasks: 1,
       task_assignments: 36,
       submissions: 27,
@@ -80,7 +80,7 @@ describe('M1 权威规模虚构 seed fixture', () => {
         awaitingReview: 6,
         reviewed: 21,
       },
-      totalDocuments: 373,
+      totalDocuments: 374,
     });
     expect(new Set(task.targetStudentIds as readonly string[])).toEqual(
       new Set(assignments.map((assignment) => String(assignment.studentId))),
@@ -108,17 +108,17 @@ describe('M1 权威规模虚构 seed fixture', () => {
 
     await expect(applySeedPackage(repository, seed, OPTIONS)).resolves.toMatchObject({
       status: 'applied',
-      createdCount: 373,
+      createdCount: 374,
       skippedCount: 0,
     });
     await expect(verifySeedPackage(repository, seed)).resolves.toMatchObject({
       ok: true,
-      expectedCount: 373,
-      matchedCount: 373,
+      expectedCount: 374,
+      matchedCount: 374,
     });
     await expect(rollbackSeedRun(repository, seed.manifest.seedRunId, OPTIONS)).resolves.toMatchObject({
       status: 'rolled_back',
-      deletedCount: 373,
+      deletedCount: 374,
     });
   });
 });

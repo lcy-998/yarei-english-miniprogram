@@ -1,6 +1,7 @@
 import type { JsonValue } from '../shared/protocol';
 import type { IdempotencyRecord, OperationLogRecord, TeacherClassGrantRecord } from '../runtime/records';
 import type { ClassMembershipGuardRecord, TaskCoreTransaction, TaskCoreTransactionScope, TaskCoreUnitOfWork } from './repository';
+import type { ReadingProgressRecord, VocabularyProgressRecord } from '../learning-progress/types';
 import type {
   ClassMembershipRecord,
   LearningResourceRecord,
@@ -21,6 +22,8 @@ export interface TaskCoreFixture {
   readonly feedback?: readonly ReviewFeedbackRecord[];
   readonly idempotencyRecords?: readonly IdempotencyRecord[];
   readonly operationLogs?: readonly OperationLogRecord[];
+  readonly readingProgress?: readonly ReadingProgressRecord[];
+  readonly vocabularyProgress?: readonly VocabularyProgressRecord[];
 }
 
 export type TaskCoreFailurePoint = 'idempotency.finalize' | 'audit.append';
@@ -48,6 +51,11 @@ function cloneResource(resource: LearningResourceRecord): LearningResourceRecord
 function cloneTask(task: TaskRecord): TaskRecord {
   return {
     ...task,
+    ...(task.publication ? { publication: {
+      ...task.publication,
+      entries: task.publication.entries.map((entry) => ({ ...entry })),
+      classMembershipGuards: task.publication.classMembershipGuards.map((guard) => ({ ...guard })),
+    } } : {}),
     targetClassIds: [...task.targetClassIds],
     targetStudentIds: [...task.targetStudentIds],
     itemRefs: task.itemRefs.map((item) => ({
@@ -99,6 +107,8 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
   private feedback: ReviewFeedbackRecord[];
   private idempotencyRecords: IdempotencyRecord[];
   private operationLogs: OperationLogRecord[];
+  private readingProgress: ReadingProgressRecord[];
+  private vocabularyProgress: VocabularyProgressRecord[];
   private transactionTail: Promise<void> = Promise.resolve();
   private nextFailure: TaskCoreFailurePoint | null = null;
 
@@ -116,6 +126,8 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
     this.feedback = (fixture.feedback ?? []).map((item) => ({ ...item }));
     this.idempotencyRecords = (fixture.idempotencyRecords ?? []).map(cloneIdempotencyRecord);
     this.operationLogs = (fixture.operationLogs ?? []).map(cloneOperationLog);
+    this.readingProgress = (fixture.readingProgress ?? []).map((item) => ({ ...item }));
+    this.vocabularyProgress = (fixture.vocabularyProgress ?? []).map((item) => ({ ...item, wrongWordIds: [...item.wrongWordIds] }));
   }
 
   /** Arms one deterministic failure for transaction rollback tests. */
@@ -166,6 +178,8 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
       feedback: this.feedback.map((item) => ({ ...item })),
       idempotencyRecords: this.idempotencyRecords.map(cloneIdempotencyRecord),
       operationLogs: this.operationLogs.map(cloneOperationLog),
+      readingProgress: this.readingProgress.map((item) => ({ ...item })),
+      vocabularyProgress: this.vocabularyProgress.map((item) => ({ ...item, wrongWordIds: [...item.wrongWordIds] })),
       membershipGuardVersions: new Map(this.membershipGuardVersions),
     };
     try {
@@ -180,6 +194,8 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
       this.feedback = snapshot.feedback;
       this.idempotencyRecords = snapshot.idempotencyRecords;
       this.operationLogs = snapshot.operationLogs;
+      this.readingProgress = snapshot.readingProgress;
+      this.vocabularyProgress = snapshot.vocabularyProgress;
       this.membershipGuardVersions = snapshot.membershipGuardVersions;
       throw error;
     } finally {
@@ -230,6 +246,16 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     const found = this.resources.find((item) => item.organizationId === organizationId && item.id === resourceId);
     return found === undefined ? null : cloneResource(found);
+  }
+
+  public async findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null> {
+    const found = this.readingProgress.find((item) => item.organizationId === organizationId && item.studentId === studentId && item.resourceId === resourceId);
+    return found === undefined ? null : { ...found };
+  }
+
+  public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
+    const found = this.vocabularyProgress.find((item) => item.organizationId === organizationId && item.studentId === studentId && item.packId === packId);
+    return found === undefined ? null : { ...found, wrongWordIds: [...found.wrongWordIds] };
   }
 
   public async listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]> {

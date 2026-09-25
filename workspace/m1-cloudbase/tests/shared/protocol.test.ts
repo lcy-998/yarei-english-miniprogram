@@ -11,7 +11,7 @@ describe('M1 线协议输入校验', () => {
     expect(valid.ok).toBe(true);
     expect(valid).toMatchObject({ ok: true, value: { businessSessionToken: 'opaque.session.token' } });
     expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'admin', payload: {} }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { action: expect.any(String) } });
-    expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: {}, expectedVersion: 0 }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { expectedVersion: expect.any(String) } });
+    expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: {}, expectedVersion: 0 }, ['selectRole'] as const)).toMatchObject({ ok: true, value: { expectedVersion: 0 } });
     expect(parseFunctionRequest({ apiVersion: 'm1.v1', action: 'selectRole', payload: {}, businessSessionToken: 'bad token' }, ['selectRole'] as const)).toMatchObject({ ok: false, fieldErrors: { businessSessionToken: expect.any(String) } });
   });
 

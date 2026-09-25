@@ -61,6 +61,24 @@ describe('@cloudbase/js-sdk v3 client adapter', () => {
     expect(parseFunctionRequest(calls[0].data, ['listReadingResources'] as const).ok).toBe(true)
   })
 
+  it('normalizes a mainland mobile number before sending it to CloudBase Auth', async () => {
+    const signInWithPassword = vi.fn(async () => ({ data: { user: {}, session: {} }, error: null }))
+    const app: CloudBaseJsSdkAppPort = {
+      auth: () => ({
+        signInWithPassword,
+        getVerification: async () => ({ verification_id: 'ver_test' }),
+        verify: async () => ({ verification_token: 'token_test' }),
+        resetPassword: async () => undefined,
+      }),
+      async callFunction() { return { result: { ok: true, data: null } } },
+    }
+    const adapter = createCloudBaseJsSdkAdapter(app)
+
+    await adapter.authentication.signIn({ mobile: '13800000000', password: 'not-forwarded' })
+
+    expect(signInWithPassword).toHaveBeenCalledWith({ phone: '+8613800000000', password: 'not-forwarded' })
+  })
+
   it('omits the business token for bootstrap and rejects malformed structured results', async () => {
     const calls: object[] = []
     const app = fakeApp({ data: { user: {}, session: {} }, error: null }, async options => {
@@ -87,6 +105,12 @@ describe('@cloudbase/js-sdk v3 client adapter', () => {
     await expect(adapter.authentication.signIn({ mobile: '+8613800000000', password: 'wrong' })).rejects.toEqual({
       code: 'INVALID_PASSWORD',
     })
+  })
+
+  it('extracts a known Auth error from a 400 response without forwarding raw diagnostics', async () => {
+    const app = fakeApp({ data: null, error: { code: 400, message: 'captcha_required: private provider diagnostic' } })
+    const adapter = createCloudBaseJsSdkAdapter(app)
+    await expect(adapter.authentication.signIn({ mobile: '13800000000', password: 'wrong' })).rejects.toEqual({ code: 'CAPTCHA_REQUIRED' })
   })
 
   it.each([

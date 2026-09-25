@@ -81,6 +81,23 @@ describe('org-content document repository', () => {
     expect(JSON.stringify(detail)).not.toMatch(/private OCR|private body|private search|ocrText|bodyBlocks/);
   });
 
+  it('opens legacy demo page images through an assigned task without listing them as a new library book', async () => {
+    const database = new FakeDocumentDatabase({
+      [ORG_CONTENT_COLLECTIONS.memberships]: [document('membership_legacy', ORGANIZATION_ID, { classId: CLASS_ID, studentId: STUDENT_ID, status: 'active' })],
+      [ORG_CONTENT_COLLECTIONS.resources]: [document('res_reading_zoo_demo', ORGANIZATION_ID, {
+        type: 'reading', title: '虚构动物绘本', contentVersion: 1, status: 'published', copyrightStatus: 'demo',
+        visibilityScope: { classIds: [CLASS_ID] },
+        payload: { demoOnly: true, chapterCount: 3, pages: [{ id: 'page_1', chapterId: 'chapter_1', pageNumber: 1,
+          thumbnailAssetKey: 'demo/page-01-thumbnail', imageAssetKey: 'demo/page-01-image', width: 1200, height: 1600, version: 1 }] },
+      })],
+    });
+    const service = new ContentQueryService(createOrgContentDocumentRepository(database));
+    await expect(service.listReadingResources(studentActor)).resolves.toEqual([]);
+    await expect(service.getReadingResource(studentActor, 'res_reading_zoo_demo')).resolves.toMatchObject({
+      category: 'picture_book', chapters: [{ id: 'chapter_1', pages: [{ id: 'page_1', imageAssetKey: 'demo/page-01-image', assetVersion: '1' }] }],
+    });
+  });
+
   it('supports teacher-student-query, including roles joined from active role assignments', async () => {
     const organizationRepository = createOrgContentDocumentRepository(seededDatabase());
     const taskRepository = new InMemoryTaskQueryRepository({});

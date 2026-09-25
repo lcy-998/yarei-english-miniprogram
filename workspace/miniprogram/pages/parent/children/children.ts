@@ -1,5 +1,5 @@
 import { ChildView, bindChild, chooseChild, listChildren, unbindChild } from '../../../services/m1-app-service'
-import { getSession } from '../../../session/session'
+import { getCurrentChildId, getSession, setCurrentChildId } from '../../../session/session'
 
 Component({
   data: { loading: true, submitting: false, error: '', children: [] as ChildView[], showAdd: false, studentNumber: '', bindingCode: '', bindingOperationId: '' },
@@ -12,7 +12,10 @@ Component({
       this.setData({ loading: true, error: '' })
       const result = await listChildren(session.user.id)
       if (!result.ok) { this.setData({ loading: false, error: result.error.message }); return }
-      this.setData({ loading: false, children: result.data })
+      const current = getCurrentChildId()
+      const selected = result.data.find((child) => child.id === current) ?? result.data[0]
+      if (selected) setCurrentChildId(selected.id)
+      this.setData({ loading: false, children: result.data.map((child) => ({ ...child, current: child.id === selected?.id })) })
     },
     toggleAdd() { const showAdd = !this.data.showAdd; this.setData({ showAdd, error: '', studentNumber: '', bindingCode: '', bindingOperationId: showAdd ? `bind_child_${Date.now()}` : '' }) },
     onStudentNumber(event: WechatMiniprogram.Input) { this.setData({ studentNumber: event.detail.value, error: '' }) },
@@ -32,6 +35,7 @@ Component({
       if (!session) return
       const result = await chooseChild(session.user.id, event.currentTarget.dataset.id as string)
       if (!result.ok) { wx.showToast({ title: result.error.message, icon: 'none' }); return }
+      setCurrentChildId(result.data.id)
       wx.reLaunch({ url: '/pages/parent/home/home' })
     },
     removeChild(event: WechatMiniprogram.TouchEvent) {
@@ -43,8 +47,11 @@ Component({
         if (!session) return
         const result = await unbindChild(session.user.id, childId, expectedVersion, `unbind_child_${childId}_${Date.now()}`)
         if (!result.ok) { wx.showToast({ title: result.error.message, icon: 'none' }); return }
+        const children = this.data.children.filter((child) => child.id !== childId)
+        const nextCurrent = children.find((child) => child.current) ?? children[0]
+        setCurrentChildId(nextCurrent?.id ?? '')
+        this.setData({ children: children.map((child) => ({ ...child, current: child.id === nextCurrent?.id })) })
         wx.showToast({ title: '已解除绑定', icon: 'success' })
-        this.loadChildren()
       } })
     },
   },

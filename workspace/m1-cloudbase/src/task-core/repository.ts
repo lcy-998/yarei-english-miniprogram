@@ -7,6 +7,7 @@ import type {
   TaskRecord,
 } from './types';
 import type { IdempotencyRecord, OperationLogRecord, TeacherClassGrantRecord } from '../runtime/records';
+import type { ReadingProgressRecord, VocabularyProgressRecord } from '../learning-progress/types';
 
 export interface ClassMembershipGuardRecord {
   readonly id: string;
@@ -17,6 +18,8 @@ export interface ClassMembershipGuardRecord {
 
 export interface TaskCoreReader {
   findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null>;
+  findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null>;
+  findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null>;
   listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]>;
   listActiveStudentMemberships(organizationId: string, studentIds: readonly string[]): Promise<readonly ClassMembershipRecord[]>;
   listActiveTeacherGrants(organizationId: string, teacherId: string, classIds: readonly string[]): Promise<readonly TeacherClassGrantRecord[]>;

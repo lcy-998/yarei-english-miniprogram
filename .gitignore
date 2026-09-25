@@ -10,6 +10,7 @@ build/
 .env.*
 !.env.example
 *.local
+workspace/miniprogram/runtime/cloudbase.local.ts
 
 # WeChat Developer Tools local state
 **/project.private.config.json

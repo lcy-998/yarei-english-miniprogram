@@ -7,6 +7,8 @@ import { AuthSessionHandler } from '../../src/auth/auth-session-handler';
 import { createCloudBaseRuntimeAdapter } from '../../src/runtime/cloudbase-runtime-adapter';
 import { InMemoryBusinessSessionRepository, InMemoryIdentityRepository, type AuthorizationFixture } from '../../src/runtime/memory-ports';
 import { createNodeCryptoCapabilities, type NodeCryptoSecrets } from '../../src/runtime/node-crypto-capabilities';
+import { DocumentDatabasePlatformError } from '../../src/repositories/document-database-port';
+import type { BusinessSessionRepository } from '../../src/runtime/ports';
 import type { RoleAssignmentRecord, UserRecord } from '../../src/runtime/records';
 
 const SECRETS: NodeCryptoSecrets = {
@@ -178,6 +180,71 @@ describe('独立管理后台服务端会话', () => {
     expect(await miniMain({
       apiVersion: 'm1.v1', action: 'listClasses', payload: {}, businessSessionToken: miniToken,
     })).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } });
+  });
+
+  it.each([
+    ['unavailable', 'SERVICE_UNAVAILABLE'],
+    ['conflict', 'CONFLICT'],
+    ['invalid-data', 'VALIDATION_ERROR'],
+  ] as const)('将管理员会话的 %s 文档库故障映射为 %s', async (kind, expectedCode) => {
+    const harness = createHarness();
+    const sessions: BusinessSessionRepository = {
+      startOrResume: async () => {
+        throw new DocumentDatabasePlatformError(kind, 'test-only persistence failure');
+      },
+      find: async () => null,
+      replace: async () => false,
+    };
+    const handler = new AdminSessionHandler(
+      harness.identities,
+      sessions,
+      harness.crypto.subjectDigest,
+      harness.clock,
+      harness.crypto.identifiers,
+      harness.crypto.businessSession,
+    );
+    const main = createAdminSessionFunction({
+      runtime: createRuntime('admin-session', harness, null),
+      handler,
+      clock: harness.clock,
+      requestIds: { next: () => 'req_admin_persistence_failure' },
+    });
+
+    await expect(main({ apiVersion: 'm1.v1', action: 'bootstrap', payload: {} })).resolves.toMatchObject({
+      ok: false,
+      error: { code: expectedCode },
+    });
+  });
+
+  it('管理员 bootstrap 遇到一次会话事务冲突后重试并成功', async () => {
+    const harness = createHarness();
+    const stableSessions = new InMemoryBusinessSessionRepository();
+    let starts = 0;
+    const sessions: BusinessSessionRepository = {
+      startOrResume: async (candidate, now) => {
+        starts += 1;
+        if (starts === 1) throw new DocumentDatabasePlatformError('conflict', 'test-only conflict');
+        return stableSessions.startOrResume(candidate, now);
+      },
+      find: (sessionId) => stableSessions.find(sessionId),
+      replace: (session, expectedVersion) => stableSessions.replace(session, expectedVersion),
+    };
+    const handler = new AdminSessionHandler(
+      harness.identities,
+      sessions,
+      harness.crypto.subjectDigest,
+      harness.clock,
+      harness.crypto.identifiers,
+      harness.crypto.businessSession,
+    );
+
+    await expect(handler.handle(
+      { action: 'bootstrap' },
+      PLATFORM_IDENTITY,
+      null,
+      harness.meta('bootstrap_retry'),
+    )).resolves.toMatchObject({ ok: true, data: { audience: 'admin-console' } });
+    expect(starts).toBe(2);
   });
 });
 

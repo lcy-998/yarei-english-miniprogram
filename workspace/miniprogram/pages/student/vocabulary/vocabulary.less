@@ -1,2 +1,35 @@
 .page{min-height:100vh;padding:0 20px 36px;box-sizing:border-box}.pack-card,.word-card,.empty-card{border:2px solid rgba(255,255,255,.9);background:rgba(255,249,240,.97);box-shadow:@yr-card-shadow-strong}.pack-card{padding:18px 22px;border-radius:22px}.pack-title{display:block;font-size:22px;font-weight:900}.pack-progress{display:block;margin-top:9px;color:@yr-text-secondary}.progress{height:10px;margin-top:14px;overflow:hidden;border-radius:8px;background:@yr-track-muted}.progress view{height:100%;border-radius:8px;background:linear-gradient(90deg,#31cf72,#1fa968)}.word-card{margin-top:18px;padding:18px;border-radius:28px}.mode-tabs{display:flex;padding:4px;border-radius:18px;background:@yr-surface-blue}.mode-tabs button{flex:1;padding:10px 0;background:transparent;color:@yr-text-secondary;font-weight:800}.mode-tabs button::after{border:0}.mode-tabs .active{border-radius:15px;background:@yr-gradient-primary;color:white;box-shadow:@yr-action-shadow}.word-visual{position:relative;height:150px;margin-top:18px;display:grid;place-items:center;border-radius:22px;background:linear-gradient(#7ed4f3,#eaf9d8)}.sun{font-size:90px;color:@yr-warning}.sound{position:absolute;right:14px;top:14px;width:48px;height:48px;padding:0;border-radius:50%;background:white;color:@yr-brand-primary;font-size:26px}.word,.meaning,.example,.prompt{display:block;text-align:center}.word{margin-top:16px;font-size:34px;font-weight:900}.meaning{margin-top:6px;font-size:22px;color:@yr-text-secondary}.example{margin:14px 0;padding:10px;border-radius:15px;background:@yr-surface-blue;font-size:17px}.prompt{margin:16px 0 10px;font-weight:800}.choices{display:flex;gap:8px}.choices button{flex:1;padding:10px 4px;border:1px solid @yr-border-subtle;background:white;color:@yr-text-primary;font-size:15px}.choices .selected{border-color:@yr-brand-primary;background:@yr-surface-blue;color:@yr-brand-primary}.primary{width:100%;margin-top:18px;padding:13px 0;border-radius:24px;background:@yr-gradient-primary;color:white;font-weight:900}.result{display:block;margin-top:12px;text-align:center;font-weight:800}.success{color:@yr-success}.danger{color:@yr-danger}.wrong-list{min-height:300px;padding:36px 8px;text-align:center;color:@yr-text-secondary}.wrong-list view{display:flex;justify-content:space-between;padding:14px;border-bottom:1px solid @yr-border-subtle;color:@yr-text-primary}.empty-card{margin-top:18px;padding:48px 20px;border-radius:24px;text-align:center;color:@yr-text-secondary}
 .wrong-list button{width:100%;display:grid;grid-template-columns:1fr 1fr auto;align-items:center;gap:8px;padding:14px;border:0;border-bottom:1px solid @yr-border-subtle;background:transparent;color:@yr-text-primary;text-align:left}.wrong-list button::after{border:0}.wrong-list button text:last-child{color:@yr-brand-primary;font-size:13px}
+
+/* Keep the pronunciation control small and anchored inside the illustration. */
+.word-visual{min-width:0;margin-top:18px}
+.sound{position:absolute;z-index:1;top:10px;right:10px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;min-width:44px;max-width:44px;margin:0;padding:0;box-sizing:border-box;border-radius:50%;box-shadow:0 4px 12px rgba(7,30,73,.14)}
+.sound::after{border:0}
+.sound-icon{display:block;width:28px;height:28px}
+
+.pack-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pack-heading > view { min-width: 0; }
+.pack-switch { flex: 0 0 auto; margin: 0; padding: 0 10px; min-height: 36px; border-radius: 12px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.pack-options { display: grid; gap: 8px; margin-top: 14px; }
+.pack-options button { margin: 0; padding: 10px 14px; border: 1px solid @yr-border-subtle; border-radius: 14px; background: #fff; color: @yr-text-primary; font-size: 14px; text-align: left; }
+.choices { flex-wrap: wrap; }
+.choices button { min-width: 30%; border-radius: 14px; }
+.spelling-input { min-height: 48px; padding: 0 14px; border: 1px solid @yr-border-subtle; border-radius: 14px; background: #fff; color: @yr-text-primary; font-size: 17px; text-align: center; }
+
+.pack-meta { display: block; margin-top: 5px; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.pack-selector { margin-top: 14px; padding-top: 14px; border-top: 1px solid @yr-border-subtle; }
+.pack-search { height: 42px; padding: 0 14px; border: 1px solid @yr-border-subtle; border-radius: 16px; background: #fff; font-size: 14px; }
+.pack-filter-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.pack-filter { position: relative; min-width: 0; }
+.pack-filter > button { width: 100%; min-height: 38px; margin: 0; padding: 0 4px; overflow: hidden; border-radius: 12px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 11px; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.pack-filter > button::after { border: 0; }
+.pack-filter-menu { position: absolute; z-index: 20; top: 40px; left: 0; min-width: 100%; max-height: 190px; overflow-y: auto; padding: 4px; border: 1px solid @yr-border-subtle; border-radius: 12px; background: #fff; box-shadow: 0 8px 18px rgba(7,30,73,.16); }
+.pack-filter-menu view { padding: 10px 6px; color: @yr-text-primary; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pack-results-head { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; color: @yr-text-secondary; font-size: 12px; font-weight: 800; }
+.pack-results-head button { margin: 0; padding: 0; background: transparent; color: @yr-brand-primary; font-size: 12px; }
+.pack-results-head button::after { border: 0; }
+.pack-selector .pack-options { display: block; max-height: 220px; margin-top: 8px; }
+.pack-selector .pack-options button { display: flex; flex-direction: column; width: 100%; margin: 0 0 7px; }
+.pack-selector .pack-options button.selected { border-color: @yr-brand-primary; background: @yr-surface-blue; }
+.pack-selector .pack-options button text:last-child { margin-top: 4px; color: @yr-text-secondary; font-size: 11px; }
+.pack-empty { display: block; padding: 18px 4px; color: @yr-text-secondary; text-align: center; font-size: 12px; }

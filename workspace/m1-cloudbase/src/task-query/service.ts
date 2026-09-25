@@ -23,6 +23,7 @@ import type {
   ReviewTaskListItem,
   SafeTaskItemView,
   StudentHomeView,
+  TeacherTaskEditView,
   StudentTaskDetailView,
   StudentTaskFilters,
   StudentTaskListItem,
@@ -135,7 +136,17 @@ export class TeacherTaskQueryService {
       const task = await this.dependencies.repository.findTask(actor.organizationId, input.taskId);
       if (task === null || !task.targetClassIds.some((classId) => classIds.includes(classId))) return failure('NOT_FOUND', this.meta());
       if (task.version !== input.expectedVersion) return failure('CONFLICT', this.meta());
-      return success(taskPreview(task, task.targetClassIds.filter((classId) => classIds.includes(classId))), this.meta());
+      const preview = taskPreview(task, task.targetClassIds.filter((classId) => classIds.includes(classId)));
+      if (task.status !== 'draft') return success(preview, this.meta());
+      const resources = await this.dependencies.repository.listPublishedResourceOptions(actor.organizationId);
+      const items = task.itemRefs.map((item) => {
+        const resource = resources.find((candidate) => candidate.id === item.resourceId);
+        return resource === undefined ? null : {
+          id: item.id, resourceId: item.resourceId, resourceVersion: 1, snapshotSchemaVersion: 1 as const,
+          title: resource.title, type: resource.type, completionRule: item.completionRule ?? {}, order: item.order,
+        };
+      }).filter((item): item is NonNullable<typeof item> => item !== null);
+      return success({ ...preview, items }, this.meta());
     }
     if (input.draft.targetClassIds.length === 0 || input.draft.targetClassIds.some((classId) => !classIds.includes(classId))) {
       return failure('FORBIDDEN', this.meta());
@@ -169,6 +180,24 @@ export class TeacherTaskQueryService {
     }, this.meta());
   }
 
+  public async getTaskForEdit(actor: TrustedActorContext, taskId: string): Promise<ServiceResult<TeacherTaskEditView>> {
+    const grants = await this.authorizedGrants(actor, 'task.publish');
+    if (grants === null) return failure('FORBIDDEN', this.meta());
+    const task = await this.dependencies.repository.findTask(actor.organizationId, taskId);
+    const allowedClassIds = new Set(grants.map((grant) => grant.classId));
+    if (task === null || task.visibility === 'recycled' || task.creatorTeacherId !== actor.actorUserId
+      || task.targetClassIds.some((classId) => !allowedClassIds.has(classId))) return failure('NOT_FOUND', this.meta());
+    return success({
+      taskId: task.id, title: task.title, status: task.status, version: task.version,
+      description: task.description, teacherNote: task.teacherNote, startsAt: task.startsAt, dueAt: task.dueAt,
+      latePolicy: { ...task.latePolicy },
+      target: { type: task.targetType, classIds: [...task.targetClassIds], studentIds: [...task.targetStudentIds] },
+      itemRefs: task.itemRefs.map((item) => ({ ...item, ...(item.completionRule === undefined ? {} : { completionRule: { ...item.completionRule } }), ...(item.scoringRule === undefined ? {} : { scoringRule: { ...item.scoringRule } }) })),
+      items: task.items.map((item) => ({ resourceId: item.resourceId, title: item.resourceSnapshot.title, type: item.resourceSnapshot.type })),
+      ...(task.publication ? { publication: { operationId: task.publication.operationId, originalVersion: task.publication.originalVersion, completedCount: task.publication.nextIndex, totalCount: task.publication.entries.length } } : {}),
+    }, this.meta());
+  }
+
   public async getCompletion(
     actor: TrustedActorContext,
     taskId: string,
@@ -193,10 +222,14 @@ export class TeacherTaskQueryService {
     const listItems = scopedAssignments.map(completionItem).sort((left, right) => (right.submittedAt ?? '').localeCompare(left.submittedAt ?? '') || left.assignmentId.localeCompare(right.assignmentId));
     const paged = paginate(this.cursorCodec, actor, 'completion', { taskId, ...filter }, page, listItems);
     if (!paged.ok) return failure('CONFLICT', this.meta());
+    const visibleItems = await Promise.all(paged.value.items.map(async (item) => {
+      const feedback = item.latestSubmissionId === null ? null : await this.dependencies.repository.findFeedback(actor.organizationId, item.latestSubmissionId);
+      return { ...item, score: feedback?.score ?? null };
+    }));
     const countedAssignments = assignments.filter((item) => item.taskId === taskId && classIds.includes(item.classId));
     const counts = Object.fromEntries(COMPLETION_STATUSES.map((status) => [status, countedAssignments.filter((item) => item.status === status).length])) as Readonly<Record<AssignmentStatus, number>>;
     const taskItem = await buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository);
-    return success({ task: taskItem, counts, assignments: paged.value }, this.meta());
+    return success({ task: taskItem, counts, assignments: { ...paged.value, items: visibleItems } }, this.meta());
   }
 
   private async authorizedGrants(actor: TrustedActorContext, permission: string): Promise<readonly QueryTeacherGrantRecord[] | null> {
@@ -297,7 +330,10 @@ export class StudentTaskQueryService {
     const feedback = submission === null || submission.status === 'draft'
       ? null
       : await this.dependencies.repository.findFeedback(actor.organizationId, submission.id);
-    return success(studentTaskDetail(task, assignment, submission, feedback), this.meta());
+    const history = (await this.dependencies.repository.listTaskSubmissions(actor.organizationId, taskId))
+      .filter((item) => item.assignmentId === assignment.id && item.studentId === actor.actorUserId && item.submittedAt !== null)
+      .sort((left, right) => right.submissionVersion - left.submissionVersion);
+    return success(studentTaskDetail(task, assignment, submission, feedback, history), this.meta());
   }
 
   private meta() { return createServiceMeta(this.dependencies); }
@@ -509,8 +545,9 @@ function taskPreview(task: TaskRecord, classIds: readonly string[]): StudentTask
     startsAt: task.startsAt,
     dueAt: task.dueAt,
     classIds,
-    items: task.items.map(safeTaskItem),
+    items: task.items.map((item) => safeTaskItem(item, task.itemRefs)),
     version: task.version,
+    target: { type: task.targetType, classIds: task.targetClassIds, studentIds: task.targetStudentIds },
   };
 }
 
@@ -525,6 +562,7 @@ function completionItem(assignment: TaskAssignmentRecord): CompletionListItem {
     latestSubmissionVersion: assignment.latestSubmissionVersion,
     isLate: assignment.isLate,
     reviewedAt: assignment.reviewedAt,
+    score: null,
   };
 }
 
@@ -550,6 +588,7 @@ function studentTaskDetail(
   assignment: TaskAssignmentRecord,
   submission: SubmissionRecord | null,
   feedback: ReviewFeedbackRecord | null,
+  history: readonly SubmissionRecord[],
 ): StudentTaskDetailView {
   return {
     taskId: task.id,
@@ -557,7 +596,7 @@ function studentTaskDetail(
     description: task.description,
     startsAt: task.startsAt,
     dueAt: task.dueAt,
-    items: task.items.map(safeTaskItem),
+    items: task.items.map((item) => safeTaskItem(item, task.itemRefs)),
     assignment: {
       status: assignment.status,
       isLate: assignment.isLate,
@@ -575,6 +614,7 @@ function studentTaskDetail(
       recordVersion: submission.recordVersion,
       assignmentVersion: assignment.version,
     },
+    submissionHistory: history.map((item) => ({ version: item.submissionVersion, status: item.status, submittedAt: item.submittedAt! })),
     feedback: safeFeedback(feedback),
   };
 }
@@ -601,10 +641,10 @@ function reviewSubmission(
   };
 }
 
-function safeTaskItem(item: TaskRecord['items'][number]): SafeTaskItemView {
+function safeTaskItem(item: TaskRecord['items'][number], references: TaskRecord['itemRefs']): SafeTaskItemView {
   return {
     id: item.id,
-    resourceId: item.resourceId,
+    resourceId: item.resourceId || references.find((reference) => reference.id === item.id)?.resourceId || '',
     resourceVersion: item.resourceVersion,
     snapshotSchemaVersion: item.snapshotSchemaVersion,
     title: item.resourceSnapshot.title,

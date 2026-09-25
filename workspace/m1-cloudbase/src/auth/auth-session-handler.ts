@@ -1,10 +1,12 @@
 import { isTrustedPlatformIdentity, type PlatformIdentity } from './trusted-actor';
 import type { AuthPayload, MiniProgramRole } from '../contracts/auth-session';
+import { DocumentDatabasePlatformError } from '../repositories/document-database-port';
 import { failure, success } from '../shared/result';
 import type { ResponseMeta, ServiceResult } from '../shared/protocol';
 import type { BusinessSessionRecord } from '../runtime/records';
 import type { BusinessSessionRepository, Clock, IdentifierGenerator, IdentityRepository, SubjectDigestPort } from '../runtime/ports';
 import type { TrustedBusinessSessionSource } from '../runtime/cloudbase-runtime-adapter';
+import type { ProfileDisplayNameMutation } from '../repositories/identity-session-document-adapter';
 
 export interface AuthSessionView {
   readonly sessionId: string;
@@ -12,7 +14,11 @@ export interface AuthSessionView {
   readonly organizationId: string;
   readonly activeRole: MiniProgramRole | null;
   readonly roles: readonly MiniProgramRole[];
+  readonly displayName: string;
+  readonly profileVersion: number;
 }
+
+const MAX_BOOTSTRAP_CONFLICT_ATTEMPTS = 3;
 
 export class AuthSessionHandler {
   public constructor(
@@ -26,14 +32,15 @@ export class AuthSessionHandler {
 
   public async handle(input: AuthPayload, identity: PlatformIdentity, sessionId: string | null, meta: ResponseMeta): Promise<ServiceResult<AuthSessionView | null>> {
     if (!isTrustedPlatformIdentity(identity)) return failure('UNAUTHENTICATED', meta);
-    const principal = await this.resolvePrincipal(identity);
+    const principal = await this.resolvePrincipalWithRetry(identity);
     if (principal === null) return failure('FORBIDDEN', meta);
     if (input.action === 'bootstrap') return this.bootstrap(principal, meta);
     if (input.action === 'logout') return this.logout(sessionId, principal, meta);
     const session = await this.resolveSession(sessionId, principal);
     if (session === null) return failure('UNAUTHENTICATED', meta);
-    if (input.action === 'selectRole') return this.selectRole(session, input.payload.role, principal.roles, meta);
-    return success(this.toView(session, principal.roles), meta);
+    if (input.action === 'selectRole') return this.selectRole(session, input.payload.role, principal, meta);
+    if (input.action === 'updateProfile') return this.updateProfile(session, principal, input.payload.displayName, input.payload.expectedProfileVersion ?? 0, meta);
+    return success(this.toView(session, principal.roles, principal), meta);
   }
 
   private async bootstrap(principal: Principal, meta: ResponseMeta): Promise<ServiceResult<AuthSessionView>> {
@@ -43,20 +50,61 @@ export class AuthSessionHandler {
       subjectDigest: principal.subjectDigest, audience: 'mini-program', role: null, authzVersion: principal.authzVersion,
       recordVersion: 1, expiresAt: addHours(now, 12), revokedAt: null,
     };
-    const resumed = await this.sessions.startOrResume(session, now);
+    const resumed = await this.startOrResume(session, now);
     if (resumed.role === null || (isMiniProgramRole(resumed.role) && principal.roles.includes(resumed.role))) {
-      return success(this.toView(resumed, principal.roles), meta);
+      return success(this.toView(resumed, principal.roles, principal), meta);
     }
     const reset = { ...resumed, role: null, recordVersion: resumed.recordVersion + 1 };
     if (!await this.sessions.replace(reset, resumed.recordVersion)) return failure('CONFLICT', meta);
-    return success(this.toView(reset, principal.roles), meta);
+    return success(this.toView(reset, principal.roles, principal), meta);
   }
 
-  private async selectRole(session: BusinessSessionRecord, role: MiniProgramRole, roles: readonly MiniProgramRole[], meta: ResponseMeta): Promise<ServiceResult<AuthSessionView>> {
-    if (!roles.includes(role)) return failure('FORBIDDEN', meta);
+  private async startOrResume(candidate: BusinessSessionRecord, now: string): Promise<BusinessSessionRecord> {
+    let lastConflict: DocumentDatabasePlatformError | null = null;
+    for (let attempt = 1; attempt <= MAX_BOOTSTRAP_CONFLICT_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.sessions.startOrResume(candidate, now);
+      } catch (error: unknown) {
+        if (!(error instanceof DocumentDatabasePlatformError) || error.kind !== 'conflict') throw error;
+        lastConflict = error;
+      }
+    }
+    throw lastConflict;
+  }
+
+  private async resolvePrincipalWithRetry(identity: PlatformIdentity): Promise<Principal | null> {
+    let lastConflict: DocumentDatabasePlatformError | null = null;
+    for (let attempt = 1; attempt <= MAX_BOOTSTRAP_CONFLICT_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.resolvePrincipal(identity);
+      } catch (error: unknown) {
+        if (!(error instanceof DocumentDatabasePlatformError) || error.kind !== 'conflict') throw error;
+        lastConflict = error;
+      }
+    }
+    throw lastConflict;
+  }
+
+  private async selectRole(session: BusinessSessionRecord, role: MiniProgramRole, principal: Principal, meta: ResponseMeta): Promise<ServiceResult<AuthSessionView>> {
+    if (!principal.roles.includes(role)) return failure('FORBIDDEN', meta);
     const updated = { ...session, role, recordVersion: session.recordVersion + 1 };
     if (!await this.sessions.replace(updated, session.recordVersion)) return failure('CONFLICT', meta);
-    return success(this.toView(updated, roles), meta);
+    return success(this.toView(updated, principal.roles, principal), meta);
+  }
+
+  private async updateProfile(
+    session: BusinessSessionRecord,
+    principal: Principal,
+    displayName: string,
+    expectedProfileVersion: number,
+    meta: ResponseMeta,
+  ): Promise<ServiceResult<AuthSessionView>> {
+    const updater = this.identities as IdentityRepository & Partial<ProfileDisplayNameMutation>;
+    if (updater.updateDisplayName === undefined) return failure('SERVICE_UNAVAILABLE', meta);
+    const result = await updater.updateDisplayName(session.userId, session.organizationId, expectedProfileVersion, displayName);
+    if (result.kind !== 'updated') return failure(result.kind === 'not_found' ? 'NOT_FOUND' : 'CONFLICT', meta);
+    const refreshed = { ...principal, displayName: result.user.displayName, profileVersion: result.user.profileVersion ?? expectedProfileVersion + 1 };
+    return success(this.toView(session, refreshed.roles, refreshed), meta);
   }
 
   private async resolvePrincipal(identity: PlatformIdentity): Promise<Principal | null> {
@@ -77,6 +125,8 @@ export class AuthSessionHandler {
       subjectDigest: digest,
       roles,
       authzVersion: user.authorizationVersion,
+      displayName: user.displayName,
+      profileVersion: user.profileVersion ?? 1,
     };
   }
 
@@ -109,17 +159,30 @@ export class AuthSessionHandler {
       && session.subjectDigest === principal.subjectDigest;
   }
 
-  private toView(session: BusinessSessionRecord, roles: readonly MiniProgramRole[]): AuthSessionView {
+  private toView(session: BusinessSessionRecord, roles: readonly MiniProgramRole[], principal?: Principal): AuthSessionView {
     const token = this.businessSessionTokens?.issueBusinessSessionToken?.(
       session.id,
       session.expiresAt,
       'mini-program',
     ) ?? session.id;
-    return { sessionId: token, userId: session.userId, organizationId: session.organizationId, activeRole: isMiniProgramRole(session.role) ? session.role : null, roles };
+    return {
+      sessionId: token, userId: session.userId, organizationId: session.organizationId,
+      activeRole: isMiniProgramRole(session.role) ? session.role : null, roles,
+      displayName: principal?.displayName ?? session.userId,
+      profileVersion: principal?.profileVersion ?? 1,
+    };
   }
 }
 
-interface Principal { readonly userId: string; readonly organizationId: string; readonly subjectDigest: string; readonly roles: readonly MiniProgramRole[]; readonly authzVersion: number; }
+interface Principal {
+  readonly userId: string;
+  readonly organizationId: string;
+  readonly subjectDigest: string;
+  readonly roles: readonly MiniProgramRole[];
+  readonly authzVersion: number;
+  readonly displayName: string;
+  readonly profileVersion: number;
+}
 
 function isMiniProgramRole(role: string | null): role is MiniProgramRole { return role === 'student' || role === 'parent' || role === 'teacher'; }
 

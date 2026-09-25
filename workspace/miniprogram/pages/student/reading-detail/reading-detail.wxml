@@ -1,2 +1,36 @@
-<g0-page-shell nature="{{true}}" tone="nature"><view class="m1-page reading-detail"><app-header title="阅读详情" back="{{true}}" backUrl="/pages/student/reading-library/reading-library"></app-header><state-panel wx:if="{{loading}}" state="loading"></state-panel><state-panel wx:elif="{{error && !reading}}" state="error" message="{{error}}" bind:retry="loadReading"></state-panel><view wx:elif="{{reading}}" class="m1-content"><view class="m1-card detail-head"><view><text class="book-name">{{reading.book.title}}</text><text class="page-meta">第 {{reading.chapterNumber}} 章 · {{reading.pageNumber}} / {{reading.pageCount}}</text></view><button class="detail-favorite {{reading.book.favorite ? 'active' : ''}}" bindtap="toggleFavorite">{{reading.book.favorite ? '已收藏' : '收藏'}}</button></view><view class="m1-card progress-card"><view><text>阅读进度</text><text>{{reading.progressPercent}}%</text></view><view class="m1-progress"><view style="width: {{reading.progressPercent}}%"></view></view></view><view class="page-frame" bindtap="previewPage"><view wx:if="{{imageLoading}}" class="page-loading">高清页图加载中…</view><view wx:if="{{imageError}}" class="page-error"><text>高清页图加载失败</text><text>保留页图位置，不用抽取正文替代</text><button bindtap="retryImage">重试</button></view><image class="reading-page-image" src="{{reading.pageImageUrl}}" mode="widthFix" bindload="imageLoaded" binderror="imageFailed" aria-label="虚构绘本 A Day at the Zoo 第 {{reading.pageNumber}} 页页图"></image><view class="zoom-hint">点击页图放大</view></view><view class="page-actions"><view class="page-action"><g0-button variant="secondary" disabled="{{reading.pageNumber <= 1 || saving}}" bind:action="previousPage">上一页</g0-button></view><view class="page-action"><g0-button disabled="{{reading.pageNumber >= reading.pageCount || saving}}" loading="{{saving}}" bind:action="nextPage">下一页</g0-button></view></view><text class="autosave">已自动保存阅读位置</text></view></view></g0-page-shell>
-
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page reading-detail">
+    <app-header title="阅读详情" back="{{true}}" backUrl="{{returnUrl}}"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error && !reading}}" state="error" message="{{error}}" bind:retry="loadReading"></state-panel>
+    <view wx:elif="{{reading}}" class="m1-content">
+      <view wx:if="{{taskMode}}" class="m1-card task-reading-context">
+        <text>任务阅读</text>
+        <text wx:if="{{taskRequiredPageCount > 0}}">阅读至第 {{taskRequiredPageCount}} 页，返回任务后自动更新进度</text>
+        <text wx:else>完成本任务指定的阅读内容</text>
+      </view>
+      <view class="m1-card detail-head">
+        <view><text class="book-name">{{reading.book.title}}</text><text class="page-meta">第 {{displayChapterNumber}} 章　{{displayPageNumber}} / {{reading.pageCount}}</text></view>
+        <button class="detail-favorite {{reading.book.favorite ? 'active' : ''}}" bindtap="toggleFavorite">{{reading.book.favorite ? '已收藏' : '收藏'}}</button>
+      </view>
+      <view class="m1-card progress-card">
+        <view><text>已保存的阅读进度</text><text>{{reading.hasSavedProgress ? reading.progressPercent : 0}}%</text></view>
+        <view class="m1-progress"><view style="width: {{reading.hasSavedProgress ? reading.progressPercent : 0}}%"></view></view>
+      </view>
+      <view class="page-frame" bindtap="previewPage">
+        <image class="reading-page-thumbnail" src="{{displayThumbnailUrl}}" mode="widthFix" aria-hidden="true"></image>
+        <image wx:if="{{showHighRes && !imageError}}" class="reading-page-image" src="{{displayImageUrl}}" mode="widthFix" bindload="imageLoaded" binderror="imageFailed" aria-label="{{reading.book.title}}第 {{displayPageNumber}} 页页图"></image>
+        <view wx:if="{{imageLoading}}" class="page-loading">高清页图加载中…</view>
+        <view wx:if="{{imageError}}" class="page-error"><text>高清页图加载失败，已保留缩略图</text><view class="page-error-actions"><button catchtap="retryImage">重试加载</button><button wx:if="{{pendingPageNumber > 0}}" catchtap="returnToSavedPage">返回已保存页</button></view></view>
+        <view class="zoom-hint">点击页图放大查看</view>
+      </view>
+      <view wx:if="{{saveError}}" class="reading-save-error"><text>{{saveError}}</text><button bindtap="saveVisiblePage">重试保存</button></view>
+      <view class="page-actions">
+        <g0-button variant="secondary" disabled="{{displayPageNumber <= 1 || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" bind:action="previousPage">上一页</g0-button>
+        <g0-button disabled="{{displayPageNumber >= reading.pageCount || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" loading="{{saving}}" bind:action="nextPage">下一页</g0-button>
+      </view>
+      <text wx:if="{{!imageLoading && !imageError && !saving && !saveError}}" class="autosave">阅读位置已保存</text>
+    </view>
+  </view>
+</g0-page-shell>
+<view wx:if="{{zoomed}}" class="reading-fullscreen" bindtap="previewPage" aria-role="button" aria-label="关闭页图放大"><image class="reading-fullscreen-image" src="{{imageError ? displayThumbnailUrl : displayImageUrl}}" mode="aspectFit"></image><text>轻触任意位置退出全屏</text></view>

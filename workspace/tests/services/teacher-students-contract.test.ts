@@ -8,7 +8,7 @@ import type {
 } from '../../miniprogram/repositories/cloudbase/protocol'
 import { configureRepositories } from '../../miniprogram/repositories/repository-factory'
 import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
-import { getTeacherStudent, listTeacherStudents } from '../../miniprogram/services/app-service'
+import { getTeacherStudent, listTeacherStudents, updateTeacherStudent } from '../../miniprogram/services/app-service'
 import { TEACHER_STUDENT_QUERY_ACTIONS, validateTeacherStudentQueryRequest } from '../../m1-cloudbase/src/contracts/teacher-student-functions'
 import { parseFunctionRequest } from '../../m1-cloudbase/src/shared/validation'
 
@@ -102,5 +102,19 @@ describe('teacher student client contract', () => {
       expect(parsed.ok).toBe(true)
       if (parsed.ok) expect(validateTeacherStudentQueryRequest(parsed.value).ok).toBe(true)
     }
+  })
+
+  it('sends a student edit through the teacher command with versions and a reason', async () => {
+    const invoker = new FakeInvoker()
+    invoker.enqueue(success({ studentId: 'student_a', displayName: '小宇同学', accountStatus: 'active', classId: 'class_a', userVersion: 3, membershipVersion: 2, classVersion: 4 }))
+    configureRepositories({ mode: 'cloudbase', invoker, authentication: { signIn: async () => undefined }, context: () => ({ sessionId: 'session_teacher' }) })
+    const result = await updateTeacherStudent('forged_teacher', { studentId: 'student_a', classId: 'class_a', displayName: '小宇同学', expectedUserVersion: 2, expectedMembershipVersion: 2, reason: '教师编辑学员姓名', operationId: 'edit_student_once' })
+    expect(result).toMatchObject({ ok: true, data: { displayName: '小宇同学' } })
+    expect(invoker.calls).toEqual([{
+      functionName: 'teacher-student-command', context: { businessSessionToken: 'session_teacher' },
+      request: { apiVersion: 'm1.v1', action: 'updateProfile', operationId: 'edit_student_once', expectedVersion: 2,
+        payload: { studentId: 'student_a', classId: 'class_a', displayName: '小宇同学', expectedMembershipVersion: 2, reason: '教师编辑学员姓名' } },
+    }])
+    expect(JSON.stringify(invoker.calls)).not.toContain('forged_teacher')
   })
 })

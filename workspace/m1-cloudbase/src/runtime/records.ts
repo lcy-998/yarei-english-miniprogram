@@ -17,6 +17,7 @@ export interface OrganizationRecord extends TimestampedRecord {
 
 export interface UserRecord extends TimestampedRecord {
   readonly authorizationVersion: number;
+  readonly profileVersion?: number;
   readonly displayName: string;
   readonly displayNameMasked: string;
   readonly studentNumber?: string;

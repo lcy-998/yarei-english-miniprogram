@@ -34,8 +34,8 @@ export function parseFunctionRequest<TAction extends string>(
     return invalid('operationId', '操作标识格式无效。');
   }
   const expectedVersion = input.expectedVersion;
-  if (expectedVersion !== undefined && (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 1)) {
-    return invalid('expectedVersion', '版本号必须是正整数。');
+  if (expectedVersion !== undefined && (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 0)) {
+    return invalid('expectedVersion', '版本号必须是非负整数。');
   }
   return {
     ok: true,

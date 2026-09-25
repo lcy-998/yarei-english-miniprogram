@@ -58,6 +58,7 @@ function vocabularyView(resource: VocabularyResourceEntity): VocabularyPackView 
     id: resource.id,
     title: resource.title,
     grade: resource.grade,
+    ...(resource.textbook ? { textbook: resource.textbook } : {}),
     unit: resource.unit,
     contentVersion: resource.contentVersion,
     words: resource.words.map((word) => ({ ...word, syllables: [...word.syllables] })),
@@ -71,7 +72,7 @@ export class ContentQueryService {
     const resources = await this.repository.listLearningResources(actor.organizationId, 'reading');
     const visible: ReadingListItemView[] = [];
     for (const resource of resources) {
-      if (resource.status === 'published' && isReading(resource)
+      if (resource.status === 'published' && isReading(resource) && resource.taskOnly !== true
         && await canReadVisibility(this.repository, actor, resource.organizationId, resource.visibility)) {
         visible.push(readingListItem(resource));
       }

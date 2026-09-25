@@ -96,7 +96,13 @@ export async function getReadingProgress(userId: string, bookId: string): Promis
   const book = state.books.find(item => item.id === bookId)
   if (!book) return fail('NOT_FOUND', '阅读内容不存在')
   const pageNumber = state.readingPages[`${userId}:${bookId}`] ?? 1
-  return ok({ book, chapterNumber: 1, chapterCount: 3, pageNumber, pageCount: book.pageCount, progressPercent: Math.round(pageNumber * 100 / book.pageCount), pageImageUrl: '/assets/m1/reading-zoo-page-03.jpg' })
+  const pages = Array.from({ length: book.pageCount }, (_, index) => ({
+    pageNumber: index + 1, chapterNumber: 1,
+    imageUrl: index === 0 ? '/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/assets/content/demo-zoo-page-02-v1.jpg',
+    thumbnailUrl: index === 0 ? '/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/assets/content/demo-zoo-page-02-v1.jpg',
+  }))
+  const page = pages[pageNumber - 1] ?? pages[0]!
+  return ok({ book, hasSavedProgress: Object.prototype.hasOwnProperty.call(state.readingPages, `${userId}:${bookId}`), chapterNumber: page.chapterNumber, chapterCount: 1, pageNumber, pageCount: book.pageCount, progressPercent: Math.round(pageNumber * 100 / book.pageCount), pageImageUrl: page.imageUrl, thumbnailImageUrl: page.thumbnailUrl, pages })
 }
 
 export async function setReadingPage(userId: string, bookId: string, pageNumber: number): Promise<ServiceResult<ReadingProgressView>> {

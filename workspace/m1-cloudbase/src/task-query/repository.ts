@@ -9,6 +9,7 @@ export interface TaskQueryRepository {
   findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null>;
   findAssignmentById(organizationId: string, assignmentId: string): Promise<TaskAssignmentRecord | null>;
   listSubmissions(organizationId: string): Promise<readonly SubmissionRecord[]>;
+  listTaskSubmissions(organizationId: string, taskId: string): Promise<readonly SubmissionRecord[]>;
   findDraftSubmission(organizationId: string, assignmentId: string, submissionVersion: number): Promise<SubmissionRecord | null>;
   findSubmission(organizationId: string, submissionId: string): Promise<SubmissionRecord | null>;
   findFeedback(organizationId: string, submissionId: string): Promise<ReviewFeedbackRecord | null>;

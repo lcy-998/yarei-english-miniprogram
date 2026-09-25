@@ -50,6 +50,21 @@ const vocabularyResource: LearningResourceAccessRecord = {
 };
 
 describe('learning progress document repository', () => {
+  it('uses legacy demo page references when the resource has no top-level pages projection', async () => {
+    const legacy: VersionedDocument = {
+      _id: 'res_reading_zoo_demo', organizationId: ORGANIZATION_ID, schemaVersion: 1, version: 1, deletedAt: null,
+      type: 'reading', status: 'published', allowedStudentIds: [STUDENT_ID],
+      payload: { demoOnly: true, pages: [{ id: 'page_legacy', chapterId: 'chapter_legacy', pageNumber: 1 }] },
+    };
+    const database = new FakeDocumentDatabase({ [LEARNING_PROGRESS_COLLECTIONS.resources]: [legacy] });
+    const progress = service(database);
+    await expect(progress.getReadingProgress(student, legacy._id)).resolves.toBeNull();
+    await expect(progress.saveReadingProgress(student, {
+      resourceId: legacy._id, chapterId: 'chapter_legacy', pageId: 'page_legacy', pageNumber: 1,
+      favorite: false, expectedVersion: 0, operationId: 'legacy_reading_page',
+    })).resolves.toMatchObject({ pageNumber: 1, resourceId: legacy._id });
+  });
+
   it('persists reading and vocabulary progress across service instances', async () => {
     const database = seededDatabase();
     const first = service(database);

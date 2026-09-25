@@ -87,14 +87,14 @@ describe('business session document repository', () => {
     expect(database.snapshot()[IDENTITY_SESSION_COLLECTIONS.sessionSlots]).toHaveLength(1);
   });
 
-  it('revokes the old session when authorization changes or the active session expires', async () => {
+  it('creates a current session after authorization changes without rewriting old session history', async () => {
     const database = new FakeDocumentDatabase();
     const repository = createBusinessSessionDocumentRepository(database);
     await repository.startOrResume(session('session_v1', { authzVersion: 1 }), NOW);
 
     const changed = await repository.startOrResume(session('session_v2', { authzVersion: 2 }), NOW);
     expect(changed.id).toBe('session_v2');
-    expect(await repository.find('session_v1')).toMatchObject({ revokedAt: NOW, recordVersion: 2 });
+    expect(await repository.find('session_v1')).toMatchObject({ revokedAt: null, recordVersion: 1 });
 
     const afterExpiry = '2026-09-18T12:00:00.000+08:00';
     const renewed = await repository.startOrResume(session('session_v2_renewed', {
@@ -102,7 +102,14 @@ describe('business session document repository', () => {
       expiresAt: '2026-09-19T12:00:00.000+08:00',
     }), afterExpiry);
     expect(renewed.id).toBe('session_v2_renewed');
-    expect(await repository.find('session_v2')).toMatchObject({ revokedAt: afterExpiry, recordVersion: 2 });
+    expect(await repository.find('session_v2')).toMatchObject({
+      revokedAt: null,
+      recordVersion: 1,
+      expiresAt: '2026-09-17T12:00:00.000+08:00',
+    });
+    expect(database.snapshot()[IDENTITY_SESSION_COLLECTIONS.sessionSlots]).toEqual([
+      expect.objectContaining({ activeSessionId: 'session_v1' }),
+    ]);
   });
 
   it('keeps mini-program and admin-console slots isolated and persists a bounded refresh', async () => {

@@ -5,28 +5,34 @@
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadDetail"></state-panel>
   <view wx:elif="{{detail}}" class="content">
     <view class="hero-card">
-      <view class="hero-copy"><text class="label">课堂任务</text><text class="title">{{detail.task.title}}</text><text class="due">截止时间：今天 20:00</text></view>
+      <view class="hero-copy"><text class="label">课堂任务</text><text class="title">{{detail.task.title}}</text><text class="due">截止时间：{{dueLabel}}</text></view>
       <view class="task-art"><g0-icon name="task" size="64"></g0-icon></view>
       <view class="progress"><view style="width: {{detail.assignment.progressPercent}}%;"></view></view>
       <view class="status-row"><view class="status-dot"></view><text class="status">{{statusLabel}}</text><text class="percent">{{detail.assignment.progressPercent}}%</text></view>
     </view>
+    <view wx:if="{{detail.assignment.status === 'redo_required' || (detail.assignment.status === 'in_progress' && detail.assignment.redoDueAt)}}" class="redo-banner"><text>{{redoExpired ? '重做期限已过' : '退回重做'}}</text><text wx:if="{{redoDueLabel}}">重做截止：{{redoDueLabel}}</text><text wx:else>重做期限不可用，请联系老师</text></view>
     <view class="section">
       <text class="section-title">任务要求</text>
       <text class="description">{{detail.task.description}}</text>
-      <view wx:for="{{detail.task.items}}" wx:key="id" class="item"><view class="item-mark"></view><text>{{item.title}}</text><text>{{item.completionRule}}</text></view>
+      <view wx:for="{{detail.task.items}}" wx:key="id" class="item"><view class="item-mark"></view><text>{{item.title}}</text><text>{{item.completionRule}}</text><button wx:if="{{item.type === 'reading'}}" class="open-reading" data-id="{{item.id}}" bindtap="openReading">去阅读</button><button wx:elif="{{item.type === 'vocabulary'}}" class="open-reading" data-id="{{item.id}}" bindtap="openVocabulary">去练习</button></view>
     </view>
     <view wx:if="{{detail.feedback}}" class="feedback"><g0-icon name="review" tone="ai" size="54"></g0-icon><view><text class="section-title">教师反馈</text><text class="score">{{detail.feedback.score}} 分</text><text>{{detail.feedback.textComment}}</text></view></view>
-    <view wx:if="{{completionInputs.length && detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="section completion-section">
+    <view wx:if="{{historyEntries.length}}" class="section submission-history"><text class="section-title">提交记录</text><view wx:for="{{historyEntries}}" wx:key="version" class="history-row"><text>第 {{item.version}} 次提交　{{item.statusLabel}}</text><text>{{item.submittedLabel}}</text></view></view>
+    <view wx:if="{{completionInputs.length && editable}}" class="section completion-section">
       <text class="section-title">完成数据</text>
+      <text wx:if="{{hasUnsupportedExercise}}" class="completion-help">本任务含尚未开放的习题内容，暂不能提交；已填写的学习记录可保留。</text>
+      <view wx:if="{{readingSyncError}}" class="reading-sync-error"><text>{{readingSyncError}}</text><button bindtap="refreshReadingCompletion">重试同步</button></view>
+      <view wx:if="{{vocabularySyncError}}" class="reading-sync-error"><text>{{vocabularySyncError}}</text><button bindtap="refreshVocabularyCompletion">重试同步</button></view>
       <view wx:for="{{completionInputs}}" wx:key="itemId" class="completion-item">
         <text class="completion-title">{{item.title}}</text>
         <text class="completion-help">完成要求：{{item.requiredCount}}</text>
-        <view wx:if="{{item.type === 'reading'}}" class="completion-field"><text>完成页数</text><input type="number" value="{{item.completedPageCount}}" data-id="{{item.itemId}}" data-field="completedPageCount" bindinput="onCompletionInput" placeholder="请输入"/></view>
-        <block wx:elif="{{item.type === 'vocabulary'}}"><view class="completion-field"><text>完成词数</text><input type="number" value="{{item.completedWordCount}}" data-id="{{item.itemId}}" data-field="completedWordCount" bindinput="onCompletionInput" placeholder="请输入"/></view><view class="completion-field"><text>正确词数</text><input type="number" value="{{item.correctWordCount}}" data-id="{{item.itemId}}" data-field="correctWordCount" bindinput="onCompletionInput" placeholder="请输入"/></view></block>
-        <view wx:else class="completion-field"><text>已答题数</text><input type="number" value="{{item.answeredQuestionCount}}" data-id="{{item.itemId}}" data-field="answeredQuestionCount" bindinput="onCompletionInput" placeholder="请输入"/></view>
+        <text wx:if="{{item.type === 'reading' && item.resourceId}}" class="completion-help">{{item.readingVerified ? '阅读进度已同步' : '请先打开阅读并保存进度'}}</text>
+        <view wx:if="{{item.type === 'reading'}}" class="completion-field"><text>完成页数</text><input type="number" value="{{item.completedPageCount}}" disabled="{{item.resourceId ? true : false}}" data-id="{{item.itemId}}" data-field="completedPageCount" bindinput="onCompletionInput" placeholder="{{item.resourceId ? '阅读后自动更新' : '请输入'}}"/></view>
+        <block wx:elif="{{item.type === 'vocabulary'}}"><text wx:if="{{item.resourceId}}" class="completion-help">{{item.vocabularyVerified ? '已同步单词练习记录' : '请先完成单词练习'}}</text><view class="completion-field"><text>完成词数</text><input type="number" value="{{item.completedWordCount}}" disabled="{{item.resourceId ? true : false}}" data-id="{{item.itemId}}" data-field="completedWordCount" bindinput="onCompletionInput" placeholder="练习后自动更新"/></view><view class="completion-field"><text>首次正确词数</text><input type="number" value="{{item.correctWordCount}}" disabled="{{item.resourceId ? true : false}}" data-id="{{item.itemId}}" data-field="correctWordCount" bindinput="onCompletionInput" placeholder="练习后自动更新"/></view></block>
+        <view wx:else class="completion-field"><text>{{item.resourceId ? '习题将在后续里程碑开放' : '已答题数'}}</text><input wx:if="{{!item.resourceId}}" type="number" value="{{item.answeredQuestionCount}}" data-id="{{item.itemId}}" data-field="answeredQuestionCount" bindinput="onCompletionInput" placeholder="请输入"/></view>
       </view>
     </view>
-    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="section"><text class="section-title">学习记录</text><textarea value="{{answer}}" maxlength="200" placeholder="写下你的学习收获或完成情况" bindinput="onAnswer"></textarea></view>
-    <view wx:if="{{detail.assignment.status !== 'awaiting_review' && detail.assignment.status !== 'completed'}}" class="actions"><view class="task-action secondary" bindtap="onSave" aria-role="button">{{saving ? '保存中…' : '保存草稿'}}</view><view class="task-action primary" bindtap="onSubmit" aria-role="button">{{submitting ? '提交中…' : '提交任务'}}</view></view>
+    <view wx:if="{{editable}}" class="section"><text class="section-title">学习记录</text><textarea value="{{answer}}" maxlength="200" placeholder="写下你的学习收获或完成情况" bindinput="onAnswer"></textarea></view>
+    <view wx:if="{{editable}}" class="actions"><view class="task-action secondary" bindtap="onSave" aria-role="button">{{saving ? '保存中…' : '保存草稿'}}</view><view class="task-action {{hasUnsupportedExercise ? 'task-action--disabled' : 'primary'}}" bindtap="onSubmit" aria-role="button">{{hasUnsupportedExercise ? '暂不可提交' : submitting ? '提交中…' : '提交任务'}}</view></view>
   </view>
 </view>

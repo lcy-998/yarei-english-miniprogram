@@ -16,6 +16,7 @@ export interface CloudBaseJsSdkAuthPort {
   getVerification(input: Readonly<{ phone_number: string; usage: 'recovery' }>): Promise<Readonly<{ verification_id?: string }>>
   verify(input: Readonly<{ verification_id: string; verification_code: string }>): Promise<Readonly<{ verification_token?: string }>>
   resetPassword(input: Readonly<{ phone_number: string; new_password: string; verification_token: string }>): Promise<void>
+  signOut?(): Promise<unknown>
 }
 
 export interface CloudBaseJsSdkAppPort {
@@ -55,7 +56,12 @@ export function createCloudBaseJsSdkAdapter(app: CloudBaseJsSdkAppPort): CloudBa
   return {
     authentication: {
       async signIn(input) {
-        const response = await auth.signInWithPassword({ phone: input.mobile, password: input.password })
+        let response: CloudBaseJsSdkAuthResponse
+        try {
+          response = await auth.signInWithPassword({ phone: normalizePhone(input.mobile), password: input.password })
+        } catch (error: unknown) {
+          throw normalizedSdkError(error, 'AUTHENTICATION_FAILED')
+        }
         if (response === null || typeof response !== 'object') {
           throw { code: 'INVALID_AUTH_RESPONSE' }
         }
@@ -67,7 +73,7 @@ export function createCloudBaseJsSdkAdapter(app: CloudBaseJsSdkAppPort): CloudBa
         }
       },
       async requestPasswordResetCode(mobile) {
-        const response = await auth.getVerification({ phone_number: mobile, usage: 'recovery' })
+        const response = await auth.getVerification({ phone_number: normalizePhone(mobile), usage: 'recovery' })
         if (typeof response.verification_id !== 'string' || response.verification_id.length === 0) {
           throw { code: 'INVALID_AUTH_RESPONSE' }
         }
@@ -81,8 +87,9 @@ export function createCloudBaseJsSdkAdapter(app: CloudBaseJsSdkAppPort): CloudBa
         if (typeof verified.verification_token !== 'string' || verified.verification_token.length === 0) {
           throw { code: 'INVALID_AUTH_RESPONSE' }
         }
-        await auth.resetPassword({ phone_number: mobile, new_password: newPassword, verification_token: verified.verification_token })
+        await auth.resetPassword({ phone_number: normalizePhone(mobile), new_password: newPassword, verification_token: verified.verification_token })
         recoveryVerification = null
+        if (typeof auth.signOut === 'function') await auth.signOut()
       },
     },
     invoker: {
@@ -107,9 +114,21 @@ export function createCloudBaseJsSdkAdapter(app: CloudBaseJsSdkAppPort): CloudBa
   }
 }
 
+function normalizePhone(value: string): string {
+  const compact = value.replace(/\s/g, '')
+  if (/^1\d{10}$/.test(compact)) return `+86${compact}`
+  if (/^\+86\d{11}$/.test(compact)) return compact
+  return value
+}
+
 function normalizedSdkError(error: unknown, fallbackCode: string): Readonly<{ code: string }> {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return { code: fallbackCode }
-  const code = error.code
+  if (typeof error !== 'object' || error === null) return { code: fallbackCode }
+  const fields = ['code', 'message', 'error', 'error_code'].map(key => key in error ? error[key as keyof typeof error] : undefined)
+  const detail = fields.filter(value => typeof value === 'string' || typeof value === 'number').map(String).join(' ').toLowerCase()
+  for (const known of ['invalid_username_or_password', 'captcha_required', 'password_not_set', 'invalid_status', 'login_disabled']) {
+    if (detail.includes(known)) return { code: known.toUpperCase() }
+  }
+  const code = 'code' in error ? error.code : undefined
   return { code: typeof code === 'string' || typeof code === 'number' ? String(code) : fallbackCode }
 }
 

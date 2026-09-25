@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayTask, hasReachedRedoLimit, nextAssignmentStatusAfterSubmit } from '../../miniprogram/domain/task-rules'
+import { canPublishReview, canSubmitAssignment, getRedoDueAt, getTodayAssignments, getTodayTask, hasReachedRedoLimit, nextAssignmentStatusAfterSubmit } from '../../miniprogram/domain/task-rules'
 import { Task, TaskAssignment } from '../../miniprogram/domain/types'
 
 const assignment = (status: TaskAssignment['status']): TaskAssignment => ({ id: 'asn_demo', taskId: 'tsk_demo', studentId: 'usr_student', classId: 'cls_demo', status, progressPercent: 0, redoCount: 0 })
@@ -21,6 +21,8 @@ describe('M0 task rules', () => {
     expect(redoDueAt).toBe('2026-09-17T08:30:00.000Z')
     expect(canSubmitAssignment(redoAssignment, redoDueAt)).toBe(true)
     expect(canSubmitAssignment(redoAssignment, '2026-09-17T08:30:00.001Z')).toBe(false)
+    expect(canSubmitAssignment({ ...redoAssignment, status: 'in_progress' }, redoDueAt)).toBe(true)
+    expect(canSubmitAssignment({ ...redoAssignment, status: 'in_progress' }, '2026-09-17T08:30:00.001Z')).toBe(false)
   })
 
   it('recognizes the two-return limit', () => {
@@ -38,7 +40,16 @@ describe('M0 task rules', () => {
   it('chooses the earliest actionable task as the home task', () => {
     const first = task('tsk_early', '2026-09-11T18:00:00+08:00')
     const second = task('tsk_late', '2026-09-11T20:00:00+08:00')
-    const result = getTodayTask([second, first], [{ ...assignment('in_progress'), taskId: first.id }, { ...assignment('completed'), id: 'asn_done', taskId: second.id }], 'usr_student')
+    const result = getTodayTask([second, first], [{ ...assignment('in_progress'), taskId: first.id }, { ...assignment('completed'), id: 'asn_done', taskId: second.id }], 'usr_student', '2026-09-11')
     expect(result.task?.id).toBe(first.id)
+  })
+
+  it('does not count an old pending task as a today task, while keeping overdue and redo visible', () => {
+    const old = task('tsk_old', '2026-09-11T20:00:00+08:00')
+    const today = task('tsk_today', '2026-09-24T20:00:00+08:00')
+    const assignments = [{ ...assignment('in_progress'), taskId: old.id }, { ...assignment('completed'), id: 'asn_today', taskId: today.id }]
+    expect(getTodayAssignments([old, today], assignments, 'usr_student', '2026-09-24').map(item => item.task.id)).toEqual([today.id])
+    expect(getTodayTask([old, today], assignments, 'usr_student', '2026-09-24').task).toBeNull()
+    expect(getTodayTask([old, today], [{ ...assignment('overdue'), taskId: old.id }], 'usr_student', '2026-09-24').task?.id).toBe(old.id)
   })
 })

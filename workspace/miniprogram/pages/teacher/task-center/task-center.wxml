@@ -10,10 +10,11 @@
       <view class="entry entry--green" bindtap="focusTasks" aria-role="button"><g0-icon name="check" tone="success" size="68"></g0-icon><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view>
       <view class="entry entry--purple" bindtap="quickReview" aria-role="button"><g0-icon name="review" tone="ai" size="68"></g0-icon><text>快速点评</text><text>评分与反馈</text></view>
     </view>
-    <view class="section-head" id="teacher-task-list"><view><text>最近任务</text><text>共 {{tasks.length}} 个已发布任务</text></view><view class="filter-pill">全部</view></view>
+    <view class="section-head" id="teacher-task-list"><view><text>最近任务</text><text>当前显示 {{tasks.length}} 项</text></view><button class="filter-pill" bindtap="toggleStatusFilter">{{statusFilter}}</button></view>
+    <input class="task-search" value="{{keyword}}" bindinput="onSearch" placeholder="搜索任务名称"/>
     <view wx:for="{{tasks}}" wx:key="id" class="task-card">
-      <view class="task-status"></view><view class="task-copy"><text class="title">{{item.title}}</text><text class="meta">三年级 2 班 · 完成率 {{item.progressPercent}}% · 待检查 {{item.pendingReviewCount}}</text><view class="task-progress"><view style="width: {{item.progressPercent}}%;"></view></view></view>
-      <button class="{{item.pendingReviewCount ? '' : 'secondary'}}" data-id="{{item.id}}" bindtap="review">{{item.pendingReviewCount ? '检查点评' : '查看完成情况'}}</button>
+      <view class="task-status"></view><view class="task-copy"><text class="title">{{item.title}}</text><text class="meta">截止 {{item.dueLabel}}　完成率 {{item.progressPercent}}%　待检查 {{item.pendingReviewCount}}</text><view class="task-progress"><view style="width: {{item.progressPercent}}%;"></view></view></view>
+      <button class="{{item.pendingReviewCount ? '' : 'secondary'}}" data-id="{{item.id}}" bindtap="review">{{item.status === 'draft' ? '继续编辑' : item.pendingReviewCount ? '检查点评' : '查看完成情况'}}</button>
     </view>
     <view wx:if="{{!tasks.length}}" class="empty">暂无已发布任务，使用上方入口创建第一项课堂任务。</view>
   </view>

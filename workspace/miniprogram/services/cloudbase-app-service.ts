@@ -15,6 +15,7 @@ import {
   TaskCompletionValue,
   TaskDetailView,
   TeacherStudentDetail,
+  TeacherStudentListItem,
   TeacherStudentPage,
   TeacherStudentStatusFilter,
   UserAccount,
@@ -44,12 +45,16 @@ export interface CloudReviewCommand {
   taskId: string
   assignmentId?: string
   decision: 'approved' | 'returned'
-  score: number
+  score?: number
   comment: string
 }
 
 export interface CloudReviewAssignmentView {
   studentName: string
+  classId?: string
+  studentNumber?: string
+  className?: string
+  submittedAt?: string
   assignmentId: string
   taskId: string
   status: string
@@ -67,17 +72,29 @@ export interface CloudAppService {
   listRoles(userId: string): Promise<ServiceResult<Role[]>>
   selectRole(userId: string, role: Role): Promise<ServiceResult<Session>>
   getUser(userId: string): Promise<ServiceResult<UserAccount>>
+  updateProfile(userId: string, displayName: string): Promise<ServiceResult<UserAccount>>
   getHome(userId: string): Promise<ServiceResult<HomeView>>
   getTaskDetail(userId: string, taskId: string): Promise<ServiceResult<TaskDetailView>>
   listStudentTasks(userId: string): Promise<ServiceResult<TaskDetailView[]>>
   saveDraft(userId: string, command: CloudSubmissionCommand): Promise<ServiceResult<Submission>>
   submitTask(userId: string, command: CloudSubmissionCommand): Promise<ServiceResult<Submission>>
   getTeacherTasks(userId: string): Promise<ServiceResult<TeacherTasksView>>
+  getTeacherWorkbench(userId: string, date: string, classId?: string): Promise<ServiceResult<TeacherWorkbenchView>>
+  previewTeacherTask(userId: string, taskId: string, version: number): Promise<ServiceResult<TeacherTaskPreviewView>>
+  getTeacherTaskForEdit(userId: string, taskId: string): Promise<ServiceResult<TeacherTaskEditView>>
+  updatePublishedTeacherTask(userId: string, command: CloudPublishTaskCommand, status: Task['status'], previousDueAt: string): Promise<ServiceResult<{ taskId: string; version: number }>>
+  updateTeacherTaskDescription(userId: string, taskId: string, version: number, description: string, operationId: string): Promise<ServiceResult<{ taskId: string; version: number }>>
+  recycleTeacherTask(userId: string, taskId: string, version: number, reason: string, operationId: string): Promise<ServiceResult<{ taskId: string }>>
   getDraftOptions(userId: string, nowIso: string): Promise<ServiceResult<TaskDraftOptionsView>>
   getCompletion(userId: string, taskId: string): Promise<ServiceResult<CloudReviewAssignmentView[]>>
+  getReviewSubmission(userId: string, submissionId: string): Promise<ServiceResult<TeacherReviewSubmissionView>>
   listTeacherStudents(userId: string, filters: Readonly<{ classId?: string; keyword?: string; status: TeacherStudentStatusFilter }>, cursor?: string): Promise<ServiceResult<TeacherStudentPage>>
   getTeacherStudent(userId: string, studentId: string): Promise<ServiceResult<TeacherStudentDetail>>
+  updateTeacherStudent(userId: string, command: TeacherStudentUpdateCommand): Promise<ServiceResult<TeacherStudentMutationView>>
+  setTeacherStudentStatus(userId: string, command: TeacherStudentStatusCommand): Promise<ServiceResult<TeacherStudentMutationView>>
+  transferTeacherStudent(userId: string, command: TeacherStudentTransferCommand): Promise<ServiceResult<TeacherStudentMutationView>>
   publishClassroomTask(userId: string, command: CloudPublishTaskCommand): Promise<ServiceResult<Task>>
+  saveTeacherTaskDraft(userId: string, command: CloudPublishTaskCommand): Promise<ServiceResult<Task>>
   reviewSubmission(userId: string, command: CloudReviewCommand): Promise<ServiceResult<ReviewFeedback>>
   listParentChildren(userId: string): Promise<ServiceResult<ParentChildLinkView[]>>
   bindChild(userId: string, command: BindChildCommand): Promise<ServiceResult<ParentChildLinkView>>
@@ -103,6 +120,33 @@ interface TeacherTasksView {
   pendingByTask: Record<string, number>
 }
 
+export interface TeacherWorkbenchView {
+  activeTaskCount: number; pendingReviewCount: number; pendingCommentCount: number;
+  recentTasks: Array<{ taskId: string }>
+}
+
+export interface TeacherTaskPreviewView {
+  taskId: string | null; title: string; description: string | null; startsAt: string; dueAt: string;
+  classIds: string[]; items: Array<{ id: string; resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise'; completionRule: Record<string, unknown> }>;
+  version: number
+  target?: { type: 'classes' | 'students'; classIds: string[]; studentIds: string[] }
+}
+
+export interface TeacherTaskEditView {
+  taskId: string; title: string; status: Task['status']; version: number; description: string | null; teacherNote: string | null;
+  startsAt: string; dueAt: string; latePolicy: { allowLate: boolean; lateDays: number };
+  target: { type: 'classes' | 'students'; classIds: string[]; studentIds: string[] };
+  itemRefs: Array<{ id: string; resourceId: string; completionRule?: Record<string, unknown>; scoringRule?: Record<string, unknown>; order: number }>
+  items: Array<{ resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' }>
+  publication?: { operationId: string; originalVersion: number; completedCount: number; totalCount: number }
+}
+
+export interface TeacherReviewSubmissionView {
+  taskTitle: string; submittedAt: string; submissionVersion: number;
+  answers: Array<{ itemId: string; value: unknown }>
+  feedback?: FeedbackWire | null
+}
+
 interface ParentHomeView { user: UserAccount; child: UserAccount; tasks: TaskDetailView[] }
 
 interface AuthSessionWire {
@@ -112,6 +156,7 @@ interface AuthSessionWire {
   activeRole: Role | null
   roles: Role[]
   displayName?: string
+  profileVersion?: number
 }
 
 interface PageWire<T> { items: T[]; total: number; nextCursor: string | null }
@@ -119,6 +164,12 @@ interface PageWire<T> { items: T[]; total: number; nextCursor: string | null }
 interface TeacherStudentPageWire extends TeacherStudentPage {}
 
 interface TeacherStudentDetailWire extends TeacherStudentDetail {}
+
+export interface TeacherStudentMutationView { studentId: string; displayName: string; accountStatus: 'active' | 'disabled'; classId: string; userVersion: number; membershipVersion: number; classVersion: number }
+interface TeacherStudentCommandBase { studentId: string; classId: string; operationId: string; expectedUserVersion: number; expectedMembershipVersion: number; reason: string }
+export interface TeacherStudentUpdateCommand extends TeacherStudentCommandBase { displayName: string }
+export interface TeacherStudentStatusCommand extends TeacherStudentCommandBase { status: 'active' | 'disabled'; expectedClassVersion: number }
+export interface TeacherStudentTransferCommand { studentId: string; sourceClassId: string; targetClassId: string; operationId: string; expectedUserVersion: number; expectedMembershipVersion: number; expectedTargetMembershipVersion: number; expectedSourceClassVersion: number; expectedTargetClassVersion: number; reason: string }
 
 interface StudentListItemWire {
   taskId: string
@@ -138,6 +189,7 @@ interface StudentHomeWire {
 
 interface SafeTaskItemWire {
   id: string
+  resourceId: string
   title: string
   type: 'reading' | 'vocabulary' | 'exercise'
   completionRule: object
@@ -175,6 +227,7 @@ interface StudentTaskDetailWire {
     recordVersion: number
     assignmentVersion: number
   } | null
+  submissionHistory?: { version: number; status: Submission['status']; submittedAt: string }[]
   feedback: FeedbackWire | null
 }
 
@@ -202,6 +255,7 @@ interface CompletionWire {
     latestSubmissionVersion: number
     submittedAt: string | null
     reviewedAt: string | null
+    score: number | null
   }>
 }
 
@@ -224,6 +278,7 @@ interface SubmissionReceiptWire {
 }
 
 interface TaskDraftReceiptWire { taskId: string; status: Task['status']; version: number }
+interface TaskPublishReceiptWire { taskId: string; status: Task['status'] | 'publishing'; version: number; assignmentCount?: number; totalCount?: number }
 
 interface TaskDraftOptionsWire {
   classes: { id: string; name: string }[]
@@ -313,6 +368,7 @@ export function createCloudAppService(
   contextProvider: CloudClientContextProvider,
 ): CloudAppService {
   let currentUser: UserAccount | null = null
+  let currentProfileVersion: number | null = null
 
   const currentContextUser = (userId: string, role: Role): UserAccount =>
     currentUser?.id === userId ? currentUser : { id: userId, displayName: userId, role }
@@ -332,17 +388,54 @@ export function createCloudAppService(
   }
 
   const getCompletionRows = async (taskId: string): Promise<ServiceResult<CloudReviewAssignmentView[]>> => {
-    const result = await repository.call<'getCompletion', { taskId: string; filter: object; page: { limit: number } }, CompletionWire>(
+    const result = await repository.call<'getCompletion', { taskId: string; filter: object; page: { limit: number; cursor?: string } }, CompletionWire>(
       'task-query', 'getCompletion', { taskId, filter: {}, page: { limit: 100 } },
     )
-    return mapResult(result, value => value.assignments.items.map(item => ({
-      studentName: item.studentId,
-      assignmentId: item.assignmentId,
-      taskId,
-      status: item.status,
-      ...(item.latestSubmissionId === null ? {} : { submissionId: item.latestSubmissionId }),
-      ...(item.latestSubmissionVersion < 1 ? {} : { submissionVersion: item.latestSubmissionVersion }),
-    })))
+    if (!result.ok) return result
+    const assignmentItems = [...result.data.assignments.items]
+    const seenAssignmentCursors = new Set<string>()
+    let assignmentCursor = result.data.assignments.nextCursor
+    for (let page = 1; assignmentCursor && page < 20; page++) {
+      if (seenAssignmentCursors.has(assignmentCursor)) return failure('CONFLICT', '任务完成情况分页异常，请重试')
+      seenAssignmentCursors.add(assignmentCursor)
+      const next = await repository.call<'getCompletion', { taskId: string; filter: object; page: { limit: number; cursor?: string } }, CompletionWire>(
+        'task-query', 'getCompletion', { taskId, filter: {}, page: { limit: 100, cursor: assignmentCursor } },
+      )
+      if (!next.ok) return next
+      assignmentItems.push(...next.data.assignments.items)
+      assignmentCursor = next.data.assignments.nextCursor
+    }
+    if (assignmentCursor) return failure('CONFLICT', '任务完成情况超过当前可加载范围，请缩小对象范围')
+    const students = new Map<string, TeacherStudentListItem>()
+    let cursor: string | undefined
+    const seen = new Set<string>()
+    for (let page = 0; page < 20; page++) {
+      const studentPage = await repository.call<'listStudents', { filters: { status: 'all' }; page: { limit: number; cursor?: string } }, TeacherStudentPageWire>(
+        'teacher-student-query', 'listStudents', { filters: { status: 'all' }, page: { limit: 50, ...(cursor === undefined ? {} : { cursor }) } },
+      )
+      if (!studentPage.ok) {
+        if (studentPage.error.code === 'FORBIDDEN') break
+        return studentPage
+      }
+      for (const item of studentPage.data.items) students.set(item.studentId, item)
+      if (!studentPage.data.nextCursor) break
+      if (seen.has(studentPage.data.nextCursor)) return failure('CONFLICT', '学员分页异常，请重试')
+      seen.add(studentPage.data.nextCursor)
+      cursor = studentPage.data.nextCursor
+    }
+    return mapResult(result, () => assignmentItems.map(item => {
+      const student = students.get(item.studentId)
+      return {
+        studentName: student?.displayName ?? '学员信息不可用',
+        ...(student?.studentNumber === undefined ? {} : { studentNumber: student.studentNumber }),
+        ...(student?.classInfo.name === undefined ? {} : { className: student.classInfo.name }),
+        ...(item.submittedAt === null ? {} : { submittedAt: item.submittedAt }),
+        ...(item.score === null ? {} : { score: item.score }),
+        assignmentId: item.assignmentId, classId: item.classId, taskId, status: item.status,
+        ...(item.latestSubmissionId === null ? {} : { submissionId: item.latestSubmissionId }),
+        ...(item.latestSubmissionVersion < 1 ? {} : { submissionVersion: item.latestSubmissionVersion }),
+      }
+    }))
   }
 
   return {
@@ -364,6 +457,7 @@ export function createCloudAppService(
       if (role === undefined) return withMeta(failure('FORBIDDEN', '当前账号没有可用身份'), result)
       if (result.data.activeRole === null && result.data.roles.length > 1) {
         currentUser = { id: result.data.userId, displayName: result.data.displayName ?? result.data.userId, role }
+        currentProfileVersion = result.data.profileVersion ?? null
         return { ok: true, data: { sessionId: result.data.sessionId, user: currentUser, availableRoles: [...result.data.roles], activeRole: null }, meta: result.meta }
       }
       const selected = result.data.activeRole === null
@@ -371,6 +465,7 @@ export function createCloudAppService(
         : result
       if (!selected.ok) return selected
       currentUser = { id: selected.data.userId, displayName: selected.data.displayName ?? selected.data.userId, role }
+      currentProfileVersion = selected.data.profileVersion ?? null
       return { ok: true, data: { sessionId: selected.data.sessionId, user: currentUser, availableRoles: [...selected.data.roles], activeRole: role }, meta: selected.meta }
     },
 
@@ -410,11 +505,32 @@ export function createCloudAppService(
       const result = await repository.call<'selectRole', { role: Role }, AuthSessionWire>('auth-session', 'selectRole', { role })
       if (!result.ok) return result
       currentUser = { id: result.data.userId, displayName: result.data.displayName ?? result.data.userId, role }
+      currentProfileVersion = result.data.profileVersion ?? null
       return { ok: true, data: { sessionId: result.data.sessionId, user: currentUser, availableRoles: [...result.data.roles], activeRole: role }, meta: result.meta }
     },
 
     async getUser(userId) {
       return currentUser?.id === userId ? { ok: true, data: currentUser } : failure('NOT_FOUND', '用户不存在')
+    },
+
+    async updateProfile(userId, displayName) {
+      if (currentUser?.id !== userId) return failure('NOT_FOUND', '用户不存在')
+      const normalized = displayName.trim()
+      if (!normalized || normalized.length > 50) return failure('VALIDATION_ERROR', '姓名须为 1—50 个字符')
+      if (currentProfileVersion === null) {
+        const current = await repository.call<'getCurrentSession', Record<string, never>, AuthSessionWire>('auth-session', 'getCurrentSession', {})
+        if (!current.ok) return current
+        currentProfileVersion = current.data.profileVersion ?? null
+      }
+      if (currentProfileVersion === null) return failure('SERVICE_UNAVAILABLE', '资料版本尚未加载，请刷新后重试')
+      const result = await repository.call<'updateProfile', { displayName: string }, AuthSessionWire>(
+        'auth-session', 'updateProfile', { displayName: normalized },
+        { operationId: `profile_${Date.now()}`, expectedVersion: currentProfileVersion },
+      )
+      if (!result.ok) return result
+      currentProfileVersion = result.data.profileVersion ?? currentProfileVersion + 1
+      currentUser = { ...currentUser, displayName: result.data.displayName ?? normalized }
+      return { ok: true, data: currentUser, meta: result.meta }
     },
 
     async getHome(userId) {
@@ -451,23 +567,68 @@ export function createCloudAppService(
     },
 
     async getTeacherTasks(_userId) {
-      const result = await repository.call<'listTeacherTasks', { filters: object; page: { limit: number } }, PageWire<TeacherTaskWire>>(
+      const result = await repository.call<'listTeacherTasks', { filters: object; page: { limit: number; cursor?: string } }, PageWire<TeacherTaskWire>>(
         'task-query', 'listTeacherTasks', { filters: {}, page: { limit: 100 } },
       )
-      return mapResult(result, value => {
+      if (!result.ok) return result
+      const taskItems = [...result.data.items]
+      const seenTaskCursors = new Set<string>()
+      let taskCursor = result.data.nextCursor
+      for (let page = 1; taskCursor && page < 20; page++) {
+        if (seenTaskCursors.has(taskCursor)) return failure('CONFLICT', '任务列表分页异常，请重试')
+        seenTaskCursors.add(taskCursor)
+        const next = await repository.call<'listTeacherTasks', { filters: object; page: { limit: number; cursor?: string } }, PageWire<TeacherTaskWire>>(
+          'task-query', 'listTeacherTasks', { filters: {}, page: { limit: 100, cursor: taskCursor } },
+        )
+        if (!next.ok) return next
+        taskItems.push(...next.data.items)
+        taskCursor = next.data.nextCursor
+      }
+      if (taskCursor) return failure('CONFLICT', '任务列表超过当前可加载范围，请缩小查询范围')
+      return mapResult(result, () => {
         const progressByTask: Record<string, number> = {}
         const pendingByTask: Record<string, number> = {}
-        for (const item of value.items) {
+        for (const item of taskItems) {
           progressByTask[item.taskId] = item.totalCount === 0 ? 0 : Math.round(item.completedCount * 100 / item.totalCount)
           pendingByTask[item.taskId] = item.pendingReviewCount
         }
         return {
-          tasks: value.items.map(mapTeacherTask),
-          pendingCount: value.items.reduce((sum, item) => sum + item.pendingReviewCount, 0),
+          tasks: taskItems.map(mapTeacherTask),
+          pendingCount: taskItems.reduce((sum, item) => sum + item.pendingReviewCount, 0),
           progressByTask,
           pendingByTask,
         }
       })
+    },
+    async getTeacherWorkbench(_userId, date, classId) {
+      return repository.call<'getTeacherWorkbench', { date: string; classId?: string }, TeacherWorkbenchView>(
+        'task-query', 'getTeacherWorkbench', { date, ...(classId === undefined ? {} : { classId }) },
+      )
+    },
+    async previewTeacherTask(_userId, taskId, version) {
+      return repository.call<'previewTask', { taskId: string }, TeacherTaskPreviewView>('task-query', 'previewTask', { taskId }, { expectedVersion: version })
+    },
+    async getTeacherTaskForEdit(_userId, taskId) {
+      return repository.call<'getTaskForEdit', { taskId: string }, TeacherTaskEditView>('task-query', 'getTaskForEdit', { taskId })
+    },
+    async updatePublishedTeacherTask(_userId, command, status, previousDueAt) {
+      const draft = command.structuredDraft
+      if (!draft || !command.taskId) return validationFailure('taskId', '请先选择任务')
+      let payload: object
+      if (status === 'scheduled') {
+        const mapped = mapStructuredTaskDraft(draft)
+        if (!mapped.ok) return mapped
+        payload = { taskId: command.taskId, title: command.title.trim(), description: command.description.trim(), ...mapped.data }
+      } else {
+        payload = { taskId: command.taskId, description: command.description.trim(), teacherNote: draft.teacherNote ?? '', ...(Date.parse(draft.dueAt) === Date.parse(previousDueAt) ? {} : { dueAt: draft.dueAt }) }
+      }
+      return repository.call<'updatePublishedTask', object, { taskId: string; version: number }>('task-command', 'updatePublishedTask', payload, { operationId: command.operationId, expectedVersion: command.expectedVersion })
+    },
+    async updateTeacherTaskDescription(_userId, taskId, version, description, operationId) {
+      return repository.call<'updatePublishedTask', { taskId: string; description: string }, { taskId: string; version: number }>('task-command', 'updatePublishedTask', { taskId, description }, { operationId, expectedVersion: version })
+    },
+    async recycleTeacherTask(_userId, taskId, version, reason, operationId) {
+      return repository.call<'recycleTask', { taskId: string; reason: string }, { taskId: string }>('task-command', 'recycleTask', { taskId, reason }, { operationId, expectedVersion: version })
     },
 
     async getDraftOptions(_userId, nowIso) {
@@ -480,6 +641,10 @@ export function createCloudAppService(
     },
 
     async getCompletion(_userId, taskId) { return getCompletionRows(taskId) },
+
+    async getReviewSubmission(_userId, submissionId) {
+      return repository.call<'getSubmissionForReview', { submissionId: string }, TeacherReviewSubmissionView>('review-query', 'getSubmissionForReview', { submissionId })
+    },
 
     async listTeacherStudents(_userId, filters, cursor) {
       return repository.call<
@@ -501,20 +666,52 @@ export function createCloudAppService(
       )
     },
 
+    async updateTeacherStudent(_userId, command) {
+      return repository.call<'updateProfile', object, TeacherStudentMutationView>('teacher-student-command', 'updateProfile', {
+        studentId: command.studentId, classId: command.classId, displayName: command.displayName,
+        expectedMembershipVersion: command.expectedMembershipVersion, reason: command.reason,
+      }, { operationId: command.operationId, expectedVersion: command.expectedUserVersion })
+    },
+    async setTeacherStudentStatus(_userId, command) {
+      return repository.call<'setStatus', object, TeacherStudentMutationView>('teacher-student-command', 'setStatus', {
+        studentId: command.studentId, classId: command.classId, status: command.status,
+        expectedMembershipVersion: command.expectedMembershipVersion, expectedClassVersion: command.expectedClassVersion, reason: command.reason,
+      }, { operationId: command.operationId, expectedVersion: command.expectedUserVersion })
+    },
+    async transferTeacherStudent(_userId, command) {
+      return repository.call<'transfer', object, TeacherStudentMutationView>('teacher-student-command', 'transfer', {
+        studentId: command.studentId, sourceClassId: command.sourceClassId, targetClassId: command.targetClassId,
+        expectedMembershipVersion: command.expectedMembershipVersion, expectedTargetMembershipVersion: command.expectedTargetMembershipVersion,
+        expectedSourceClassVersion: command.expectedSourceClassVersion, expectedTargetClassVersion: command.expectedTargetClassVersion, reason: command.reason,
+      }, { operationId: command.operationId, expectedVersion: command.expectedUserVersion })
+    },
+
     async publishClassroomTask(userId, command) {
-      const mappedDraft = mapStructuredTaskDraft(command.structuredDraft)
-      if (!mappedDraft.ok) return mappedDraft
-      const draft = await repository.call<'saveDraft', object, TaskDraftReceiptWire>('task-command', 'saveDraft', {
-        title: command.title.trim(),
-        description: command.description.trim(),
-        ...mappedDraft.data,
-      }, { operationId: command.operationId })
-      if (!draft.ok) return draft
-      const published = await repository.call<'publishTask', { taskId: string }, TaskDraftReceiptWire>(
-        'task-command', 'publishTask', { taskId: draft.data.taskId },
-        { operationId: command.operationId, expectedVersion: draft.data.version },
-      )
-      if (!published.ok) return published
+      let draftTaskId = command.taskId ?? ''
+      let draftVersion = command.expectedVersion
+      if (!command.resumePublication) {
+        const mappedDraft = mapStructuredTaskDraft(command.structuredDraft)
+        if (!mappedDraft.ok) return mappedDraft
+        const draft = await repository.call<'saveDraft', object, TaskDraftReceiptWire>('task-command', 'saveDraft', {
+          title: command.title.trim(),
+          description: command.description.trim(),
+          ...(command.taskId === undefined ? {} : { taskId: command.taskId }),
+          ...mappedDraft.data,
+        }, { operationId: command.operationId, ...(command.taskId === undefined ? {} : { expectedVersion: command.expectedVersion }) })
+        if (!draft.ok) return draft
+        draftTaskId = draft.data.taskId
+        draftVersion = draft.data.version
+      } else if (!draftTaskId) return validationFailure('taskId', '未找到待继续发布的任务')
+      let published: ServiceResult<TaskPublishReceiptWire>
+      for (let attempt = 0; ; attempt += 1) {
+        published = await repository.call<'publishTask', { taskId: string }, TaskPublishReceiptWire>(
+          'task-command', 'publishTask', { taskId: draftTaskId },
+          { operationId: command.operationId, expectedVersion: draftVersion },
+        )
+        if (!published.ok) return published
+        if (published.data.status !== 'publishing') break
+        if (attempt >= 9) return failure('SERVICE_UNAVAILABLE', '任务仍在发布中，请稍后点击发布继续完成')
+      }
       return {
         ok: true,
         data: {
@@ -539,6 +736,21 @@ export function createCloudAppService(
       }
     },
 
+    async saveTeacherTaskDraft(userId, command) {
+      const mappedDraft = mapStructuredTaskDraft(command.structuredDraft)
+      if (!mappedDraft.ok) return mappedDraft
+      const result = await repository.call<'saveDraft', object, TaskDraftReceiptWire>('task-command', 'saveDraft', {
+        title: command.title.trim(), description: command.description.trim(), ...(command.taskId === undefined ? {} : { taskId: command.taskId }), ...mappedDraft.data,
+      }, { operationId: command.operationId, ...(command.taskId === undefined ? {} : { expectedVersion: command.expectedVersion }) })
+      if (!result.ok) return result
+      return { ok: true, data: {
+        id: result.data.taskId, title: command.title.trim(), deliveryType: 'classroom', status: 'draft',
+        creatorTeacherId: userId, classId: command.structuredDraft?.target.type === 'classes' ? command.structuredDraft.target.classIds[0] ?? '' : '',
+        startsAt: command.structuredDraft?.startsAt ?? '', dueAt: command.structuredDraft?.dueAt ?? '',
+        description: command.description.trim(), items: [], version: result.data.version,
+      }, meta: result.meta }
+    },
+
     async reviewSubmission(userId, command) {
       const completion = await getCompletionRows(command.taskId)
       if (!completion.ok) return completion
@@ -554,7 +766,7 @@ export function createCloudAppService(
         submissionId: row.submissionId,
         decision: command.decision,
         expectedSubmissionVersion: command.expectedVersion,
-        score: command.score,
+        ...(command.score === undefined ? {} : { score: command.score }),
         textComment: command.comment.trim(),
         ...(command.decision === 'returned' ? { returnReason: command.comment.trim() } : {}),
       }, { operationId: command.operationId, expectedVersion: target.data.assignmentVersion })
@@ -573,7 +785,7 @@ export function createCloudAppService(
         submissionId: result.data.submissionId,
         teacherId: userId,
         decision: result.data.decision,
-        score: command.score,
+        ...(command.score === undefined ? {} : { score: command.score }),
         textComment: command.comment.trim(),
         ...(command.decision === 'returned' ? { returnReason: command.comment.trim() } : {}),
         publishedAt: new Date().toISOString(),
@@ -800,6 +1012,7 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
       const rule = taskCompletionRule(item.type, item.completionRule)
       return {
         id: item.id,
+        resourceId: item.resourceId,
         title: item.title,
         type: item.type,
         completionRule: rule === undefined ? '完成规则暂不可用' : completionRuleLabel(item.type, completionRequiredCount(item.type, item.completionRule as Record<string, unknown>) ?? 0),
@@ -840,7 +1053,9 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
     assignmentVersion: value.submission.assignmentVersion,
   }
   const feedback = value.feedback === null || submission === undefined ? undefined : mapFeedback(value.feedback, assignment.id, submission.id)
-  return { task, assignment, ...(submission === undefined ? {} : { submission }), ...(feedback === undefined ? {} : { feedback }) }
+  return { task, assignment, ...(submission === undefined ? {} : { submission }),
+    submissionHistory: value.submissionHistory ?? (submission?.submittedAt ? [{ version: submission.version, status: submission.status, submittedAt: submission.submittedAt }] : []),
+    ...(feedback === undefined ? {} : { feedback }) }
 }
 
 function mapTeacherTask(value: TeacherTaskWire): Task {
@@ -851,6 +1066,7 @@ function mapTeacherTask(value: TeacherTaskWire): Task {
     status: value.status,
     creatorTeacherId: '',
     classId: value.classIds[0] ?? '',
+    classIds: value.classIds,
     startsAt: value.startsAt,
     dueAt: value.dueAt,
     description: '',
@@ -979,36 +1195,45 @@ function mapStructuredTaskDraft(value: StructuredTaskDraft | undefined): Service
 }
 
 function mapDraftOptions(value: TaskDraftOptionsWire, nowIso: string): ServiceResult<TaskDraftOptionsView> {
-  const selectedClass = value.classes.find(candidate => (
-    ['reading', 'vocabulary', 'exercise'] as const
-  ).every(type => value.resources.some(resource => resource.type === type && resource.allowedClassIds.includes(candidate.id))))
-  if (selectedClass === undefined) return validationFailure('resources', '当前班级缺少阅读、单词或习题资源')
+  const selectedClass = value.classes.find(candidate => value.resources.some(resource => (
+    resource.allowedClassIds.includes(candidate.id)
+      && completionRequiredCount(resource.type, resource.completionRule) !== null
+  )))
+  const defaultClass = selectedClass ?? value.classes[0]
+  if (defaultClass === undefined) return validationFailure('classes', '当前没有可布置的授权班级')
   const selectedResources: TaskDraftOptionsView['resources'] = []
   const items: StructuredTaskDraft['items'] = []
+  for (const resource of value.resources) {
+    const requiredCount = completionRequiredCount(resource.type, resource.completionRule)
+    if (requiredCount === null) continue
+    selectedResources.push({ id: resource.id, title: resource.title, type: resource.type, requiredCount, allowedClassIds: resource.allowedClassIds })
+  }
   for (const type of ['reading', 'vocabulary', 'exercise'] as const) {
-    const resource = value.resources.find(candidate => candidate.type === type && candidate.allowedClassIds.includes(selectedClass.id))
-    if (resource === undefined) return validationFailure('resources', '当前班级任务资源不完整')
+    const resource = value.resources.find(candidate => (
+      candidate.type === type
+        && candidate.allowedClassIds.includes(defaultClass.id)
+        && completionRequiredCount(type, candidate.completionRule) !== null
+    ))
+    if (resource === undefined) continue
     const requiredCount = completionRequiredCount(type, resource.completionRule)
     const maxScore = resource.scoringRule.kind === 'manual' && isPositiveIntegerValue(resource.scoringRule.maxScore)
       ? resource.scoringRule.maxScore
-      : null
-    if (requiredCount === null || maxScore === null) return validationFailure('resources', '任务资源缺少有效完成阈值或评分规则')
-    selectedResources.push({ id: resource.id, title: resource.title, type, requiredCount })
+      : 100
+    if (requiredCount === null) continue
     items.push({ id: `item_${type}`, resourceId: resource.id, type, requiredCount, maxScore })
   }
   if (!isOffsetIso(nowIso)) return validationFailure('startsAt', '当前时间无效')
   const startsAt = new Date(nowIso)
-  const dueAt = new Date(startsAt)
-  dueAt.setHours(20, 0, 0, 0)
-  if (dueAt <= startsAt) dueAt.setDate(dueAt.getDate() + 1)
+  const dueAt = new Date(startsAt.getTime() + 24 * 60 * 60 * 1000)
   return {
     ok: true,
     data: {
-      selectedClassName: selectedClass.name,
+      selectedClassName: defaultClass.name,
+      availableClasses: value.classes,
       resources: selectedResources,
       structuredDraft: {
         items,
-        target: { type: 'classes', classIds: [selectedClass.id] },
+        target: { type: 'classes', classIds: [defaultClass.id] },
         startsAt: startsAt.toISOString(),
         dueAt: dueAt.toISOString(),
         latePolicy: { allowLate: true, lateDays: 7 },
@@ -1130,6 +1355,10 @@ function authenticationFailure(error: unknown): ServiceResult<Session> {
   if (code.includes('NETWORK') || code.includes('TIMEOUT')) {
     return { ok: false, error: { code: 'NETWORK_ERROR', message: '网络连接失败，请检查网络后重试', retryable: true } }
   }
+  if (code.includes('CAPTCHA_REQUIRED')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '登录尝试过多，需要完成验证码验证', retryable: false } }
+  if (code.includes('INVALID_STATUS')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '账号暂不可用或已锁定，请稍后重试', retryable: false } }
+  if (code.includes('PASSWORD_NOT_SET')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '该账号尚未设置密码，请联系管理员', retryable: false } }
+  if (code.includes('LOGIN_DISABLED')) return { ok: false, error: { code: 'SERVICE_UNAVAILABLE', message: '当前环境未开启密码登录，请联系管理员', retryable: false } }
   return { ok: false, error: { code: 'UNAUTHENTICATED', message: '手机号或密码不正确', retryable: false } }
 }
 

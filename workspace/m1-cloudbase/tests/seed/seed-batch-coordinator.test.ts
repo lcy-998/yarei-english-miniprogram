@@ -17,7 +17,7 @@ import { SEED_COLLECTION_ORDER } from '../../src/seed/model';
 
 const ORGANIZATION_ID = 'org_qihang_demo';
 const FIXED_NOW = '2026-09-17T13:00:00+08:00';
-// These two cases deliberately process all 373 authoritative documents. On
+// These two cases deliberately process all 374 authoritative documents. On
 // Windows, concurrent Vitest workers can exceed the framework's 5s default
 // despite the coordinator completing correctly, so retain a bounded contract
 // timeout rather than weakening the assertions or reducing fixture coverage.
@@ -29,7 +29,7 @@ const OPTIONS: SeedBatchCoordinatorOptions = {
   now: () => FIXED_NOW,
 };
 
-describe('373 条权威种子的安全分批协调器', () => {
+describe('374 条权威种子的安全分批协调器', () => {
   it('批次提交中断后标为 failed，并从最后完整批次恢复；全量 verify 后才 succeeded', async () => {
     const seed = createAuthoritativeM1SeedPackage();
     const database = new FakeDocumentDatabase();
@@ -67,9 +67,9 @@ describe('373 条权威种子的安全分批协调器', () => {
       status: 'succeeded',
       nextBatchIndex: 15,
       verifiedBatchCount: 15,
-      createdCount: 373,
+      createdCount: 374,
     });
-    expect(countSeedDocuments(database.snapshot())).toBe(373);
+    expect(countSeedDocuments(database.snapshot())).toBe(374);
     const firstSucceeded = observed.findIndex((item) => item.status === 'succeeded');
     expect(firstSucceeded).toBe(observed.length - 1);
     expect(observed.slice(0, -1).every((item) => item.status !== 'succeeded')).toBe(true);
@@ -94,26 +94,26 @@ describe('373 条权威种子的安全分批协调器', () => {
     }));
 
     await expect(beginSeedBatchRollback(repository, seed.manifest.seedRunId, OPTIONS)).resolves.toMatchObject({
-      status: 'rolling_back', rollbackCursor: 373,
+      status: 'rolling_back', rollbackCursor: 374,
     });
     await expect(advanceSeedBatchRollback(repository, seed.manifest.seedRunId, OPTIONS)).rejects.toMatchObject({
       code: 'CONFLICT',
     });
-    expect(countSeedDocuments(database.snapshot())).toBe(373);
+    expect(countSeedDocuments(database.snapshot())).toBe(374);
     await expect(readRun(repository, seed.manifest.seedRunId)).resolves.toMatchObject({
       status: 'failed',
       failedFromStatus: 'rolling_back',
-      rollbackCursor: 373,
+      rollbackCursor: 374,
     });
 
     await replaceStoredDocument(database, lastReference.collection, lastReference.id, () => originalStored!);
     let state = await resumeFailedSeedBatchRun(repository, seed, OPTIONS);
-    expect(state).toMatchObject({ status: 'rolling_back', rollbackCursor: 373 });
+    expect(state).toMatchObject({ status: 'rolling_back', rollbackCursor: 374 });
     for (let step = 0; state.status !== 'rolled_back' && step < 20; step += 1) {
       state = await advanceSeedBatchRollback(repository, seed.manifest.seedRunId, OPTIONS);
     }
 
-    expect(state).toMatchObject({ status: 'rolled_back', rollbackCursor: 0, createdCount: 373 });
+    expect(state).toMatchObject({ status: 'rolled_back', rollbackCursor: 0, createdCount: 374 });
     expect(countSeedDocuments(database.snapshot())).toBe(0);
     expect(database.snapshot().migration_runs).toHaveLength(1);
     expect(database.snapshot().migration_runs?.[0]).toMatchObject({ status: 'rolled_back' });

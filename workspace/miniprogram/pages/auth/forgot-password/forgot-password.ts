@@ -1,4 +1,5 @@
 import { requestPasswordResetCode, resetPassword } from '../../../services/app-service'
+import { getRepositoryMode } from '../../../repositories/repository-factory'
 
 Component({
   data: { step: 1, mobile: '', code: '', newPassword: '', confirmPassword: '', loading: false, error: '', codeSent: false, countdown: 0, codeButtonLabel: '获取验证码' },
@@ -15,7 +16,7 @@ Component({
       if (!result.ok) { this.setData({ error: result.error.message }); return }
       this.setData({ codeSent: true, countdown: 60, codeButtonLabel: '60 秒' })
       this.tickCountdown()
-      wx.showToast({ title: '演示验证码：246810', icon: 'none' })
+      wx.showToast({ title: getRepositoryMode() === 'cloudbase' ? '验证码已发送，请查收短信' : '演示验证码：246810', icon: 'none' })
     },
     tickCountdown() {
       if (this.data.countdown <= 0) return

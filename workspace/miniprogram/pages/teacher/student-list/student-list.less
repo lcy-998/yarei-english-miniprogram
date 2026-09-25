@@ -14,3 +14,31 @@
 .class-option.selected { background: @yr-surface-blue; color: @yr-brand-primary; }
 .teacher-students { background: radial-gradient(circle at 4% 0%, rgba(68,182,123,.42) 0 12%, transparent 30%), radial-gradient(circle at 96% 5%, rgba(82,190,226,.45) 0 15%, transparent 34%), linear-gradient(180deg,#9bd9ca 0%,#bfe6ef 24%,#e8f3f5 49%,#eef2f5 100%); }
 
+/* Class changes alter list height; keep the background anchored to the viewport. */
+.teacher-students { position: relative; background: #eef2f5; }
+.student-list-background { position: fixed; z-index: 0; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; background: radial-gradient(circle at 4% 0%, rgba(68,182,123,.42) 0 12%, transparent 30%), radial-gradient(circle at 96% 5%, rgba(82,190,226,.45) 0 15%, transparent 34%), linear-gradient(180deg,#9bd9ca 0%,#bfe6ef 24%,#e8f3f5 49%,#eef2f5 100%); }
+.student-list-foreground { position: relative; z-index: 1; }
+
+.m1-toolbar picker{flex:0 0 108px;min-width:0}
+.m1-toolbar picker .status-filter{display:flex;align-items:center;justify-content:center;width:100%;box-sizing:border-box}
+.load-more{width:100%;height:46px;margin:4px 0 0;border:1px solid @yr-border-subtle;border-radius:15px;background:#fff;color:@yr-brand-primary;font-size:13px;font-weight:900;line-height:46px}
+.load-more::after{border:0}
+.import-panel{margin-bottom:16px;padding:18px;border-radius:22px;background:@yr-surface-warm}
+.import-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.import-heading>view{min-width:0}
+.import-title,.import-subtitle{display:block}
+.import-title{color:@yr-text-primary;font-size:18px;font-weight:900}
+.import-subtitle{margin-top:4px;color:@yr-text-secondary;font-size:12px;line-height:1.5}
+.import-heading button{flex:none;height:32px;margin:0;padding:0 8px;background:transparent;color:@yr-brand-primary;font-size:13px;line-height:32px}
+.import-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.import-actions button,.import-copy-errors{min-height:44px;margin:0;padding:0 8px;border:1px solid @yr-brand-primary;border-radius:14px;background:#fff;color:@yr-brand-primary;font-size:13px;font-weight:900;line-height:44px}
+.import-actions .import-pick{border-color:transparent;background:@yr-gradient-primary;color:#fff}
+.import-actions button::after,.import-heading button::after,.import-copy-errors::after{border:0}
+.import-result{margin-top:16px;padding-top:14px;border-top:1px solid @yr-border-subtle}
+.import-file{display:block;overflow:hidden;color:@yr-text-primary;font-size:13px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+.import-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.import-counts text{padding:10px 4px;border-radius:11px;background:@yr-surface-blue-100;color:@yr-text-primary;font-size:12px;font-weight:800;text-align:center}
+.import-warning,.import-more,.import-note{display:block;margin-top:10px;color:@yr-text-secondary;font-size:12px;line-height:1.5}
+.import-warning{color:@yr-danger;font-weight:800}
+.import-error{margin-top:8px;padding:9px 10px;border-radius:10px;background:#fff;color:@yr-text-primary;font-size:12px;line-height:1.45}
+.import-copy-errors{width:100%;margin-top:12px}

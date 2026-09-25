@@ -95,6 +95,10 @@ export class InMemoryTaskQueryRepository implements TaskQueryRepository {
     return this.submissions.filter((item) => item.organizationId === organizationId).map(cloneSubmission);
   }
 
+  public async listTaskSubmissions(organizationId: string, taskId: string): Promise<readonly SubmissionRecord[]> {
+    return this.submissions.filter((item) => item.organizationId === organizationId && item.taskId === taskId).map(cloneSubmission);
+  }
+
   public async findDraftSubmission(organizationId: string, assignmentId: string, submissionVersion: number): Promise<SubmissionRecord | null> {
     const found = this.submissions.find((item) => item.organizationId === organizationId
       && item.assignmentId === assignmentId
