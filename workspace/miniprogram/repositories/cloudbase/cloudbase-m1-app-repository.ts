@@ -2,6 +2,7 @@ import { ServiceError, ServiceResponseMeta, ServiceResult } from '../../domain/t
 import { ChildView, M1AppRepository, ProfileView, ReadingBookView, ReadingCategory, ReadingProgressView, StudentDetailView, StudentListView, WordPracticeView } from '../m1-app-repository'
 import { AuthV2AccountPort } from './auth-v2-account-port'
 import { CloudFunctionInvoker, M1FunctionName, M1FunctionRequest } from './cloud-function-invoker'
+import { displayPageImageUrl } from '../../shared/reading-page-image'
 
 type JsonRecord = Record<string, unknown>
 type Guard<T> = (value: unknown) => value is T
@@ -461,12 +462,3 @@ function request(action: string, payload: Record<string, unknown>, options: Read
 function unavailable<T>(message: string): Promise<ServiceResult<T>> {
   return Promise.resolve(fail('SERVICE_UNAVAILABLE', message))
 }
-
-function displayPageImageUrl(assetKey: string): string {
-  if (assetKey.startsWith('https://') || assetKey.startsWith('http://') || assetKey.startsWith('cloud://') || assetKey.startsWith('/')) {
-    return assetKey
-  }
-  if (assetKey.includes('page-01')) return '/assets/content/demo-zoo-picture-book-cover-v1.jpg'
-  return '/assets/content/demo-zoo-page-02-v1.jpg'
-}
-

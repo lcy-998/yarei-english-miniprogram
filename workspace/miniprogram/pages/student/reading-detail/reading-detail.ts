@@ -1,6 +1,7 @@
 import { ReadingProgressView, getReadingProgress, setReadingPage, toggleReadingFavorite } from '../../../services/m1-app-service'
 import { getCurrentBookId, getSession, setCurrentTaskId } from '../../../session/session'
 import { TeacherReviewRoute, loadTeacherReviewItem, teacherReviewRoute } from '../../../shared/teacher-review-item'
+import { displayPageImageUrl } from '../../../shared/reading-page-image'
 
 Component({
   data: { initialized: false, loading: true, saving: false, imageLoading: true, imageError: false, showHighRes: true, zoomed: false, error: '', saveError: '', reading: null as ReadingProgressView | null,
@@ -69,7 +70,8 @@ Component({
       const chapterTitles = [...new Set(pages.map(page => page.chapterTitle))]
       const pageViews = pages.map(page => ({ pageNumber: page.pageNumber,
         chapterNumber: chapterTitles.indexOf(page.chapterTitle) + 1,
-        imageUrl: page.imageAssetKey, thumbnailUrl: page.thumbnailAssetKey }))
+        imageUrl: displayPageImageUrl(page.imageAssetKey),
+        thumbnailUrl: displayPageImageUrl(page.thumbnailAssetKey) }))
       const first = pageViews[0]
       const progressPercent = Math.round(visited.filter(Boolean).length * 100 / pages.length)
       const reading: ReadingProgressView = {

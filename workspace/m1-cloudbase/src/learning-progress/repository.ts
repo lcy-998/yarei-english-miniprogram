@@ -8,7 +8,7 @@ import type {
 } from './types';
 
 export interface LearningProgressReader {
-  findResource(organizationId: string, resourceId: string): Promise<LearningResourceAccessRecord | null>;
+  findResource(organizationId: string, resourceId: string, studentId?: string): Promise<LearningResourceAccessRecord | null>;
   findReadingProgress(organizationId: string, studentId: string, resourceId: string): Promise<ReadingProgressRecord | null>;
   listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]>;
   findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null>;

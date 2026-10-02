@@ -8,7 +8,8 @@ export interface ReviewTaskOption {
 }
 
 export function reviewTaskOptions(tasks: readonly Pick<Task, 'id' | 'title' | 'status'>[], pendingByTask: Readonly<Record<string, number>>): ReviewTaskOption[] {
-  const published = tasks.filter(task => task.status !== 'draft' && task.status !== 'withdrawn')
+  const published = tasks.filter(task => typeof task.id === 'string' && task.id.trim() !== ''
+    && task.status !== 'draft' && task.status !== 'withdrawn')
     .map(task => ({ id: task.id, title: task.title, pendingCount: pendingByTask[task.id] ?? 0 }))
   return [...published.filter(task => task.pendingCount > 0), ...published.filter(task => task.pendingCount === 0)]
 }

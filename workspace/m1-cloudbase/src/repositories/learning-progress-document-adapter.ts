@@ -19,6 +19,7 @@ import {
 
 export const LEARNING_PROGRESS_COLLECTIONS = {
   resources: 'learning_resources',
+  memberships: 'class_memberships',
   reading: 'reading_progress',
   readingPageEvents: 'reading_page_events',
   vocabulary: 'vocabulary_progress',
@@ -35,8 +36,8 @@ export function createLearningProgressDocumentRepository(
 class LearningProgressDocumentRepository implements LearningProgressRepository {
   public constructor(private readonly database: DocumentDatabasePort) {}
 
-  public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceAccessRecord | null> {
-    return this.read((reader) => new LearningProgressDocumentReader(reader).findResource(organizationId, resourceId));
+  public async findResource(organizationId: string, resourceId: string, studentId?: string): Promise<LearningResourceAccessRecord | null> {
+    return this.read((reader) => new LearningProgressDocumentReader(reader).findResource(organizationId, resourceId, studentId));
   }
 
   public async findReadingProgress(
@@ -98,10 +99,22 @@ class LearningProgressDocumentReader {
   public async findResource(
     organizationId: string,
     resourceId: string,
+    studentId?: string,
   ): Promise<LearningResourceAccessRecord | null> {
     const document = await this.documents.get(LEARNING_PROGRESS_COLLECTIONS.resources, resourceId);
     if (!isVisible(document, organizationId)) return null;
-    return decodeResource(document);
+    const resource = decodeResource(document);
+    if (document.allowedStudentIds !== undefined || studentId === undefined) return resource;
+    const visibility = requireObject(document.visibility);
+    const visibilityType = requireEnum(visibility.type, ['organization', 'classes'] as const);
+    const classIds = visibilityType === 'classes' ? requireStringArray(visibility.classIds) : [];
+    const memberships = await this.documents.find(LEARNING_PROGRESS_COLLECTIONS.memberships, {
+      organizationId, studentId, status: 'active', deletedAt: null,
+    });
+    const authorized = memberships.some(membership => isVisible(membership, organizationId)
+      && typeof membership.classId === 'string'
+      && (visibilityType === 'organization' || classIds.includes(membership.classId)));
+    return { ...resource, allowedStudentIds: authorized ? [studentId] : [] };
   }
 
   public async findReadingProgress(
@@ -298,14 +311,21 @@ export function auditDocumentId(organizationId: string, requestId: string): stri
 
 function decodeResource(document: VersionedDocument): LearningResourceAccessRecord {
   const type = requireEnum(document.type, ['reading', 'vocabulary'] as const);
-  const status = requireEnum(document.status, ['published', 'offline'] as const);
-  const allowedStudentIds = requireStringArray(document.allowedStudentIds);
+  const status = document.status === 'draft' ? 'offline'
+    : requireEnum(document.status, ['published', 'offline'] as const);
+  const allowedStudentIds = document.allowedStudentIds === undefined ? [] : requireStringArray(document.allowedStudentIds);
   const legacyPayload = document.payload === undefined ? null : requireObject(document.payload);
   const rawContentVersion = document.contentVersion;
   const contentVersion = typeof rawContentVersion === 'string' && rawContentVersion.trim()
     ? rawContentVersion : typeof rawContentVersion === 'number' && Number.isSafeInteger(rawContentVersion)
       && rawContentVersion > 0 ? String(rawContentVersion) : undefined;
-  const rawPages = document.pages ?? (legacyPayload?.demoOnly === true ? legacyPayload.pages : undefined);
+  const chapterPages = document.pages !== undefined
+    || (legacyPayload?.demoOnly === true && legacyPayload.pages !== undefined)
+    || legacyPayload?.chapters === undefined ? undefined
+    : requireObjectArray(legacyPayload.chapters).flatMap(chapter => requireObjectArray(chapter.pages)
+      .map(page => ({ ...page, chapterId: chapter.id })));
+  const rawPages = document.pages ?? (legacyPayload?.demoOnly === true ? legacyPayload.pages : undefined)
+    ?? chapterPages ?? (type === 'vocabulary' ? [] : undefined);
   const pages = requireObjectArray(rawPages).map((page) => ({
     id: requireString(page.id),
     chapterId: requireString(page.chapterId),
@@ -319,7 +339,9 @@ function decodeResource(document: VersionedDocument): LearningResourceAccessReco
     ...(contentVersion === undefined ? {} : { contentVersion }),
     allowedStudentIds,
     pages,
-    wordIds: document.wordIds === undefined && type === 'reading' && legacyPayload?.demoOnly === true ? [] : requireStringArray(document.wordIds),
+    wordIds: document.wordIds === undefined && type === 'reading' ? []
+      : requireStringArray(document.wordIds ?? (legacyPayload?.words === undefined ? undefined
+        : requireObjectArray(legacyPayload.words).map(word => requireString(word.id)))),
   };
 }
 

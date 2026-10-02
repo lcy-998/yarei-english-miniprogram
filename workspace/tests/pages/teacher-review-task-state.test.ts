@@ -68,6 +68,7 @@ describe('快速点评任务选择', () => {
       { id: 'task_c', title: '习题任务', status: 'active' },
       { id: 'task_draft', title: '草稿', status: 'draft' },
       { id: 'task_withdrawn', title: '已撤回', status: 'withdrawn' },
+      { id: '', title: '无标识旧记录', status: 'active' },
     ], { task_a: 3, task_c: 1, task_draft: 2 })
     expect(options).toEqual([
       { id: 'task_a', title: '阅读任务', pendingCount: 3 },

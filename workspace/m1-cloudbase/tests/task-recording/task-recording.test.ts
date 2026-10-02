@@ -168,6 +168,24 @@ describe('M2 录音任务可信证据', () => {
     expect(uploads).toEqual([]);
   });
 
+  it('暂存文件下载故障可重试，不误判为音频无效或创建私有副本', async () => {
+    const ownerDigest = createHash('sha256').update(JSON.stringify(['org_1', 'student_1'])).digest('hex');
+    const stagingPath = `task-recordings/staging/${ownerDigest}/recording_demo_3.mp3`;
+    const input = { stagingFileId: `cloud://virtual-env/${stagingPath}`, stagingPath,
+      organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_demo_3' };
+    let uploadCount = 0;
+    const uploadFile = async () => { uploadCount += 1; return { fileID: 'cloud://virtual-env/unexpected.mp3' }; };
+    const missingContent = new CloudBaseTaskRecordingSeal({
+      downloadFile: async () => ({}), uploadFile,
+    }, 'virtual-env');
+    await expect(missingContent.inspectAndSeal(input)).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    const failedDownload = new CloudBaseTaskRecordingSeal({
+      downloadFile: async () => { throw new Error('temporary storage failure'); }, uploadFile,
+    }, 'virtual-env');
+    await expect(failedDownload.inspectAndSeal(input)).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(uploadCount).toBe(0);
+  });
+
   it('教师只能试听已纳入对应提交版本的录音，试听留下审计；家长和失去班级权限的教师不能获取链接', async () => {
     const submission: SubmissionRecord = { id: 'submission_1', organizationId: 'org_1',
       taskId: task.id, assignmentId: assignment.id, studentId: student.actorUserId,

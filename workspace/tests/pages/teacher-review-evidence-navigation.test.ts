@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadTeacherReviewItem, teacherExerciseView, teacherReviewRoute } from '../../miniprogram/shared/teacher-review-item'
+import { displayPageImageUrl } from '../../miniprogram/shared/reading-page-image'
 
 interface PageContext {
   data: Record<string, unknown>
@@ -86,6 +87,19 @@ describe('T-08 打开原学生作业页的教师只读模式', () => {
     await definition.methods.imageLoaded.call(context)
     await definition.methods.saveVisiblePage.call(context)
     expect(context.data.saving).toBe(false)
+  })
+
+  it('教师阅读页使用与学生页一致的页图地址转换', () => {
+    expect(displayPageImageUrl('demo/reading/zoo/page-01-image'))
+      .toBe('/assets/content/demo-zoo-picture-book-cover-v1.jpg')
+    expect(displayPageImageUrl('demo/reading/zoo/page-02-thumbnail'))
+      .toBe('/assets/content/demo-zoo-page-02-v1.jpg')
+    expect(displayPageImageUrl('demo/page-01-image'))
+      .toBe('/assets/content/demo-zoo-picture-book-cover-v1.jpg')
+    expect(displayPageImageUrl('demo/image')).toBe('/assets/content/demo-zoo-page-02-v1.jpg')
+    expect(displayPageImageUrl('https://example.invalid/signed-page')).toBe('https://example.invalid/signed-page')
+    expect(displayPageImageUrl('')).toBe('')
+    expect(displayPageImageUrl('unknown-page')).toBe('')
   })
 
   it('教师在原单词词卡翻阅时保留学生首答，不能提交答案', async () => {

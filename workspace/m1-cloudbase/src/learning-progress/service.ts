@@ -168,7 +168,7 @@ export class LearningProgressService {
     type: LearningResourceAccessRecord['type'],
     reader: Pick<LearningProgressRepository, 'findResource'> = this.repository,
   ): Promise<LearningResourceAccessRecord> {
-    const resource = await reader.findResource(actor.organizationId, resourceId);
+    const resource = await reader.findResource(actor.organizationId, resourceId, actor.actorUserId);
     if (resource === null || resource.type !== type) throw new LearningProgressError('NOT_FOUND');
     if (resource.status !== 'published') throw new LearningProgressError('RESOURCE_OFFLINE');
     if (!resource.allowedStudentIds.includes(actor.actorUserId)) throw new LearningProgressError('NOT_FOUND');

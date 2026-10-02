@@ -51,6 +51,40 @@ const vocabularyResource: LearningResourceAccessRecord = {
 };
 
 describe('learning progress document repository', () => {
+  it('reads M2 chapter pages only for active members of an authorized class', async () => {
+    const resourceId = 'reading_m2_class_resource';
+    const resource: VersionedDocument = {
+      _id: resourceId, organizationId: ORGANIZATION_ID, schemaVersion: 1, version: 1, deletedAt: null,
+      type: 'reading', status: 'published', contentVersion: 2,
+      visibility: { type: 'classes', classIds: ['class_m2'] },
+      payload: { chapters: [{ id: 'chapter_m2', pages: [
+        { id: 'page_m2_1', pageNumber: 1 }, { id: 'page_m2_2', pageNumber: 2 },
+      ] }] },
+    };
+    const membership: VersionedDocument = {
+      _id: 'membership_m2', organizationId: ORGANIZATION_ID, schemaVersion: 1, version: 1,
+      deletedAt: null, studentId: STUDENT_ID, classId: 'class_m2', status: 'active',
+    };
+    const database = new FakeDocumentDatabase({
+      [LEARNING_PROGRESS_COLLECTIONS.resources]: [resource],
+      [LEARNING_PROGRESS_COLLECTIONS.memberships]: [membership],
+    });
+    const progress = service(database);
+    await expect(progress.getReadingProgress(student, resourceId)).resolves.toBeNull();
+    await expect(progress.saveReadingProgress(student, {
+      resourceId, chapterId: 'chapter_m2', pageId: 'page_m2_2', pageNumber: 2,
+      favorite: false, expectedVersion: 0, operationId: 'm2_class_page',
+    })).resolves.toMatchObject({ resourceId, pageNumber: 2 });
+    await expect(progress.getReadingProgress({ ...student, actorUserId: 'other_student' }, resourceId))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const inactive = new FakeDocumentDatabase({
+      [LEARNING_PROGRESS_COLLECTIONS.resources]: [resource],
+      [LEARNING_PROGRESS_COLLECTIONS.memberships]: [{ ...membership, status: 'transferred' }],
+    });
+    await expect(service(inactive).getReadingProgress(student, resourceId))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
   it('uses legacy demo page references when the resource has no top-level pages projection', async () => {
     const legacy: VersionedDocument = {
       _id: 'res_reading_zoo_demo', organizationId: ORGANIZATION_ID, schemaVersion: 1, version: 1, deletedAt: null,

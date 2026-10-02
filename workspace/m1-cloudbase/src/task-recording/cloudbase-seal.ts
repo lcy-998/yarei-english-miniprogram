@@ -29,11 +29,11 @@ export class CloudBaseTaskRecordingSeal implements TaskRecordingSealPort {
     let buffer: Buffer;
     try {
       const downloaded = await this.storage.downloadFile({ fileID: input.stagingFileId });
-      if (!Buffer.isBuffer(downloaded.fileContent)) throw new TaskRecordingError('MEDIA_INVALID');
+      if (!Buffer.isBuffer(downloaded.fileContent)) throw new TaskRecordingError('SERVICE_UNAVAILABLE');
       buffer = downloaded.fileContent;
     } catch (error: unknown) {
       if (error instanceof TaskRecordingError) throw error;
-      throw new TaskRecordingError('MEDIA_INVALID');
+      throw new TaskRecordingError('SERVICE_UNAVAILABLE');
     }
     if (buffer.length < 1 || buffer.length > MAX_BYTES) throw new TaskRecordingError('MEDIA_INVALID');
     let parsed: Awaited<ReturnType<AudioMetadataReader['read']>>;
