@@ -1,5 +1,5 @@
 <g0-page-shell tone="parent"><view class="page">
-  <app-header title="" showBell="{{true}}"></app-header>
+  <app-header title="" showBell="{{true}}" bellCount="{{noticeCount}}"></app-header>
   <view class="brand-header"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>陪伴成长每一步</text></view></view>
   <text class="screen-title">家长中心</text>
   <state-panel wx:if="{{loading}}" state="loading" message="正在加载孩子学习概览"></state-panel>
@@ -16,7 +16,7 @@
         <view class="overview-metric overview-metric--success"><g0-icon name="check" tone="success" size="{{52}}"></g0-icon><view><text>本周完成率</text><text>{{completionRate}}%</text></view></view>
         <view class="overview-metric overview-metric--primary"><g0-icon name="task" size="{{52}}"></g0-icon><view><text>待办任务</text><text>{{pendingCount}}</text></view></view>
       </view>
-      <view class="overdue-row"><view><g0-icon name="task" tone="warning" size="{{38}}"></g0-icon><text>逾期任务</text><text>{{overdueCount}}</text></view><view class="report-link" data-label="学习报告" bindtap="openFuture" aria-role="button">查看学习报告<view class="mini-arrow" aria-hidden="true"></view></view></view>
+      <view class="overdue-row"><view><g0-icon name="task" tone="warning" size="{{38}}"></g0-icon><text>逾期任务</text><text>{{overdueCount}}</text></view><view class="report-link" bindtap="openReport" aria-role="button">查看学习报告<view class="mini-arrow" aria-hidden="true"></view></view></view>
     </view>
 
     <view class="section-card">

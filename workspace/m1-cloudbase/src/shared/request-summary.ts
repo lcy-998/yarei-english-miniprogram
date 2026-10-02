@@ -55,7 +55,7 @@ export function createOperationFingerprint(input: OperationFingerprintInput): Op
   return { recordId, requestHash };
 }
 
-function hashHex(text: string): string {
+export function hashHex(text: string): string {
   let hash = 0xcbf29ce484222325n;
   const prime = 0x100000001b3n;
   const mask = 0xffffffffffffffffn;

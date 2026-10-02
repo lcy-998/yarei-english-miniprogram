@@ -22,17 +22,26 @@ import type {
   VersionedDocument,
 } from './document-database-port';
 import { TaskCorePersistenceError, toTaskCorePersistenceError } from './persistence-error';
-import type { ReadingProgressRecord, VocabularyProgressRecord } from '../learning-progress/types';
+import type { ReadingPageEventRecord, ReadingProgressRecord, VocabularyProgressRecord } from '../learning-progress/types';
+import type { VocabularyAttemptRecord } from '../vocabulary-evidence/types';
+import { projectTaskRecording, TASK_RECORDING_COLLECTIONS } from '../task-recording/document-repository';
+import type { TaskRecordingRecord } from '../task-recording/types';
+import { projectTemplate } from '../task-template/document-repository';
+import type { TaskTemplate } from '../task-template/types';
 import { readingProgressDocumentId, vocabularyProgressDocumentId } from './learning-progress-document-adapter';
 
 export const TASK_CORE_COLLECTIONS = {
   classes: 'classes',
   resources: 'learning_resources',
   readingProgress: 'reading_progress',
+  readingPageEvents: 'reading_page_events',
   vocabularyProgress: 'vocabulary_progress',
+  vocabularyAttempts: 'vocabulary_attempts',
+  taskRecordings: 'task_recordings',
   memberships: 'class_memberships',
   teacherGrants: 'teacher_class_grants',
   tasks: 'tasks',
+  templates: 'task_templates',
   assignments: 'task_assignments',
   submissions: 'submissions',
   feedback: 'review_feedback',
@@ -55,9 +64,24 @@ class TaskCoreDocumentRepository implements TaskCoreUnitOfWork {
     return this.read((reader) => new TaskCoreDocumentReader(reader).findReadingProgress(organizationId, studentId, resourceId));
   }
 
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return this.read(reader => readTaskReadingPageEvents(reader, organizationId, studentId, resourceId));
+  }
+
   public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
     return this.read((reader) => new TaskCoreDocumentReader(reader).findVocabularyProgress(organizationId, studentId, packId));
   }
+
+  public async listVocabularyAttempts(organizationId: string, studentId: string, packId: string,
+    taskId: string, itemId: string, round: number, contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+    return this.read((reader) => readTaskVocabularyAttempts(reader, organizationId, studentId, packId,
+      taskId, itemId, round, contentVersion));
+  }
+
+  public async findTaskRecording(organizationId: string, recordingId: string): Promise<TaskRecordingRecord | null> {
+    return this.read((reader) => readTaskRecording(reader, organizationId, recordingId));
+  }
+
 
   public async listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]> {
     return this.read((reader) => new TaskCoreDocumentReader(reader).listActiveClassMemberships(organizationId, classIds));
@@ -77,6 +101,10 @@ class TaskCoreDocumentRepository implements TaskCoreUnitOfWork {
 
   public async findTask(organizationId: string, taskId: string): Promise<TaskRecord | null> {
     return this.read((reader) => new TaskCoreDocumentReader(reader).findTask(organizationId, taskId));
+  }
+
+  public async findTemplate(organizationId: string, templateId: string): Promise<TaskTemplate | null> {
+    return this.read((reader) => new TaskCoreDocumentReader(reader).findTemplate(organizationId, templateId));
   }
 
   public async findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null> {
@@ -143,12 +171,27 @@ class TaskCoreDocumentReader implements TaskCoreReader {
     return record.studentId === studentId && record.resourceId === resourceId ? record : null;
   }
 
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return readTaskReadingPageEvents(this.documents, organizationId, studentId, resourceId);
+  }
+
   public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.vocabularyProgress, vocabularyProgressDocumentId(organizationId, studentId, packId), organizationId);
     if (found === null) return null;
     const record = decodeDocument<VocabularyProgressRecord>(found);
     return record.studentId === studentId && record.packId === packId ? record : null;
   }
+
+  public async listVocabularyAttempts(organizationId: string, studentId: string, packId: string,
+    taskId: string, itemId: string, round: number, contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+    return readTaskVocabularyAttempts(this.documents, organizationId, studentId, packId,
+      taskId, itemId, round, contentVersion);
+  }
+
+  public async findTaskRecording(organizationId: string, recordingId: string): Promise<TaskRecordingRecord | null> {
+    return readTaskRecording(this.documents, organizationId, recordingId);
+  }
+
 
   public async findIdempotencyRecord(recordId: string): Promise<IdempotencyRecord | null> {
     const found = await this.documents.get(TASK_CORE_COLLECTIONS.idempotency, recordId);
@@ -190,6 +233,14 @@ class TaskCoreDocumentReader implements TaskCoreReader {
   public async findTask(organizationId: string, taskId: string): Promise<TaskRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.tasks, taskId, organizationId);
     return found === null ? null : decodeDocument<TaskRecord>(found, true);
+  }
+
+  public async findTemplate(organizationId: string, templateId: string): Promise<TaskTemplate | null> {
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.templates, templateId, organizationId);
+    if (found === null) return null;
+    const template = projectTemplate({ ...found, version: found.version });
+    if (!template || template.id !== templateId) throw new TaskCorePersistenceError('INTERNAL_ERROR');
+    return template;
   }
 
   public async findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null> {
@@ -281,12 +332,27 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
     return record.studentId === studentId && record.resourceId === resourceId ? record : null;
   }
 
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return readTaskReadingPageEvents(this.transaction, organizationId, studentId, resourceId);
+  }
+
   public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.vocabularyProgress, vocabularyProgressDocumentId(organizationId, studentId, packId), organizationId);
     if (found === null) return null;
     const record = decodeDocument<VocabularyProgressRecord>(found);
     return record.studentId === studentId && record.packId === packId ? record : null;
   }
+
+  public async listVocabularyAttempts(organizationId: string, studentId: string, packId: string,
+    taskId: string, itemId: string, round: number, contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+    return readTaskVocabularyAttempts(this.transaction, organizationId, studentId, packId,
+      taskId, itemId, round, contentVersion);
+  }
+
+  public async findTaskRecording(organizationId: string, recordingId: string): Promise<TaskRecordingRecord | null> {
+    return readTaskRecording(this.transaction, organizationId, recordingId);
+  }
+
 
   public async listActiveClassMemberships(organizationId: string, classIds: readonly string[]): Promise<readonly ClassMembershipRecord[]> {
     await this.validateClassMembershipGuards(organizationId, classIds);
@@ -312,6 +378,15 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
   public async findTask(organizationId: string, taskId: string): Promise<TaskRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.tasks, taskId, organizationId);
     return found === null ? null : decodeDocument<TaskRecord>(found, true);
+  }
+
+  public async findTemplate(organizationId: string, templateId: string): Promise<TaskTemplate | null> {
+    if (!this.scope.templateIds?.includes(templateId)) return null;
+    const found = await this.getScoped(TASK_CORE_COLLECTIONS.templates, templateId, organizationId);
+    if (found === null) return null;
+    const template = projectTemplate({ ...found, version: found.version });
+    if (!template || template.id !== templateId) throw new TaskCorePersistenceError('INTERNAL_ERROR');
+    return template;
   }
 
   public async findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null> {
@@ -399,6 +474,12 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
 
   public async saveTask(task: TaskRecord): Promise<void> {
     await this.saveVersioned(TASK_CORE_COLLECTIONS.tasks, task.id, task.organizationId, task.version, task);
+  }
+
+  public async saveTemplate(template: TaskTemplate): Promise<void> {
+    if (!this.scope.templateIds?.includes(template.id)) throw new TaskCorePersistenceError('CONFLICT');
+    await this.saveVersioned(TASK_CORE_COLLECTIONS.templates, template.id, template.organizationId,
+      template.version, template);
   }
 
   public async saveAssignment(assignment: TaskAssignmentRecord): Promise<void> {
@@ -626,6 +707,47 @@ export function auditDocumentId(organizationId: string, requestId: string): stri
   return `audit:${organizationId}:${requestId}`;
 }
 
+export async function readTaskVocabularyAttempts(documents: DocumentDatabaseReaderPort, organizationId: string,
+  studentId: string, packId: string, taskId: string, itemId: string, round: number,
+  contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+  const found = await documents.find(TASK_CORE_COLLECTIONS.vocabularyAttempts, { organizationId,
+    studentId, packId, taskId, itemId, round, contentVersion, deletedAt: null });
+  return found.map((document) => {
+    const attempt = decodeDocument<VocabularyAttemptRecord>(document);
+    if (typeof attempt.id !== 'string' || !attempt.id.trim()
+      || attempt.organizationId !== organizationId || attempt.studentId !== studentId || attempt.packId !== packId
+      || attempt.taskId !== taskId || attempt.itemId !== itemId || attempt.round !== round
+      || attempt.contentVersion !== contentVersion || typeof attempt.wordId !== 'string'
+      || typeof attempt.studentInput !== 'string' || typeof attempt.isCorrect !== 'boolean'
+      || typeof attempt.firstAttempt !== 'boolean' || !Number.isSafeInteger(attempt.attemptNumber)
+      || attempt.attemptNumber < 1 || typeof attempt.attemptedAt !== 'string'
+      || !Number.isFinite(Date.parse(attempt.attemptedAt))) {
+      throw new TaskCorePersistenceError('INTERNAL_ERROR');
+    }
+    return attempt;
+  });
+}
+
+async function readTaskReadingPageEvents(documents: DocumentDatabaseReaderPort, organizationId: string,
+  studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+  const found = await documents.find(TASK_CORE_COLLECTIONS.readingPageEvents, {
+    organizationId, studentId, resourceId, deletedAt: null,
+  });
+  return found.map(document => {
+    const event = decodeDocument<ReadingPageEventRecord>(document);
+    if (event.organizationId !== organizationId || event.studentId !== studentId
+      || event.resourceId !== resourceId || typeof event.pageId !== 'string' || !event.pageId.trim()
+      || typeof event.chapterId !== 'string' || !Number.isSafeInteger(event.pageNumber)
+      || event.pageNumber < 1 || !Number.isSafeInteger(event.progressVersion)
+      || event.progressVersion < 1 || typeof event.operationId !== 'string'
+      || (event.contentVersion !== null && typeof event.contentVersion !== 'string')
+      || typeof event.visitedAt !== 'string' || !Number.isFinite(Date.parse(event.visitedAt))) {
+      throw new TaskCorePersistenceError('INTERNAL_ERROR');
+    }
+    return { ...event, id: typeof event.id === 'string' ? event.id : document._id };
+  });
+}
+
 function decodeDocument<T>(document: VersionedDocument, includeVersion = false): T {
   const { _id: ignoredId, schemaVersion: ignoredSchemaVersion, version, deletedAt: ignoredDeletedAt, ...record } = document;
   void ignoredId;
@@ -651,6 +773,15 @@ function decodeLearningResource(document: VersionedDocument): LearningResourceRe
   }
   return { ...resource, id: typeof document.id === 'string' && document.id.length > 0 ? document.id : document._id,
     visibility, allowedClassIds: [...allowedClassIds] };
+}
+
+async function readTaskRecording(reader: DocumentDatabaseReaderPort, organizationId: string,
+  recordingId: string): Promise<TaskRecordingRecord | null> {
+  const document = await reader.get(TASK_RECORDING_COLLECTIONS.recordings, recordingId);
+  if (!isVisibleInOrganization(document, organizationId)) return null;
+  const recording = projectTaskRecording(document);
+  if (!recording || recording.id !== recordingId) throw new TaskCorePersistenceError('INTERNAL_ERROR');
+  return recording;
 }
 
 function decodeTeacherGrant(document: VersionedDocument): TeacherClassGrantRecord {

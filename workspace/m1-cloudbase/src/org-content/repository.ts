@@ -3,6 +3,11 @@ import type {
   ClassEntity,
   ClassMembershipEntity,
   LearningResourceEntity,
+  ExerciseResourceEntity,
+  ReadingResourceEntity,
+  VocabularyResourceEntity,
+  TaskCatalogFilters,
+  SchoolQuestionFilters,
   OrganizationAuditEntity,
   OrganizationEntity,
   ParentStudentLinkEntity,
@@ -72,6 +77,17 @@ export interface OrgContentRepository {
   listActiveParentLinks(organizationId: string, parentId: string): Promise<readonly ParentStudentLinkEntity[]>;
   listActiveParentLinksForStudent(organizationId: string, studentId: string): Promise<readonly ParentStudentLinkEntity[]>;
   listLearningResources(organizationId: string, type: LearningResourceEntity['type']): Promise<readonly LearningResourceEntity[]>;
+  listExerciseResourcePage(
+    organizationId: string,
+    filters: Omit<SchoolQuestionFilters, 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ExerciseResourceEntity | null)[]; hasMore: boolean }>>;
+  listTaskCatalogResourcePage(
+    organizationId: string,
+    type: TaskCatalogFilters['type'],
+    filters: Omit<TaskCatalogFilters, 'type' | 'source' | 'category' | 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ReadingResourceEntity | VocabularyResourceEntity | null)[]; hasMore: boolean }>>;
   findLearningResource(organizationId: string, resourceId: string): Promise<LearningResourceEntity | null>;
   findOperation?(recordId: string, organizationId: string): Promise<Readonly<{ requestHash: string; status: 'processing' | 'succeeded' | 'failed'; resultKind: 'value' | 'void'; result: JsonValue; errorCode: OrgContentError['code'] | null }> | null>;
   transaction<T>(work: (transaction: OrgContentTransaction) => Promise<T>): Promise<T>;

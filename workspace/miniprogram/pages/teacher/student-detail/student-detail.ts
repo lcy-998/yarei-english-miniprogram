@@ -1,6 +1,6 @@
 import { TeacherStudentClassOption, TeacherStudentDetail } from '../../../domain/types'
 import { getTeacherStudent, listTeacherStudents, setTeacherStudentStatus, transferTeacherStudent, updateTeacherStudent } from '../../../services/app-service'
-import { getCurrentStudentId, getSession, setTeacherTaskTargetStudentId, takeTeacherTaskTargetStudentId } from '../../../session/session'
+import { getCurrentStudentId, getSession, setTeacherStatsTargetStudentId, setTeacherTaskTargetStudentId, takeTeacherTaskTargetStudentId } from '../../../session/session'
 import { createPageOperationId } from '../../../shared/write-intent'
 
 Component({
@@ -24,6 +24,7 @@ Component({
       this.setData({ loading: false, student: detail.data, classes, transferClassIndex: 0 }, () => this.updateVisibleTasks())
     },
     setTab(event: WechatMiniprogram.TouchEvent) { this.setData({ currentTab: event.currentTarget.dataset.tab as string }, () => this.updateVisibleTasks()) },
+    openStats() { if (this.data.student) setTeacherStatsTargetStudentId(this.data.student.studentId); wx.navigateTo({ url: '/pages/teacher/learning-stats/learning-stats' }) },
     updateVisibleTasks() {
       const tasks = this.data.student?.recentTasks ?? []
       this.setData({ visibleTasks: this.data.currentTab === 'scores' ? tasks.filter(item => item.score !== null) : tasks })

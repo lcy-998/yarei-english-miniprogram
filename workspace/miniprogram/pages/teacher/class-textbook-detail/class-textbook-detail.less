@@ -1,0 +1,19 @@
+@import "../textbook-pages.less";
+.chapter-row { margin-top: 10px; padding: 9px; border-radius: 13px; background: @yr-surface-blue; }
+.chapter-row text { color: @yr-text-primary; font-size: 14px; font-weight: 800; line-height: 1.4; }
+.lesson-row { margin: 6px 0 0 14px; padding: 7px 0; border-top: 1px solid #dbe7f5; background: rgba(255,255,255,.55); }
+.book-status { display: block; margin-top: 8px; color: @yr-success; font-size: 14px; font-weight: 800; }
+.book-status.invalid { color: #a53230; }
+.class-detail-intro { display: flex; align-items: center; gap: 11px; padding: 15px; border: @yr-card-border; border-radius: 18px; background: linear-gradient(145deg,@yr-surface-blue,@yr-surface-warm); box-shadow: 0 4px 12px rgba(7,30,73,.06); }
+.class-detail-avatar { flex: none; width: 43px; height: 43px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 17px; font-weight: 900; }
+.config-summary { border-color: rgba(23,100,216,.2); background: linear-gradient(135deg,@yr-surface-blue-50,@yr-surface-blue); }
+.textbook-content .textbook-card:not(.config-summary) { border-color: rgba(23,100,216,.16); background: linear-gradient(145deg,@yr-surface-warm,#fff); }
+.textbook-content .textbook-card:nth-of-type(even):not(.config-summary) { background: linear-gradient(145deg,@yr-surface-blue-50,#fff); }
+.textbook-content .textbook-empty { background: @yr-surface-blue-50; }
+.config-summary .textbook-primary { margin-top: 13px; }
+.book-cover-mark { flex: none; width: 52px; height: 67px; display: flex; align-items: center; justify-content: center; border: 3px solid #d5e9ff; border-radius: 8px 12px 12px 8px; background: linear-gradient(145deg,#70bcff,#2874d8); box-shadow: 3px 4px 7px rgba(23,100,216,.13); }
+.book-cover-mark g0-icon { display: block; }
+.chapter-row { background: @yr-surface-blue; }
+.lesson-row { margin-left: 16px; }
+.textbook-reorder { flex: none; }
+.textbook-reorder button { min-width: 31px; width: 31px; height: 31px; line-height: 31px; }

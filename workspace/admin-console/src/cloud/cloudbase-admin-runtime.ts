@@ -4,6 +4,9 @@ import { createAdminSessionClient, MemoryAdminSessionStore, type AdminSessionCli
 import type { AdminSessionFunctionInvoker } from './admin-session-contract';
 import { createAdminSessionTransport } from './admin-session-transport';
 import { createOrganizationAdminClient, type OrganizationAdminClient } from './organization-admin-client';
+import { createTaskActivityClient } from './task-activity-client';
+import type { TaskActivityClient } from '../services/task-activity-models';
+import { createAdminTextbookClient, type AdminTextbookClient } from './admin-textbook-client';
 
 export interface CloudBaseBrowserAuthResponse {
   readonly data?: unknown;
@@ -27,6 +30,8 @@ export interface CloudBaseBrowserSdk {
 export interface CloudBaseAdminRuntime {
   readonly sessions: AdminSessionClient;
   readonly organization: OrganizationAdminClient;
+  readonly taskActivities: TaskActivityClient;
+  readonly textbooks: AdminTextbookClient;
   signInWithPassword(input: Readonly<{ mobile: string; password: string }>): Promise<AdminCloudResult<null>>;
   signOutPlatform(): Promise<void>;
 }
@@ -53,10 +58,14 @@ export function createCloudBaseAdminRuntime(options: Readonly<{
   const sessionTransport = createAdminSessionTransport({ invoker, now: options.now });
   const sessions = createAdminSessionClient({ transport: sessionTransport, store, now: options.now });
   const organization = createOrganizationAdminClient(createAdminCloudTransport({ invoker, sessions: store, now: options.now }));
+  const taskActivities = createTaskActivityClient(app, store, options.now);
+  const textbooks = createAdminTextbookClient(app, sessions);
 
   return {
     sessions,
     organization,
+    taskActivities,
+    textbooks,
     async signInWithPassword(input) {
       if (!isMobile(input.mobile) || !isPassword(input.password)) return failed('VALIDATION_ERROR', '请输入有效的手机号和密码。');
       await clearQuietly(store);

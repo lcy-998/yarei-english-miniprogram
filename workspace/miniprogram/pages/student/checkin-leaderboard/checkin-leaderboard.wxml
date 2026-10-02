@@ -1,0 +1,50 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page board-page">
+    <app-header title="打卡排行榜" back="{{true}}" backUrl="/pages/student/class-home/class-home"></app-header>
+    <view class="board-content">
+      <state-panel wx:if="{{loading && !result && !activities.length}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error && !result && !activities.length}}" state="error" message="{{error}}" bind:retry="loadActivities"></state-panel>
+      <view wx:else>
+        <view class="board-hero m1-card">
+          <view class="hero-icon" aria-hidden="true"><text class="hero-icon-number">✓</text></view>
+          <view class="hero-copy"><text class="hero-kicker">坚持每一天</text><text class="hero-title">{{activityTitle || '班级打卡'}}</text><text wx:if="{{result}}" class="hero-sub">{{result.startsOn}} 至 {{result.endsOn}}</text></view>
+          <text wx:if="{{result && result.leaderboard}}" class="hero-status {{result.leaderboard.finalized ? 'hero-status-final' : ''}}">{{result.leaderboard.finalized ? '已结束' : '进行中'}}</text>
+          <view wx:if="{{result && result.leaderboard}}" class="hero-facts"><text>{{result.leaderboard.effectiveDayCount}} 个有效任务日</text><text>{{result.restDayCount}} 个休息日</text></view>
+        </view>
+        <view wx:if="{{activities.length > 1}}" class="activity-picker m1-card"><text>选择活动</text><picker range="{{activityNames}}" bindchange="chooseActivity"><view>{{activityTitle}}　⌄</view></picker></view>
+        <button wx:if="{{selfId && activityId}}" class="refresh-button" bindtap="openActivity">查看今天的打卡任务</button>
+        <text wx:if="{{error}}" class="board-error">{{error}}　已保留上次可查看的榜单。</text>
+        <state-panel wx:if="{{loading && !result}}" state="loading"></state-panel>
+        <view wx:elif="{{!activities.length}}" class="empty-card m1-card">当前班级暂无可查看的打卡活动。</view>
+        <view wx:elif="{{result && result.evidenceStatus === 'not_available'}}" class="empty-card m1-card">该活动的每日证据或最终榜单尚未齐备，暂不显示名次。</view>
+        <view wx:elif="{{result && result.leaderboard}}">
+          <view class="board-note"><text class="note-symbol" aria-hidden="true">i</text><text>同天数并列，休息日不计入排名</text></view>
+          <view class="board-summary"><text>{{result.leaderboard.finalized ? '最终榜单' : '进行中榜单'}}</text><text>更新于 {{updatedLabel}}</text></view>
+          <view class="rank-list m1-card">
+            <view class="rank-heading"><text>名次</text><text>同学</text><text>完成天数</text></view>
+            <view wx:for="{{result.leaderboard.ranks}}" wx:key="studentId" class="rank-row {{item.studentId === selfId ? 'rank-self' : ''}}">
+              <view class="rank-number {{item.rank <= 3 ? 'rank-medal rank-medal-' + item.rank : ''}}"><text>{{item.rank}}</text></view>
+              <view class="rank-avatar" aria-hidden="true"><view class="avatar-head"></view><view class="avatar-body"></view></view>
+              <view class="rank-name"><text>{{item.displayNameMasked}}</text><text wx:if="{{item.studentId === selfId}}" class="self-tag">我</text></view>
+              <text class="rank-days">{{item.completedDays}}<text class="days-unit"> 天</text></text>
+            </view>
+          </view>
+          <view wx:if="{{!result.leaderboard.ranks.length}}" class="empty-card m1-card">暂无参与学员记录。</view>
+          <button class="refresh-button" loading="{{refreshing}}" disabled="{{refreshing}}" bindtap="refresh">刷新榜单</button>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{result && result.evidenceStatus === 'available' && result.myRank}}" class="self-footer" bindtap="openMyHistory" aria-role="button" aria-label="我的名次 {{result.myRank.rank}}，已完成 {{result.myRank.completedDays}} 天，查看打卡记录"><view class="self-rank"><text>我的排名</text><text>{{result.myRank.rank}}</text></view><view class="self-copy"><text>我的打卡</text><text>已完成 {{result.myRank.completedDays}} 天　查看记录</text></view><view class="self-arrow" aria-hidden="true"></view></view>
+    <view wx:if="{{historyOpen}}" class="history-shade" bindtap="closeMyHistory"></view>
+    <view wx:if="{{historyOpen}}" class="history-panel">
+      <view class="history-head"><view><text class="section-title">我的打卡历史</text><text class="history-subtitle">{{activityTitle}}</text></view><button bindtap="closeMyHistory">关闭</button></view>
+      <scroll-view scroll-y="{{true}}" class="history-list">
+        <view wx:for="{{historyRows}}" wx:key="date" class="history-row"><text>{{item.date}}</text><text class="{{item.complete ? 'history-complete' : ''}}">{{item.statusLabel}}</text></view>
+        <text wx:if="{{historyError}}" class="board-error">{{historyError}}</text>
+        <button wx:if="{{historyNextDate}}" loading="{{historyLoading}}" disabled="{{historyLoading}}" bindtap="loadMoreHistory">{{historyRows.length ? '加载更早记录' : '加载记录'}}</button>
+        <text wx:elif="{{historyRows.length}}" class="history-end">已显示全部日期</text>
+        <text wx:else class="history-end">活动尚未开始</text>
+      </scroll-view>
+    </view>
+  </view>
+</g0-page-shell>

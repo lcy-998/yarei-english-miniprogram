@@ -6,7 +6,7 @@ import {
   FunctionName,
   FunctionRequest,
 } from '../../miniprogram/repositories/cloudbase/protocol'
-import { configureRepositories, getRepositoryMode } from '../../miniprogram/repositories/repository-factory'
+import { configureRepositories, getCloudAppService, getRepositoryMode } from '../../miniprogram/repositories/repository-factory'
 import { getCompletion, getDraftOptions, getHome, getParentFeedback, getParentHome, getReadingProgress, getReadingResource, getTaskDetail, getTeacherTasks, getVocabularyProgress, listReadingResources, listVocabularyPacks, login, logout, publishClassroomTask, requestPasswordResetCode, resetPassword, saveDraft, saveReadingProgress, saveVocabularyProgress, selectRole, submitTask } from '../../miniprogram/services/app-service'
 import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 import {
@@ -123,6 +123,20 @@ describe('repository factory and CloudBase request mapping', () => {
     configureRepositories({ mode: 'memory' })
   })
 
+  it('clears a stored business session when the CloudBase client login expires', async () => {
+    const removeStorageSync = vi.fn()
+    vi.stubGlobal('wx', { removeStorageSync })
+    const invoker = new FakeInvoker()
+    invoker.rejectNext({ error: 'unauthenticated', error_description: 'private provider detail' })
+    configureRepositories({ mode: 'cloudbase', invoker,
+      authentication: { signIn: async () => undefined },
+      context: () => ({ sessionId: 'ses_expired_demo' }) })
+    const result = await getCloudAppService()?.listNotifications('usr_student_demo', 'all', 0, 20, 30)
+    expect(result).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED',
+      message: '登录状态已失效，请重新登录' } })
+    expect(removeStorageSync).toHaveBeenCalledWith('yarei_session')
+  })
+
   it('教师完成情况使用授权学员姓名、学号和真实评分', async () => {
     const invoker = new FakeInvoker()
     invoker.enqueue(success({
@@ -168,7 +182,10 @@ describe('repository factory and CloudBase request mapping', () => {
 
   it('maps a student home query without putting caller identity in the payload', async () => {
     const invoker = new FakeInvoker()
-    invoker.enqueue(success({ localDate: '2026-09-16', completedCount: 2, totalCount: 3, nextTask: null }))
+    invoker.enqueue(success({ localDate: '2026-09-16', completedCount: 1, totalCount: 1, nextTask: null,
+      todayTasks: [{ taskId: 'task_done', title: '已完成的虚构任务', status: 'completed',
+        startsAt: '2026-09-16T08:00:00+08:00', dueAt: '2026-09-16T20:00:00+08:00',
+        submittedAt: '2026-09-16T10:00:00+08:00', redoDueAt: null }] }))
     configureRepositories({
       mode: 'cloudbase',
       invoker,
@@ -179,7 +196,8 @@ describe('repository factory and CloudBase request mapping', () => {
     const result = await getHome('untrusted_student_id')
 
     expect(getRepositoryMode()).toBe('cloudbase')
-    expect(result).toMatchObject({ ok: true, data: { completedCount: 2, totalCount: 3 } })
+    expect(result).toMatchObject({ ok: true, data: { completedCount: 1, totalCount: 1,
+      todayTasks: [{ taskId: 'task_done', status: 'completed' }] } })
     expect(invoker.calls).toEqual([{
       functionName: 'student-task-query',
       request: { apiVersion: 'm1.v1', action: 'getHome', payload: { localDate: '2026-09-16' } },
@@ -594,7 +612,7 @@ describe('repository factory and CloudBase request mapping', () => {
     const queryHandler = { getTeacherWorkbench: vi.fn(), listTeacherTasks: vi.fn(), previewTask: vi.fn(), getCompletion: vi.fn(), getDraftOptions: vi.fn(async () => serverSuccess({ classes: [], resources: [] })) }
     const queryMain = createTaskQueryFunction({ ...serverBoundary('task-query', 'teacher'), handler: queryHandler })
     expect(await queryMain(invoker.calls[0]?.request)).toMatchObject({ ok: true })
-    expect(queryHandler.getDraftOptions).toHaveBeenCalledWith(expect.objectContaining({ actorRole: 'teacher' }))
+    expect(queryHandler.getDraftOptions).toHaveBeenCalledWith(expect.objectContaining({ actorRole: 'teacher' }), undefined)
 
     const saveTaskDraft = vi.fn(async () => serverSuccess({ taskId: 'task_page' }))
     const taskMain = createTaskCommandFunction({

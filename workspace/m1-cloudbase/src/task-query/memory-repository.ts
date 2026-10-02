@@ -2,6 +2,8 @@ import type { JsonValue } from '../shared/protocol';
 import type { ReviewFeedbackRecord, SubmissionRecord, TaskAssignmentRecord, TaskRecord } from '../task-core/types';
 import type { TaskQueryRepository } from './repository';
 import type { QueryResourceOptionRecord, QueryTeacherGrantRecord } from './types';
+import type { VocabularyAttemptRecord } from '../vocabulary-evidence/types';
+import type { ReadingPageEventRecord } from '../learning-progress/types';
 
 export interface TaskQueryFixture {
   readonly teacherGrants?: readonly QueryTeacherGrantRecord[];
@@ -10,6 +12,8 @@ export interface TaskQueryFixture {
   readonly assignments?: readonly TaskAssignmentRecord[];
   readonly submissions?: readonly SubmissionRecord[];
   readonly feedback?: readonly ReviewFeedbackRecord[];
+  readonly vocabularyAttempts?: readonly VocabularyAttemptRecord[];
+  readonly readingPageEvents?: readonly ReadingPageEventRecord[];
 }
 
 function cloneJson(value: JsonValue): JsonValue {
@@ -48,6 +52,8 @@ export class InMemoryTaskQueryRepository implements TaskQueryRepository {
   private readonly assignments: TaskAssignmentRecord[];
   private readonly submissions: SubmissionRecord[];
   private readonly feedback: ReviewFeedbackRecord[];
+  private readonly vocabularyAttempts: VocabularyAttemptRecord[];
+  private readonly readingPageEvents: ReadingPageEventRecord[];
 
   public constructor(fixture: TaskQueryFixture) {
     this.teacherGrants = (fixture.teacherGrants ?? []).map((item) => ({ ...item, permissions: [...item.permissions] }));
@@ -56,6 +62,8 @@ export class InMemoryTaskQueryRepository implements TaskQueryRepository {
     this.assignments = (fixture.assignments ?? []).map((item) => ({ ...item }));
     this.submissions = (fixture.submissions ?? []).map(cloneSubmission);
     this.feedback = (fixture.feedback ?? []).map((item) => ({ ...item }));
+    this.vocabularyAttempts = (fixture.vocabularyAttempts ?? []).map((item) => ({ ...item }));
+    this.readingPageEvents = (fixture.readingPageEvents ?? []).map((item) => ({ ...item }));
   }
 
   public replaceTeacherGrant(grant: QueryTeacherGrantRecord): void {
@@ -117,9 +125,26 @@ export class InMemoryTaskQueryRepository implements TaskQueryRepository {
     return found === undefined ? null : { ...found };
   }
 
+  public async listVocabularyAttempts(organizationId: string, studentId: string, packId: string,
+    taskId: string, itemId: string, round: number, contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+    return this.vocabularyAttempts.filter((item) => item.organizationId === organizationId && item.studentId === studentId
+      && item.packId === packId && item.taskId === taskId && item.itemId === itemId
+      && item.round === round && item.contentVersion === contentVersion).map((item) => ({ ...item }));
+  }
+
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return this.readingPageEvents.filter(item => item.organizationId === organizationId && item.studentId === studentId
+      && item.resourceId === resourceId).map(item => ({ ...item }));
+  }
+
   public async listPublishedResourceOptions(organizationId: string): Promise<readonly QueryResourceOptionRecord[]> {
     return this.resources
       .filter((item) => item.organizationId === organizationId && item.status === 'published')
       .map((item) => ({ ...item, allowedClassIds: [...item.allowedClassIds] }));
+  }
+
+  public async findPublishedResourceOption(organizationId: string, resourceId: string): Promise<QueryResourceOptionRecord | null> {
+    const found = this.resources.find((item) => item.organizationId === organizationId && item.id === resourceId && item.status === 'published');
+    return found === undefined ? null : { ...found, allowedClassIds: [...found.allowedClassIds] };
   }
 }

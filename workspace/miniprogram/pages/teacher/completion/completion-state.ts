@@ -16,6 +16,25 @@ export function isBatchReviewable(row: ReviewAssignmentView): boolean {
   return row.status === 'awaiting_review' && !!row.submissionId && row.submissionVersion !== undefined
 }
 
+export function selectedBatchCounts(rows: readonly SelectableCompletionRow[]): Readonly<{ selected: number; candidates: number; excluded: number }> {
+  const selected = rows.filter(row => row.selected)
+  const candidates = selected.filter(isBatchReviewable).length
+  return { selected: selected.length, candidates, excluded: selected.length - candidates }
+}
+
+export function scoreCaption(row: ReviewAssignmentView): string {
+  if (row.score === undefined) return '暂无分数'
+  return row.status === 'awaiting_review' ? '系统参考分' : '列表参考分'
+}
+
+export function requiresIndividualReview(detail: { taskItems?: readonly { type: string }[];
+  exerciseEvidence?: readonly { questionType: string }[] }): boolean {
+  if (!detail.taskItems?.length) return true
+  return detail.taskItems.some(item => item.type === 'recording'
+    || item.type === 'exercise' && !detail.exerciseEvidence?.length)
+    || Boolean(detail.exerciseEvidence?.some(item => item.questionType === 'subjective'))
+}
+
 export function filterCompletionRows<T extends SelectableCompletionRow>(rows: readonly T[], filter: CompletionFilter, keyword: string): T[] {
   const search = keyword.trim().toLowerCase()
   return rows.filter(row => {

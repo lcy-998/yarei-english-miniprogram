@@ -14,6 +14,13 @@ App<IAppOption>({
       return
     }
 
+    try { wx.cloud.init({ env: envId.trim() }) }
+    catch (_error: unknown) {
+      initializeRepositories({ mode: 'memory' })
+      console.warn('[M2] Cloud storage startup failed; using memory repository.')
+      return
+    }
+
     const startup = initializeRepositories(
       { mode: 'cloudbase', envId: envId.trim() },
       {

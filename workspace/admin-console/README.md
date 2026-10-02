@@ -1,5 +1,7 @@
 # 雅睿英语 M1 管理后台
 
+> 2026-10-01 产品基线 0.40.0：本工程保留 M1/M2 独立网页后台的历史实现与当前非生产验收路径。用户已确认 A-01—A-08 在 M3 后续迁入微信原生小程序，由逐账号获管理授权的指定教师从“我的”进入；原生八页验收前本工程继续作为过渡和回退路径，通过后停用网页入口并保留历史代码、数据与审计。本次仅更新规划，未执行停用。迁移方案见 `../../docs/native-admin-migration-plan-2026-10-01.md`。
+
 本目录是 A-01～A-04 的可运行切片，使用 React、TypeScript 和 Vite。默认启动仍使用统一虚构数据和内存 repository；只有显式提供 `VITE_CLOUDBASE_ENV_ID` 与浏览器端 `window.cloudbase` SDK 时，页面才显示独立后台登录并切换到 CloudBase 客户端。
 
 `src/cloud/` 已提供本地可测试的 `organization-admin` action 合约、严格响应 view model、错误映射和可注入 transport。该边界只接受 `audience=admin-console` 的独立后台会话；小程序会话、过期会话和未配置会话均在发起调用前失败关闭。

@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'RESOURCE_OFFLINE'
+  | 'MEDIA_INVALID'
   | 'TASK_NOT_SUBMITTABLE'
   | 'REDO_LIMIT_REACHED'
   | 'DUPLICATE_OPERATION'
@@ -75,6 +76,28 @@ export const FUNCTION_NAMES = [
   'teacher-student-command',
   'learning-progress-query',
   'learning-progress-command',
+  'activity-command',
+  'activity-query',
+  'vocabulary-evidence-command',
+  'vocabulary-evidence-query',
+  'student-work-command',
+  'student-work-query',
+  'phonics-query',
+  'phonics-command',
+  'task-template-query',
+  'task-template-command',
+  'teacher-textbook-query',
+  'teacher-textbook-command',
+  'learning-stats-query',
+  'notification-query',
+  'notification-command',
+  'maintenance-timer',
+  'admin-task-activity-query',
+  'admin-task-activity-command',
+  'textbook-admin-query',
+  'textbook-admin-command',
+  'task-recording-query',
+  'task-recording-command',
 ] as const;
 
 export type FunctionName = (typeof FUNCTION_NAMES)[number];

@@ -2,7 +2,7 @@ import { hasPermission, hasScope, type TrustedActorContext } from '../auth/trust
 import { AuthorizationService } from '../auth/authorization-service';
 import type { Clock, IdentifierGenerator, IdentityRepository } from '../runtime/ports';
 import type { IdempotencyRecord, OperationLogRecord } from '../runtime/records';
-import { createOperationFingerprint } from '../shared/request-summary';
+import { canonicalize, createOperationFingerprint } from '../shared/request-summary';
 import { createMeta, failure, success, type RequestIdGenerator } from '../shared/result';
 import type { ErrorCode, FunctionName, JsonObject, JsonValue, ServiceResult } from '../shared/protocol';
 import {
@@ -11,6 +11,11 @@ import {
   type BatchReviewPreviewCodec,
   type BatchReviewPreviewIntent,
 } from './batch-review-preview';
+import { evaluateExerciseSubmission, readExerciseQuestionSnapshot } from './exercise-evidence';
+import { readingPageIdsFromPayload, selectedReadingPageIds, supportsReadingRangeSnapshot } from './reading-range';
+import { automaticTaskScore, manualTaskItemIds, scoreTaskWithManualItems,
+  type ManualTaskItemScore } from './task-score';
+import { summarizeVocabularyFirstAttempts, vocabularyWordIds } from '../vocabulary-evidence/summary';
 import type { TaskCoreReader, TaskCoreTransaction, TaskCoreTransactionScope, TaskCoreUnitOfWork } from './repository';
 import type {
   ClassMembershipRecord,
@@ -108,7 +113,9 @@ export class TaskCoreService {
             ...(item.completionRule === undefined ? {} : { completionRule: { ...item.completionRule } }),
             scoringRule: { ...(item.scoringRule ?? defaultScoringRule()) },
           })),
-          items: [],
+          items: current?.items.filter((item) => input.itemRefs.some((reference) => sameFrozenReference(reference, item))) ?? [],
+          copiedFromTaskId: current?.copiedFromTaskId ?? null,
+          copiedFromTemplateId: current?.copiedFromTemplateId ?? null,
           publishedAt: null,
           deadlineExtendedAt: null,
           visibility: 'visible',
@@ -127,6 +134,148 @@ export class TaskCoreService {
     });
   }
 
+  /** Creates a targetless draft from a server-owned published snapshot. */
+  public async copyTaskSnapshot(
+    actor: TrustedActorContext,
+    sourceTaskId: string,
+    expectedVersion: number,
+    operationId: string,
+  ): Promise<ServiceResult<JsonObject>> {
+    const source = await this.repository.findTask(actor.organizationId, sourceTaskId);
+    if (!source || source.status === 'draft' || source.visibility === 'recycled') return this.fail('NOT_FOUND');
+    if (source.creatorTeacherId !== actor.actorUserId
+      || !(await this.canTeacherAccessAll(actor, source.targetClassIds, 'task.publish'))
+      || !(await this.canTeacherAccessAll(actor, source.targetClassIds, 'content.read'))) return this.fail('FORBIDDEN');
+    const scope = await this.prepareScope(actor, {
+      classIds: source.targetClassIds,
+      resourceIds: source.items.map((item) => item.resourceId),
+    });
+    return this.executeAtomic({
+      actor, functionName: 'task-command', action: 'copyTaskSnapshot', operationId,
+      expectedVersion, payload: { sourceTaskId }, scope,
+      perform: async (transaction) => {
+        const current = await transaction.findTask(actor.organizationId, sourceTaskId);
+        if (!current || current.status === 'draft' || current.visibility === 'recycled') return this.fail('NOT_FOUND');
+        if (current.version !== expectedVersion) return this.fail('CONFLICT');
+        if (current.creatorTeacherId !== actor.actorUserId
+          || !(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish'))
+          || !(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'content.read'))) return this.fail('FORBIDDEN');
+        const snapshotError = validateCopyableSnapshot(current);
+        if (snapshotError) return this.fail('VALIDATION_ERROR', { itemRefs: snapshotError });
+        for (const item of current.items) {
+          const resource = await transaction.findResource(actor.organizationId, item.resourceId);
+          if (!resource) return this.fail('NOT_FOUND');
+          if (resource.status !== 'published') return this.fail('RESOURCE_OFFLINE');
+          if (resource.type !== item.resourceSnapshot.type) return this.fail('VALIDATION_ERROR', { itemRefs: '原资源类型已变化，无法再次布置。' });
+        }
+        const copiedItems = orderedCopiedItems(current.items);
+        const draft: TaskRecord = {
+          ...current,
+          id: this.ids.next('task'), creatorTeacherId: actor.actorUserId,
+          status: 'draft', targetType: 'classes', targetClassIds: [], targetStudentIds: [],
+          startsAt: '', dueAt: '',
+          itemRefs: copiedItems.map((item) => ({
+            id: item.id, resourceId: item.resourceId, order: item.order,
+            completionRule: structuredClone(item.completionRule), scoringRule: structuredClone(item.scoringRule),
+          })),
+          items: copiedItems, latePolicy: { ...current.latePolicy },
+          copiedFromTaskId: sourceTaskId,
+          publishedAt: null, deadlineExtendedAt: null, visibility: 'visible',
+          withdrawnAt: null, withdrawnBy: null, withdrawReason: null,
+          recycledAt: null, recycledBy: null, recycleReason: null, recoverableUntil: null,
+          version: 1, publication: null, publishOperationId: null,
+        };
+        await transaction.saveTask(draft);
+        const result = success<JsonObject>({ taskId: draft.id, status: 'draft', version: 1 }, createMeta(this.clock, this.requestIds));
+        await this.appendAudit(transaction, {
+          actor, requestId: result.meta.requestId, action: 'task.copy', targetType: 'task', targetId: draft.id,
+          result: 'succeeded', metadata: { sourceTaskId, sourceVersion: expectedVersion },
+        });
+        return result;
+      },
+    });
+  }
+
+  /** Atomically instantiates a visible template and counts one successful use. */
+  public async instantiateTemplate(
+    actor: TrustedActorContext,
+    templateId: string,
+    expectedVersion: number,
+    operationId: string,
+  ): Promise<ServiceResult<JsonObject>> {
+    if (actor.actorRole !== 'teacher' || !hasPermission(actor, 'task.publish')
+      || !hasPermission(actor, 'content.read')) return this.fail('FORBIDDEN');
+    const source = await this.repository.findTemplate(actor.organizationId, templateId);
+    if (!source || source.status !== 'active' || (source.scope === 'personal'
+      && source.ownerTeacherId !== actor.actorUserId)) return this.fail('NOT_FOUND');
+    const classIds: string[] = [];
+    for (const classId of unique(actor.scopeIds)) {
+      if (await this.canTeacherAccessAll(actor, [classId], 'task.publish')
+        && await this.canTeacherAccessAll(actor, [classId], 'content.read')) classIds.push(classId);
+    }
+    if (!classIds.length) return this.fail('FORBIDDEN');
+    const scope = await this.prepareScope(actor, { classIds, templateIds: [templateId],
+      resourceIds: source.items.map((item) => item.resourceId) });
+    return this.executeAtomic({
+      actor, functionName: 'task-command', action: 'instantiateTemplate', operationId,
+      expectedVersion, payload: { templateId }, scope,
+      perform: async (transaction) => {
+        const template = await transaction.findTemplate(actor.organizationId, templateId);
+        if (!template || template.status !== 'active' || (template.scope === 'personal'
+          && template.ownerTeacherId !== actor.actorUserId)) return this.fail('NOT_FOUND');
+        if (template.version !== expectedVersion) return this.fail('CONFLICT');
+        if (template.title.trim().length < 1 || template.title.trim().length > 50
+          || template.description.length > 300) return this.fail('VALIDATION_ERROR', { templateId: '模板基本信息无效。' });
+        const snapshotError = validateCopyableContent(template.itemRefs, template.items);
+        if (snapshotError) return this.fail('VALIDATION_ERROR', { templateId: snapshotError });
+        let commonClassIds = [...classIds];
+        for (const item of template.items) {
+          const resource = await transaction.findResource(actor.organizationId, item.resourceId);
+          if (!resource) return this.fail('NOT_FOUND');
+          if (resource.status !== 'published') return this.fail('RESOURCE_OFFLINE');
+          if (resource.type !== item.resourceSnapshot.type) return this.fail('VALIDATION_ERROR', { templateId: '模板原资源类型已变化。' });
+          if (resource.visibility === 'classes') {
+            commonClassIds = commonClassIds.filter((classId) => resource.allowedClassIds.includes(classId));
+          }
+        }
+        let authorized = false;
+        for (const classId of commonClassIds) {
+          if (await this.canTeacherAccessAllInTransaction(transaction, actor, [classId], 'task.publish')
+            && await this.canTeacherAccessAllInTransaction(transaction, actor, [classId], 'content.read')) {
+            authorized = true;
+            break;
+          }
+        }
+        if (!authorized) return this.fail('FORBIDDEN');
+        const copiedItems = orderedCopiedItems(template.items);
+        const draft: TaskRecord = {
+          id: this.ids.next('task'), organizationId: actor.organizationId,
+          creatorTeacherId: actor.actorUserId, title: template.title.trim(), deliveryType: 'classroom',
+          status: 'draft', targetType: 'classes', targetClassIds: [], targetStudentIds: [],
+          startsAt: '', dueAt: '', latePolicy: { allowLate: true, lateDays: 7 },
+          description: cleanOptional(template.description), teacherNote: null,
+          itemRefs: copiedItems.map((item) => ({ id: item.id, resourceId: item.resourceId,
+            order: item.order, completionRule: structuredClone(item.completionRule),
+            scoringRule: structuredClone(item.scoringRule) })),
+          items: copiedItems, copiedFromTemplateId: templateId,
+          publishedAt: null, deadlineExtendedAt: null, visibility: 'visible',
+          withdrawnAt: null, withdrawnBy: null, withdrawReason: null,
+          recycledAt: null, recycledBy: null, recycleReason: null, recoverableUntil: null, version: 1,
+          publication: null, publishOperationId: null,
+        };
+        await transaction.saveTask(draft);
+        await transaction.saveTemplate({ ...template, useCount: template.useCount + 1,
+          version: template.version + 1, updatedAt: this.clock.nowIso() });
+        const result = success<JsonObject>({ taskId: draft.id, status: 'draft', version: 1,
+          templateVersion: template.version + 1 }, createMeta(this.clock, this.requestIds));
+        await this.appendAudit(transaction, { actor, requestId: result.meta.requestId,
+          action: 'task.instantiateTemplate', targetType: 'task', targetId: draft.id,
+          result: 'succeeded', metadata: { templateId, templateVersion: expectedVersion } });
+        return result;
+      },
+    });
+  }
+
   public async publishTask(
     actor: TrustedActorContext,
     taskId: string,
@@ -134,6 +283,10 @@ export class TaskCoreService {
     operationId: string,
   ): Promise<ServiceResult<JsonObject>> {
     const preparedTask = await this.repository.findTask(actor.organizationId, taskId);
+    if (preparedTask?.status === 'draft' && preparedTask.targetClassIds.length === 0 && preparedTask.targetStudentIds.length === 0) {
+      if (preparedTask.creatorTeacherId !== actor.actorUserId) return this.fail('FORBIDDEN');
+      return this.fail('VALIDATION_ERROR', { targetClassIds: '再次布置须重新选择布置对象和时间。' });
+    }
     const preparedMemberships = preparedTask === null
       ? []
       : preparedTask.targetType === 'classes'
@@ -176,30 +329,9 @@ export class TaskCoreService {
         if (!resolvedTarget.ok) return this.fail('VALIDATION_ERROR', resolvedTarget.fieldErrors);
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, resolvedTarget.classIds, 'task.publish'))) return this.fail('FORBIDDEN');
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, resolvedTarget.classIds, 'content.read'))) return this.fail('FORBIDDEN');
-
-        const frozenItems: FrozenTaskItem[] = [];
-        for (const reference of current.itemRefs) {
-          const resource = await transaction.findResource(actor.organizationId, reference.resourceId);
-          if (resource === null) return this.fail('NOT_FOUND');
-          if (resource.status !== 'published') return this.fail('RESOURCE_OFFLINE');
-          if (resource.visibility === 'classes' && resolvedTarget.classIds.some((classId) => !resource.allowedClassIds.includes(classId))) {
-            return this.fail('FORBIDDEN');
-          }
-          const completionRule = reference.completionRule ?? defaultCompletionRule(resource.type);
-          if (!isSupportedCompletionRule(resource.type, completionRule)) {
-            return this.fail('VALIDATION_ERROR', { itemRefs: '任务内容的完成规则无效。' });
-          }
-          frozenItems.push({
-            id: reference.id,
-            resourceId: resource.id,
-            resourceVersion: resource.contentVersion,
-            snapshotSchemaVersion: 1,
-            resourceSnapshot: { title: resource.title, type: resource.type, payload: resource.payload },
-            completionRule,
-            scoringRule: reference.scoringRule ?? defaultScoringRule(),
-            order: reference.order,
-          });
-        }
+        const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, resolvedTarget.classIds, current.items);
+        if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
+        const frozenItems = frozen.items;
 
         const memberships = resolvedTarget.memberships;
         const byStudent = new Map(memberships.map((membership) => [membership.studentId, membership]));
@@ -288,7 +420,7 @@ export class TaskCoreService {
             const found = await transaction.findClassMembershipGuard(actor.organizationId, guard.classId);
             if (!found || found.version !== guard.expectedVersion) return this.fail('CONFLICT');
           }
-          const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, target.classIds);
+          const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, target.classIds, current.items);
           if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
           const entries = [...byStudent.values()].sort((left, right) => left.studentId.localeCompare(right.studentId))
             .map((membership) => ({ studentId: membership.studentId, classId: membership.classId }));
@@ -591,7 +723,9 @@ export class TaskCoreService {
     const cleanedReason = cleanOptional(reason);
     if (cleanedReason === null || cleanedReason.length > 200) return this.fail('VALIDATION_ERROR', { reason: '删除原因须为 1—200 字。' });
     const preparedTask = await this.repository.findTask(actor.organizationId, taskId);
-    const scope = await this.prepareScope(actor, { classIds: preparedTask?.targetClassIds ?? [] });
+    const classIds = preparedTask?.targetClassIds ?? [];
+    const scope = await this.prepareScope(actor, { classIds: classIds.length > 0 ? classIds
+      : preparedTask?.status === 'draft' ? actor.scopeIds : [] });
     return this.executeAtomic({
       actor,
       functionName: 'task-command',
@@ -605,7 +739,10 @@ export class TaskCoreService {
         if (current === null || current.visibility === 'recycled') return this.fail('NOT_FOUND');
         if (current.creatorTeacherId !== actor.actorUserId) return this.fail('FORBIDDEN');
         if (current.version !== expectedVersion) return this.fail('CONFLICT');
-        if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish'))) return this.fail('FORBIDDEN');
+        const mayRecycleUnassignedDraft = current.status === 'draft' && current.targetClassIds.length === 0
+          && await this.canTeacherAccessAnyInTransaction(transaction, actor, 'task.publish');
+        if (!mayRecycleUnassignedDraft
+          && !(await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish'))) return this.fail('FORBIDDEN');
         const now = this.clock.nowIso();
         const next: TaskRecord = {
           ...current,
@@ -656,8 +793,10 @@ export class TaskCoreService {
       submissionId: string;
       decision: 'approved' | 'returned';
       score?: number;
+      itemScores?: readonly ManualTaskItemScore[];
       textComment?: string;
       returnReason?: string;
+      overrideReason?: string;
       expectedSubmissionVersion: number;
     }>,
     expectedAssignmentVersion: number,
@@ -695,6 +834,30 @@ export class TaskCoreService {
         if (assignment.version !== expectedAssignmentVersion || submission.submissionVersion !== input.expectedSubmissionVersion) return this.fail('CONFLICT');
         if (submission.status !== 'submitted' || assignment.latestSubmissionId !== submission.id || assignment.status !== 'awaiting_review') return this.fail('CONFLICT');
         if (input.decision === 'returned' && assignment.redoCount >= MAX_REDO_COUNT) return this.fail('REDO_LIMIT_REACHED');
+        const task = await transaction.findTask(actor.organizationId, submission.taskId);
+        if (task === null) return this.fail('NOT_FOUND');
+        const needsItemScores = task.items.some(item => item.resourceSnapshot.type === 'recording'
+          || (item.resourceSnapshot.type === 'exercise' && item.resourceSnapshot.payload.questionType === 'subjective'));
+        if (needsItemScores && input.itemScores === undefined) {
+          return this.fail('VALIDATION_ERROR', { itemScores: '请逐项评分后发布点评。' });
+        }
+        const manualIds = manualTaskItemIds(task, submission);
+        const reviewedScore = input.itemScores !== undefined
+          ? scoreTaskWithManualItems(task, submission, input.itemScores) : null;
+        if (input.itemScores !== undefined && (manualIds === null || reviewedScore === null
+          || (input.score !== undefined && input.score !== reviewedScore))) {
+          return this.fail('VALIDATION_ERROR', { itemScores: '逐项评分与发布快照或作答不一致。' });
+        }
+        if (input.decision === 'returned' && reviewedScore === null && input.score === undefined) {
+          return this.fail('VALIDATION_ERROR', { score: '退回重做前请先评分。' });
+        }
+        const originalAutomaticScore = automaticTaskScore(task, submission);
+        const isOverride = originalAutomaticScore !== null && input.score !== undefined && input.score !== originalAutomaticScore;
+        const requestedOverrideReason = cleanOptional(input.overrideReason);
+        if (isOverride && requestedOverrideReason === null) {
+          return this.fail('VALIDATION_ERROR', { overrideReason: '覆盖系统自动分必须填写原因。' });
+        }
+        const overrideReason = isOverride ? requestedOverrideReason : null;
 
         const now = this.clock.nowIso();
         const feedback: ReviewFeedbackRecord = {
@@ -706,7 +869,10 @@ export class TaskCoreService {
           submissionVersion: submission.submissionVersion,
           teacherId: actor.actorUserId,
           decision: input.decision,
-          score: input.score ?? null,
+          score: reviewedScore ?? input.score ?? originalAutomaticScore,
+          ...(input.itemScores === undefined ? {} : { itemScores: input.itemScores.map(item => ({ ...item })) }),
+          ...(originalAutomaticScore === null ? {} : { originalAutomaticScore }),
+          ...(overrideReason === null ? {} : { overrideReason }),
           textComment: cleanOptional(input.textComment),
           returnReason: input.decision === 'returned' ? cleanOptional(input.returnReason) : null,
           publishedAt: now,
@@ -745,7 +911,8 @@ export class TaskCoreService {
           targetType: 'submission',
           targetId: submission.id,
           result: 'succeeded',
-          metadata: { submissionVersion: submission.submissionVersion, decision: input.decision },
+          metadata: { submissionVersion: submission.submissionVersion, decision: input.decision,
+            ...(overrideReason === null ? {} : { overrideReasonLength: overrideReason.length }) },
         });
         return result;
       },
@@ -777,6 +944,9 @@ export class TaskCoreService {
 
     const preparedTask = await this.repository.findTask(actor.organizationId, intent.task.id);
     if (preparedTask === null) return this.fail('NOT_FOUND');
+    if (preparedTask.items.some((item) => item.resourceSnapshot.type === 'recording')) {
+      return this.fail('VALIDATION_ERROR', { previewToken: '录音任务需逐份评分，不能只发布批量评语。' });
+    }
     const preparedAssignments = scopeBatchAssignments(
       await this.repository.listTaskAssignments(actor.organizationId, intent.task.id),
       intent,
@@ -804,6 +974,9 @@ export class TaskCoreService {
         if (nowTime < Date.parse(intent.issuedAt) || nowTime > Date.parse(intent.expiresAt)) return this.fail('CONFLICT');
         const task = await transaction.findTask(actor.organizationId, intent.task.id);
         if (task === null) return this.fail('NOT_FOUND');
+        if (task.items.some((item) => item.resourceSnapshot.type === 'recording')) {
+          return this.fail('VALIDATION_ERROR', { previewToken: '录音任务需逐份评分，不能只发布批量评语。' });
+        }
         if (task.version !== intent.task.version || previewVersion !== intent.previewVersion) return this.fail('CONFLICT');
         if (!(await this.canTeacherAccessAllInTransaction(
           transaction,
@@ -818,6 +991,9 @@ export class TaskCoreService {
         );
         const eligible = await collectEligibleBatchSubmissions(transaction, actor.organizationId, intent.task.id, assignments, intent);
         if (!sameEligibleBatch(eligible.map((item) => item.preview), intent.eligible)) return this.fail('CONFLICT');
+        if (eligible.some((item) => manualTaskItemIds(task, item.submission)?.length !== 0)) {
+          return this.fail('VALIDATION_ERROR', { previewToken: '所选作业需要逐项人工评分，请逐人检查。' });
+        }
 
         const now = this.clock.nowIso();
         const feedbackIds: string[] = [];
@@ -894,6 +1070,7 @@ export class TaskCoreService {
       title: task.title,
       studentId,
       assignmentStatus: assignment.status,
+      automaticScore: submission === null ? null : automaticTaskScore(task, submission),
       submission: submission === null || submission.submittedAt === null ? null : {
         id: submission.id,
         version: submission.submissionVersion,
@@ -965,11 +1142,20 @@ export class TaskCoreService {
         const task = await transaction.findTask(actor.organizationId, taskId);
         if (task === null) return this.fail('NOT_FOUND');
         if (!isSubmittable(task, assignment, this.clock.nowIso())) return this.fail('TASK_NOT_SUBMITTABLE');
+        const returnedSubmission = assignment.redoDueAt === null || assignment.latestSubmissionId === null
+          ? null : await transaction.findSubmission(actor.organizationId, assignment.latestSubmissionId);
+        const returnFeedback = returnedSubmission === null ? null
+          : await transaction.findFeedbackBySubmission(actor.organizationId, returnedSubmission.id);
+        if (assignment.redoDueAt !== null && (returnedSubmission?.status !== 'returned'
+          || returnFeedback?.decision !== 'returned')) return this.fail('SERVICE_UNAVAILABLE');
+        const redoSince = returnFeedback?.publishedAt ?? null;
         const validItemIds = new Set(task.items.map((item) => item.id));
         if (answers.some((answer) => !validItemIds.has(answer.itemId))) return this.fail('VALIDATION_ERROR', { answers: '包含不属于当前任务的作答项。' });
         if (action === 'submit' && (answers.length !== task.items.length || validItemIds.size !== new Set(answers.map((answer) => answer.itemId)).size)) {
           return this.fail('VALIDATION_ERROR', { answers: '请完成全部任务项后提交。' });
         }
+        const verifiedReadingPages = new Map<string, readonly Readonly<{ pageId: string; pageNumber: number; visitedAt: string }>[]>();
+        const verifiedRecordings = new Map<string, Readonly<{ recordingId: string; durationMs: number; sizeBytes: number }>>();
         if (action === 'submit') {
           const answersByItem = new Map(answers.map((answer) => [answer.itemId, answer]));
           for (const item of task.items) {
@@ -980,20 +1166,79 @@ export class TaskCoreService {
             if (item.resourceSnapshot.type === 'reading') {
               const resourceId = item.resourceId || task.itemRefs.find((reference) => reference.id === item.id)?.resourceId;
               if (!resourceId) return this.fail('VALIDATION_ERROR', { answers: '任务阅读资源引用无效。' });
-              const progress = await transaction.findReadingProgress(actor.organizationId, actor.actorUserId, resourceId);
               const requested = isJsonObject(answer.value) ? answer.value.completedPageCount : null;
-              if (progress === null || typeof requested !== 'number' || progress.pageNumber < requested) {
-                return this.fail('VALIDATION_ERROR', { answers: '请先完成并保存本任务的阅读进度。' });
+              const pageIds = selectedReadingPageIds(item.completionRule);
+              if (item.completionRule.pageIds !== undefined && pageIds === null) {
+                return this.fail('SERVICE_UNAVAILABLE');
+              }
+              if (pageIds !== null) {
+                const events = await transaction.listReadingPageEvents(actor.organizationId, actor.actorUserId, resourceId);
+                const eligible = events.filter(event => event.contentVersion === String(item.resourceVersion)
+                  && task.publishedAt !== null && Date.parse(event.visitedAt) >= Date.parse(redoSince ?? task.publishedAt)
+                  && Date.parse(event.visitedAt) <= Date.parse(this.clock.nowIso()));
+                const visits = pageIds.map(pageId => eligible.filter(event => event.pageId === pageId)
+                  .sort((left, right) => left.visitedAt.localeCompare(right.visitedAt))[0]);
+                if (requested !== pageIds.length || visits.some(visit => visit === undefined)) {
+                  return this.fail('VALIDATION_ERROR', { answers: '请先完成并保存本任务指定的阅读页。' });
+                }
+                verifiedReadingPages.set(item.id, visits.map(visit => ({ pageId: visit!.pageId,
+                  pageNumber: visit!.pageNumber,
+                  visitedAt: visit!.visitedAt })));
+              } else {
+                const progress = await transaction.findReadingProgress(actor.organizationId, actor.actorUserId, resourceId);
+                if (progress === null || typeof requested !== 'number' || progress.pageNumber < requested
+                  || (redoSince !== null && Date.parse(progress.updatedAt) < Date.parse(redoSince))) {
+                  return this.fail('VALIDATION_ERROR', { answers: '请先完成并保存本任务的阅读进度。' });
+                }
               }
             }
             if (item.resourceSnapshot.type === 'vocabulary') {
               const resourceId = item.resourceId || task.itemRefs.find((reference) => reference.id === item.id)?.resourceId;
               if (!resourceId) return this.fail('VALIDATION_ERROR', { answers: '任务单词资源引用无效。' });
-              const progress = await transaction.findVocabularyProgress(actor.organizationId, actor.actorUserId, resourceId);
               const requested = isJsonObject(answer.value) ? answer.value : null;
-              if (progress === null || requested === null || progress.completedCount !== requested.completedWordCount || progress.correctCount !== requested.correctWordCount) {
-                return this.fail('VALIDATION_ERROR', { answers: '请先完成并同步本任务的单词练习。' });
+              if (item.snapshotSchemaVersion === 2) {
+                const wordIds = vocabularyWordIds(item.resourceSnapshot.payload);
+                if (wordIds === null || requested === null) return this.fail('VALIDATION_ERROR', { answers: '任务单词快照无效。' });
+                const attempts = await transaction.listVocabularyAttempts(actor.organizationId, actor.actorUserId,
+                  resourceId, task.id, item.id, assignment.latestSubmissionVersion + 1, String(item.resourceVersion));
+                const summary = summarizeVocabularyFirstAttempts(wordIds, attempts);
+                if (summary === null || summary.completedCount !== requested.completedWordCount
+                  || summary.correctCount !== requested.correctWordCount) {
+                  return this.fail('VALIDATION_ERROR', { answers: '请先完成并同步本任务的逐词作答。' });
+                }
+              } else {
+                const progress = await transaction.findVocabularyProgress(actor.organizationId, actor.actorUserId, resourceId);
+                if (progress === null || requested === null || progress.completedCount !== requested.completedWordCount
+                  || progress.correctCount !== requested.correctWordCount
+                  || (redoSince !== null && Date.parse(progress.updatedAt) < Date.parse(redoSince))) {
+                  return this.fail('VALIDATION_ERROR', { answers: '请先完成并同步本任务的单词练习。' });
+                }
               }
+            }
+            if (item.resourceSnapshot.type === 'exercise' && returnedSubmission !== null) {
+              const oldAnswer = returnedSubmission.answers.find(candidate => candidate.itemId === item.id);
+              if (oldAnswer && sameExerciseResponse(oldAnswer.value, answer.value)) {
+                return this.fail('VALIDATION_ERROR', { answers: '请订正退回的习题后再提交。' });
+              }
+            }
+            if (item.resourceSnapshot.type === 'recording') {
+              if (!isJsonObject(answer.value) || typeof answer.value.recordingId !== 'string') {
+                return this.fail('VALIDATION_ERROR', { answers: '请先录制并提交有效录音。' });
+              }
+              const recording = await transaction.findTaskRecording(actor.organizationId, answer.value.recordingId);
+              if (!recording || recording.status !== 'submitted' || recording.taskId !== task.id
+                || recording.itemId !== item.id || recording.assignmentId !== assignment.id
+                || recording.studentId !== actor.actorUserId || recording.classId !== assignment.classId
+                || recording.submissionVersion !== assignment.latestSubmissionVersion + 1
+                || recording.resourceVersion !== item.resourceVersion || !recording.fileId
+                || !recording.contentSha256 || !Number.isSafeInteger(recording.durationMs)
+                || recording.durationMs! < 1000 || recording.durationMs! > 300000
+                || !Number.isSafeInteger(recording.sizeBytes) || recording.sizeBytes! < 1
+                || recording.sizeBytes! > 20 * 1024 * 1024) {
+                return this.fail('VALIDATION_ERROR', { answers: '录音尚未通过服务端核验，请重试。' });
+              }
+              verifiedRecordings.set(item.id, { recordingId: recording.id,
+                durationMs: recording.durationMs!, sizeBytes: recording.sizeBytes! });
             }
           }
         }
@@ -1004,6 +1249,24 @@ export class TaskCoreService {
         if (draft !== null && draft.recordVersion !== expectedDraftRecordVersion) return this.fail('CONFLICT');
         const now = this.clock.nowIso();
         const late = Date.parse(now) > Date.parse(task.dueAt);
+        const storedAnswers = answers.map((answer): SubmissionAnswer => {
+          if (action !== 'submit') return { ...answer };
+          const item = task.items.find((candidate) => candidate.id === answer.itemId);
+          const readingPages = verifiedReadingPages.get(answer.itemId);
+          if (item?.resourceSnapshot.type === 'reading' && readingPages) {
+            return { itemId: answer.itemId, value: { kind: 'reading',
+              completedPageCount: readingPages.length, verifiedPageEvents: readingPages } };
+          }
+          const recording = verifiedRecordings.get(answer.itemId);
+          if (item?.resourceSnapshot.type === 'recording' && recording) {
+            return { itemId: answer.itemId, value: { kind: 'recording', ...recording } };
+          }
+          if (item?.resourceSnapshot.type !== 'exercise') return { ...answer };
+          const snapshot = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
+          if (snapshot === null) return { ...answer };
+          const evaluated = evaluateExerciseSubmission(snapshot, answer.value);
+          return evaluated.canonicalValue === null ? { ...answer } : { itemId: answer.itemId, value: evaluated.canonicalValue };
+        });
         const submission: SubmissionRecord = {
           id: draft?.id ?? `submission_${assignment.id}_${submissionVersion}`,
           organizationId: actor.organizationId,
@@ -1013,7 +1276,7 @@ export class TaskCoreService {
           submissionVersion,
           recordVersion: (draft?.recordVersion ?? 0) + 1,
           status: action === 'submit' ? 'submitted' : 'draft',
-          answers: answers.map((answer) => ({ ...answer })),
+          answers: storedAnswers,
           isLate: late,
           submittedAt: action === 'submit' ? now : null,
           supersedesSubmissionId: assignment.latestSubmissionId,
@@ -1162,6 +1425,19 @@ export class TaskCoreService {
     return true;
   }
 
+  private async canTeacherAccessAnyInTransaction(
+    transaction: TaskCoreTransaction,
+    actor: TrustedActorContext,
+    permission: string,
+  ): Promise<boolean> {
+    if (actor.actorRole !== 'teacher' || !hasPermission(actor, permission)) return false;
+    for (const classId of unique(actor.scopeIds)) {
+      const grant = await transaction.findActiveTeacherGrant(actor.organizationId, actor.actorUserId, classId);
+      if (grant !== null && grant.permissions.includes(permission)) return true;
+    }
+    return false;
+  }
+
   private async canTeacherAccessAll(actor: TrustedActorContext, classIds: readonly string[], permission: string): Promise<boolean> {
     if (classIds.length === 0) return false;
     for (const classId of unique(classIds)) {
@@ -1173,6 +1449,7 @@ export class TaskCoreService {
 
   private async prepareScope(actor: TrustedActorContext, input: Readonly<{
     classIds?: readonly string[];
+    templateIds?: readonly string[];
     resourceIds?: readonly string[];
     memberships?: readonly ClassMembershipRecord[];
     assignments?: readonly TaskAssignmentRecord[];
@@ -1186,6 +1463,7 @@ export class TaskCoreService {
     return {
       organizationId: actor.organizationId,
       resourceIds: unique(input.resourceIds ?? []),
+      templateIds: unique(input.templateIds ?? []),
       membershipIds: unique((input.memberships ?? []).map((membership) => membership.id)),
       teacherGrantIds: unique(grants.map((grant) => grant._id)),
       assignmentIds: unique((input.assignments ?? []).map((assignment) => assignment.id)),
@@ -1355,12 +1633,22 @@ function validatePublishedTaskUpdate(input: UpdatePublishedTaskInput): Readonly<
   return Object.keys(errors).length === 0 ? null : errors;
 }
 
-function validateReview(input: Readonly<{ decision: 'approved' | 'returned'; score?: number; textComment?: string; returnReason?: string }>): Readonly<Record<string, string>> | null {
+function validateReview(input: Readonly<{ decision: 'approved' | 'returned'; score?: number;
+  itemScores?: readonly ManualTaskItemScore[]; textComment?: string; returnReason?: string;
+  overrideReason?: string }>): Readonly<Record<string, string>> | null {
   const errors: Record<string, string> = {};
   if (input.score !== undefined && (!Number.isFinite(input.score) || input.score < 0 || input.score > 100)) errors.score = '评分须为 0—100。';
+  if (input.itemScores !== undefined && (!Array.isArray(input.itemScores)
+    || input.itemScores.some(item => item === null || typeof item !== 'object'
+      || typeof item.itemId !== 'string' || !item.itemId.trim()
+      || !Number.isFinite(item.score) || item.score < 0 || item.score > 100)
+    || new Set(input.itemScores.map(item => item.itemId)).size !== input.itemScores.length)) {
+    errors.itemScores = '逐项评分无效。';
+  }
   if ((input.textComment?.trim().length ?? 0) > 500) errors.textComment = '点评最多 500 字。';
   if (input.decision === 'returned' && cleanOptional(input.returnReason) === null) errors.returnReason = '退回重做必须填写原因。';
   if ((input.returnReason?.trim().length ?? 0) > 200) errors.returnReason = '退回原因最多 200 字。';
+  if ((input.overrideReason?.trim().length ?? 0) > 200) errors.overrideReason = '自动分覆盖原因最多 200 字。';
   return Object.keys(errors).length === 0 ? null : errors;
 }
 
@@ -1412,16 +1700,20 @@ function reviewPayload(input: Readonly<{
   submissionId: string;
   decision: 'approved' | 'returned';
   score?: number;
+  itemScores?: readonly ManualTaskItemScore[];
   textComment?: string;
   returnReason?: string;
+  overrideReason?: string;
   expectedSubmissionVersion: number;
 }>): JsonObject {
   return {
     submissionId: input.submissionId,
     decision: input.decision,
     score: input.score ?? null,
+    itemScores: input.itemScores?.map(item => ({ itemId: item.itemId, score: item.score })) ?? null,
     textComment: input.textComment ?? null,
     returnReason: input.returnReason ?? null,
+    overrideReason: input.overrideReason ?? null,
     expectedSubmissionVersion: input.expectedSubmissionVersion,
   };
 }
@@ -1459,6 +1751,7 @@ function hasDuplicateAnswerItems(answers: readonly SubmissionAnswer[]): boolean 
 function defaultCompletionRule(type: FrozenTaskItem['resourceSnapshot']['type']): JsonObject {
   if (type === 'reading') return { kind: 'reading_pages', requiredPageCount: 1 };
   if (type === 'vocabulary') return { kind: 'vocabulary_words', requiredWordCount: 1 };
+  if (type === 'recording') return { kind: 'recording_upload' };
   return { kind: 'exercise_questions', requiredQuestionCount: 1 };
 }
 
@@ -1474,6 +1767,90 @@ function normalizeItemReference(reference: TaskRecord['itemRefs'][number]): Task
   };
 }
 
+function sameFrozenReference(reference: TaskRecord['itemRefs'][number], item: FrozenTaskItem): boolean {
+  return reference.id === item.id && reference.resourceId === item.resourceId && reference.order === item.order
+    && canonicalize(reference.completionRule ?? {}) === canonicalize(item.completionRule)
+    && canonicalize(reference.scoringRule ?? {}) === canonicalize(item.scoringRule);
+}
+
+function orderedCopiedItems(items: readonly FrozenTaskItem[]): FrozenTaskItem[] {
+  return [...items].sort((left, right) => left.order - right.order)
+    .map((item, index) => ({ ...structuredClone(item), order: index + 1 }));
+}
+
+function copyableItemError(item: FrozenTaskItem): string | null {
+  const type = item.resourceSnapshot.type;
+  if (type !== 'reading' && type !== 'vocabulary' && type !== 'exercise' && type !== 'recording') {
+    return '原任务含 M2 尚不可发布的内容类型。';
+  }
+  if (!isSupportedCompletionRule(type, item.completionRule)
+    || !supportsReadingRangeSnapshot(item.resourceSnapshot, item.completionRule)
+    || !supportsRecordingPromptSnapshot(item.resourceSnapshot)) return '原任务完成规则或内容快照不完整。';
+  const rule = item.completionRule;
+  let expectedCompletion: JsonObject;
+  if (type === 'reading') expectedCompletion = { kind: 'reading_pages', requiredPageCount: rule.requiredPageCount ?? null,
+    ...(rule.pageIds === undefined ? {} : { pageIds: rule.pageIds }) };
+  else if (type === 'vocabulary') expectedCompletion = { kind: 'vocabulary_words', requiredWordCount: rule.requiredWordCount ?? null };
+  else if (type === 'recording') expectedCompletion = { kind: 'recording_upload' };
+  else expectedCompletion = { kind: 'exercise_questions', requiredQuestionCount: rule.requiredQuestionCount ?? null };
+  if (canonicalize(rule) !== canonicalize(expectedCompletion)) return '原任务完成规则无法在当前布置表单保真。';
+  if (item.scoringRule.kind === 'completion_only') return '原任务含无评分内容项，当前复制路径无法保真计分规则。';
+  if ((item.scoringRule.kind !== 'automatic' && item.scoringRule.kind !== 'manual')
+    || typeof item.scoringRule.maxScore !== 'number' || !Number.isSafeInteger(item.scoringRule.maxScore)
+    || item.scoringRule.maxScore < 1 || item.scoringRule.maxScore > 100
+    || (type === 'recording' && item.scoringRule.kind !== 'manual')) return '原任务计分规则不完整。';
+  const scoring = item.scoringRule;
+  if (scoring.weightPercent !== undefined && (typeof scoring.weightPercent !== 'number'
+    || !Number.isFinite(scoring.weightPercent) || scoring.weightPercent <= 0 || scoring.weightPercent > 100)) {
+    return '原任务计分权重不完整。';
+  }
+  const expectedScoring = { kind: scoring.kind, maxScore: scoring.maxScore,
+    ...(scoring.weightPercent === undefined ? {} : { weightPercent: scoring.weightPercent }) };
+  if (canonicalize(scoring) !== canonicalize(expectedScoring)) return '原任务计分规则无法在当前布置表单保真。';
+  if (type === 'reading') {
+    const selected = selectedReadingPageIds(item.completionRule);
+    const available = readingPageIdsFromPayload(item.resourceSnapshot.payload);
+    if (!selected || !available || !selected.every((id) => available.includes(id))) return '原阅读页图快照不完整。';
+    const chapters = item.resourceSnapshot.payload.chapters;
+    const pages = Array.isArray(chapters) ? chapters.flatMap((chapter) => {
+      if (!chapter || typeof chapter !== 'object' || Array.isArray(chapter)) return [];
+      const raw = chapter as JsonObject;
+      return Array.isArray(raw.pages) ? raw.pages : [];
+    }) : [];
+    if (selected.some((id) => !pages.some((page) => page && typeof page === 'object' && !Array.isArray(page)
+      && (page as JsonObject).id === id && typeof (page as JsonObject).imageAssetKey === 'string'
+      && !!((page as JsonObject).imageAssetKey as string).trim()))) return '原阅读页图快照不完整。';
+  }
+  if (type === 'vocabulary' && vocabularyWordIds(item.resourceSnapshot.payload) === null) return '原词包快照不完整。';
+  if (type === 'exercise') {
+    const snapshot = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
+    if (!snapshot || snapshot.questionId !== item.resourceId || item.completionRule.requiredQuestionCount !== 1) {
+      return '原题干、答案或解析快照不完整。';
+    }
+  }
+  return null;
+}
+
+function validateCopyableSnapshot(task: TaskRecord): string | null {
+  return validateCopyableContent(task.itemRefs, task.items);
+}
+
+function validateCopyableContent(references: readonly TaskRecord['itemRefs'][number][],
+  items: readonly FrozenTaskItem[]): string | null {
+  if (!items.length || items.length !== references.length
+    || new Set(items.map((item) => item.id)).size !== items.length
+    || new Set(items.map((item) => item.order)).size !== items.length
+    || items.some((item) => !Number.isSafeInteger(item.order) || item.order < 1)
+    || !validTaskItemWeights(references)) return '原任务内容快照不完整。';
+  for (const item of items) {
+    const reference = references.find((candidate) => candidate.id === item.id);
+    if (!reference || !sameFrozenReference(reference, item)) return '原任务内容快照与规则不一致。';
+    const error = copyableItemError(item);
+    if (error) return error;
+  }
+  return null;
+}
+
 type FrozenItemsResult = Readonly<{ ok: true; items: readonly FrozenTaskItem[] }> | Readonly<{
   ok: false;
   code: ErrorCode;
@@ -1485,7 +1862,11 @@ async function freezeTaskItemReferences(
   organizationId: string,
   references: readonly TaskRecord['itemRefs'][number][],
   classIds: readonly string[],
+  retainedItems: readonly FrozenTaskItem[] = [],
 ): Promise<FrozenItemsResult> {
+  if (!validTaskItemWeights(references)) {
+    return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '任务内容权重合计必须为 100%。' } };
+  }
   const items: FrozenTaskItem[] = [];
   for (const reference of references) {
     const resource = await reader.findResource(organizationId, reference.resourceId);
@@ -1494,15 +1875,40 @@ async function freezeTaskItemReferences(
     if (resource.visibility === 'classes' && classIds.some((classId) => !resource.allowedClassIds.includes(classId))) {
       return { ok: false, code: 'FORBIDDEN' };
     }
+    const retained = retainedItems.find((item) => sameFrozenReference(reference, item));
+    if (retained) {
+      const error = copyableItemError(retained);
+      if (error || retained.resourceSnapshot.type !== resource.type) {
+        return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: error ?? '原资源类型已变化，无法再次布置。' } };
+      }
+      items.push(structuredClone(retained));
+      continue;
+    }
     const completionRule = reference.completionRule ?? defaultCompletionRule(resource.type);
     if (!isSupportedCompletionRule(resource.type, completionRule)) {
       return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '任务内容的完成规则无效。' } };
+    }
+    if (!supportsExerciseSnapshot(resource, completionRule)) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '题目快照不完整或与完成规则不一致。' } };
+    }
+    if (!supportsReadingRangeSnapshot(resource, completionRule)) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '阅读指定页不在当前内容版本中。' } };
+    }
+    if (!supportsRecordingPromptSnapshot(resource)) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '录音提示内容无效或依赖未开放的视频素材。' } };
+    }
+    if (resource.type === 'recording' && reference.scoringRule?.kind === 'automatic') {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '录音任务只能由教师人工评分。' } };
+    }
+    const wordIds = resource.type === 'vocabulary' ? vocabularyWordIds(resource.payload) : null;
+    if (resource.type === 'vocabulary' && resource.payload.words !== undefined && wordIds === null) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '单词词包快照无效。' } };
     }
     items.push({
       id: reference.id,
       resourceId: resource.id,
       resourceVersion: resource.contentVersion,
-      snapshotSchemaVersion: 1,
+      snapshotSchemaVersion: wordIds === null ? 1 : 2,
       resourceSnapshot: { title: resource.title, type: resource.type, payload: resource.payload },
       completionRule,
       scoringRule: reference.scoringRule ?? defaultScoringRule(),
@@ -1510,6 +1916,13 @@ async function freezeTaskItemReferences(
     });
   }
   return { ok: true, items };
+}
+
+export function validTaskItemWeights(references: readonly TaskRecord['itemRefs'][number][]): boolean {
+  const weights = references.map((item) => item.scoringRule?.weightPercent);
+  if (weights.every((weight) => weight === undefined)) return true;
+  return weights.every((weight) => typeof weight === 'number' && Number.isFinite(weight) && weight > 0 && weight <= 100)
+    && Math.abs(weights.reduce<number>((total, weight) => total + (typeof weight === 'number' ? weight : 0), 0) - 100) < 0.000001;
 }
 
 function uniqueMembershipsByStudent(memberships: readonly ClassMembershipRecord[]): readonly ClassMembershipRecord[] {
@@ -1559,10 +1972,28 @@ async function reconcileScheduledAssignments(
   }
 }
 
-function isSupportedCompletionRule(type: FrozenTaskItem['resourceSnapshot']['type'], rule: JsonObject): boolean {
-  if (type === 'reading') return rule.kind === 'reading_pages' && isPositiveInteger(rule.requiredPageCount);
+export function isSupportedCompletionRule(type: FrozenTaskItem['resourceSnapshot']['type'], rule: JsonObject): boolean {
+  if (type === 'reading') return rule.kind === 'reading_pages' && isPositiveInteger(rule.requiredPageCount)
+    && (rule.pageIds === undefined || (selectedReadingPageIds(rule)?.length === rule.requiredPageCount));
   if (type === 'vocabulary') return rule.kind === 'vocabulary_words' && isPositiveInteger(rule.requiredWordCount);
-  return rule.kind === 'exercise_questions' && isPositiveInteger(rule.requiredQuestionCount);
+  if (type === 'recording') return rule.kind === 'recording_upload';
+  if (type === 'exercise') return rule.kind === 'exercise_questions' && isPositiveInteger(rule.requiredQuestionCount);
+  return false;
+}
+
+export function supportsRecordingPromptSnapshot(resource: Readonly<{ type: string; payload: JsonObject }>): boolean {
+  if (resource.type !== 'recording') return true;
+  const prompt = resource.payload.promptText;
+  return resource.payload.promptKind === 'text' && resource.payload.requiresVideo === false
+    && typeof prompt === 'string' && prompt.trim().length > 0 && prompt.trim().length <= 500;
+}
+
+export function supportsExerciseSnapshot(resource: Readonly<{ id: string; type: string; payload: JsonObject }>, rule: JsonObject): boolean {
+  if (resource.type !== 'exercise') return true;
+  if (resource.payload.questionIds === undefined && resource.payload.questionType === undefined
+    && resource.payload.correctAnswer === undefined) return true;
+  const snapshot = readExerciseQuestionSnapshot(resource.payload);
+  return snapshot !== null && snapshot.questionId === resource.id && rule.requiredQuestionCount === 1;
 }
 
 function satisfiesCompletionRule(item: FrozenTaskItem, value: JsonValue): boolean {
@@ -1572,7 +2003,8 @@ function satisfiesCompletionRule(item: FrozenTaskItem, value: JsonValue): boolea
     return value.kind === 'reading'
       && isNonNegativeInteger(value.completedPageCount)
       && isPositiveInteger(rule.requiredPageCount)
-      && value.completedPageCount >= rule.requiredPageCount;
+      && (rule.pageIds === undefined ? value.completedPageCount >= rule.requiredPageCount
+        : value.completedPageCount === rule.requiredPageCount);
   }
   if (item.resourceSnapshot.type === 'vocabulary') {
     return value.kind === 'vocabulary'
@@ -1582,6 +2014,14 @@ function satisfiesCompletionRule(item: FrozenTaskItem, value: JsonValue): boolea
       && isPositiveInteger(rule.requiredWordCount)
       && value.completedWordCount >= rule.requiredWordCount;
   }
+  if (item.resourceSnapshot.type === 'recording') {
+    return value.kind === 'recording' && typeof value.recordingId === 'string'
+      && value.recordingId.trim().length > 0 && rule.kind === 'recording_upload';
+  }
+  if (item.resourceSnapshot.payload.questionIds !== undefined) {
+    const structuredQuestion = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
+    return structuredQuestion !== null && evaluateExerciseSubmission(structuredQuestion, value).complete;
+  }
   return value.kind === 'exercise'
     && isNonNegativeInteger(value.answeredQuestionCount)
     && isPositiveInteger(rule.requiredQuestionCount)
@@ -1590,6 +2030,20 @@ function satisfiesCompletionRule(item: FrozenTaskItem, value: JsonValue): boolea
 
 function isJsonObject(value: JsonValue): value is JsonObject {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sameExerciseResponse(previous: JsonValue, current: JsonValue): boolean {
+  const comparable = (value: JsonValue): string => {
+    if (!isJsonObject(value)) return JSON.stringify(value);
+    if (Array.isArray(value.questionResponses) && value.questionResponses.length) {
+      return JSON.stringify(value.questionResponses.map(response => isJsonObject(response)
+        ? { questionId: response.questionId, response: response.response } : response));
+    }
+    return JSON.stringify(Object.fromEntries(Object.entries(value)
+      .filter(([key]) => key !== 'correctQuestionCount' && key !== 'isCorrect')
+      .sort(([left], [right]) => left.localeCompare(right))));
+  };
+  return comparable(previous) === comparable(current);
 }
 
 function isPositiveInteger(value: JsonValue | undefined): value is number {
@@ -1683,7 +2137,7 @@ function lifecycleStatusForTimes(
   return 'active';
 }
 
-function isSubmittable(task: TaskRecord, assignment: TaskAssignmentRecord, now: string): boolean {
+export function isSubmittable(task: TaskRecord, assignment: TaskAssignmentRecord, now: string): boolean {
   const current = Date.parse(now);
   if (task.visibility !== 'visible') return false;
   const lifecycle = effectiveLifecycleStatus(task, now);

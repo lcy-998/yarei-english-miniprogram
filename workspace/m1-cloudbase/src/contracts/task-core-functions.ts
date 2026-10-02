@@ -3,7 +3,7 @@ import { parseExactObject } from '../shared/strict-object';
 import type { SaveTaskDraftInput, SubmissionAnswer, UpdatePublishedTaskInput } from '../task-core/types';
 import type { PageRequest, StudentTaskFilters } from '../task-query/types';
 
-export const TASK_COMMAND_ACTIONS = ['saveDraft', 'publishTask', 'updatePublishedTask', 'withdrawTask', 'recycleTask'] as const;
+export const TASK_COMMAND_ACTIONS = ['saveDraft', 'copyTaskSnapshot', 'instantiateTemplate', 'publishTask', 'updatePublishedTask', 'withdrawTask', 'recycleTask'] as const;
 export type TaskCommandAction = (typeof TASK_COMMAND_ACTIONS)[number];
 
 export const SUBMISSION_COMMAND_ACTIONS = ['saveDraft', 'submit'] as const;
@@ -23,6 +23,18 @@ export type TaskCommandInput =
   | Readonly<{
       action: 'saveDraft';
       input: SaveTaskDraftInput;
+      expectedVersion: number;
+      operationId: string;
+    }>
+  | Readonly<{
+      action: 'copyTaskSnapshot';
+      sourceTaskId: string;
+      expectedVersion: number;
+      operationId: string;
+    }>
+  | Readonly<{
+      action: 'instantiateTemplate';
+      templateId: string;
       expectedVersion: number;
       operationId: string;
     }>
@@ -62,8 +74,10 @@ export type ReviewCommandInput =
         submissionId: string;
         decision: 'approved' | 'returned';
         score?: number;
+        itemScores?: readonly Readonly<{ itemId: string; score: number }>[];
         textComment?: string;
         returnReason?: string;
+        overrideReason?: string;
         expectedSubmissionVersion: number;
       }>;
       expectedAssignmentVersion: number;
@@ -88,6 +102,24 @@ export function validateTaskCommandRequest(
   request: FunctionRequest<TaskCommandAction, JsonObject>,
 ): BoundaryValidation<TaskCommandInput> {
   if (request.operationId === undefined) return invalid('operationId', '写操作必须提供操作标识。');
+  if (request.action === 'copyTaskSnapshot') {
+    const exact = parseExactObject(request.payload, ['sourceTaskId']);
+    if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
+    const sourceTaskId = requiredId(exact.value.sourceTaskId, 'sourceTaskId');
+    if (!sourceTaskId.ok) return sourceTaskId;
+    if (request.expectedVersion === undefined) return invalid('expectedVersion', '再次布置必须提供原任务当前版本。');
+    return { ok: true, value: { action: 'copyTaskSnapshot', sourceTaskId: sourceTaskId.value,
+      expectedVersion: request.expectedVersion, operationId: request.operationId } };
+  }
+  if (request.action === 'instantiateTemplate') {
+    const exact = parseExactObject(request.payload, ['templateId']);
+    if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
+    const templateId = requiredId(exact.value.templateId, 'templateId');
+    if (!templateId.ok) return templateId;
+    if (request.expectedVersion === undefined) return invalid('expectedVersion', '模板布置必须提供模板当前版本。');
+    return { ok: true, value: { action: 'instantiateTemplate', templateId: templateId.value,
+      expectedVersion: request.expectedVersion, operationId: request.operationId } };
+  }
   if (request.action === 'withdrawTask' || request.action === 'recycleTask') {
     const exact = parseExactObject(request.payload, ['taskId', 'reason']);
     if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
@@ -282,7 +314,7 @@ export function validateReviewCommandRequest(
   const exact = parseExactObject(
     request.payload,
     ['submissionId', 'decision', 'expectedSubmissionVersion'],
-    ['score', 'textComment', 'returnReason'],
+    ['score', 'itemScores', 'textComment', 'returnReason', 'overrideReason'],
   );
   if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
   if (request.operationId === undefined) return invalid('operationId', '发布点评必须提供操作标识。');
@@ -294,10 +326,22 @@ export function validateReviewCommandRequest(
   if (!expectedSubmissionVersion.ok) return expectedSubmissionVersion;
   const score = optionalFiniteNumber(exact.value.score, 'score');
   if (!score.ok) return score;
+  const itemScores = exact.value.itemScores;
+  if (itemScores !== undefined && (!Array.isArray(itemScores) || !itemScores.length
+    || itemScores.some(item => {
+      const entry = parseExactObject(item, ['itemId', 'score']);
+      return !entry.ok || typeof entry.value.itemId !== 'string' || !entry.value.itemId.trim()
+        || typeof entry.value.score !== 'number' || !Number.isFinite(entry.value.score)
+        || entry.value.score < 0 || entry.value.score > 100;
+    }) || new Set(itemScores.map(item => (item as { itemId: string }).itemId)).size !== itemScores.length)) {
+    return invalid('itemScores', '逐项评分无效。');
+  }
   const textComment = optionalString(exact.value.textComment, 'textComment');
   if (!textComment.ok) return textComment;
   const returnReason = optionalString(exact.value.returnReason, 'returnReason');
   if (!returnReason.ok) return returnReason;
+  const overrideReason = optionalString(exact.value.overrideReason, 'overrideReason');
+  if (!overrideReason.ok) return overrideReason;
   return {
     ok: true,
     value: {
@@ -307,8 +351,10 @@ export function validateReviewCommandRequest(
         decision: exact.value.decision,
         expectedSubmissionVersion: expectedSubmissionVersion.value,
         ...(score.value === undefined ? {} : { score: score.value }),
+        ...(itemScores === undefined ? {} : { itemScores: itemScores as Array<{ itemId: string; score: number }> }),
         ...(textComment.value === undefined ? {} : { textComment: textComment.value }),
         ...(returnReason.value === undefined ? {} : { returnReason: returnReason.value }),
+        ...(overrideReason.value === undefined ? {} : { overrideReason: overrideReason.value }),
       },
       expectedAssignmentVersion: request.expectedVersion,
       operationId: request.operationId,
@@ -390,7 +436,7 @@ function parseParentPage(value: unknown): BoundaryValidation<PageRequest> {
   return { ok: true, value: { limit: exact.value.limit, ...(cursor.value === undefined ? {} : { cursor: cursor.value }) } };
 }
 
-function parseItemRefs(value: unknown): BoundaryValidation<SaveTaskDraftInput['itemRefs']> {
+export function parseItemRefs(value: unknown): BoundaryValidation<SaveTaskDraftInput['itemRefs']> {
   if (!Array.isArray(value)) return invalid('itemRefs', '任务内容必须是数组。');
   const result: SaveTaskDraftInput['itemRefs'][number][] = [];
   for (const [index, item] of value.entries()) {

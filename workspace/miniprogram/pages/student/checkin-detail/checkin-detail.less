@@ -1,0 +1,70 @@
+.checkin-detail { min-height: 100vh; padding-bottom: 138px; box-sizing: border-box;
+  background: linear-gradient(180deg,rgba(255,255,255,.03) 0%,rgba(255,255,255,.42) 31%,
+    rgba(255,255,255,.58) 72%,rgba(255,255,255,.08) 100%); }
+.checkin-content { position: relative; z-index: 1; padding: 18px 20px 30px; }
+.checkin-card { margin-bottom: 18px; padding: 22px 20px; border: 1px solid rgba(255,255,255,.92);
+  border-radius: @yr-radius-student-card; background: rgba(255,249,240,.98);
+  box-shadow: 0 10px 24px rgba(7,30,73,.11); }
+.checkin-hero { position: relative; overflow: hidden; }
+.checkin-hero-main { display: flex; align-items: flex-start; gap: 16px; }
+.checkin-hero-main g0-icon { flex: 0 0 64px; }
+.checkin-hero-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; }
+.checkin-eyebrow { color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.checkin-title { display: block; margin-top: 6px; color: @yr-text-primary; font-size: 23px;
+  font-weight: 900; line-height: 1.32; overflow-wrap: break-word; }
+.checkin-status { display: inline-flex; margin-top: 10px; padding: 6px 11px; border-radius: 15px;
+  background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; font-weight: 900; line-height: 1.2; }
+.checkin-status.is-complete { background: @yr-surface-green; color: @yr-success; }
+.checkin-meta, .checkin-description-row { display: flex; align-items: flex-start; gap: 12px;
+  margin-top: 16px; padding: 11px 12px; border-radius: 12px; background: rgba(237,247,251,.72);
+  color: @yr-text-secondary; font-size: 12px; line-height: 1.5; }
+.checkin-meta text:first-child, .checkin-description-row text:first-child { flex: none; color: @yr-text-primary; font-weight: 800; }
+.checkin-meta text:last-child, .checkin-description-row text:last-child { flex: 1; min-width: 0; overflow-wrap: break-word; }
+.checkin-description-row { margin-top: 8px; background: rgba(255,255,255,.72); }
+.checkin-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid @yr-border-subtle;
+  color: @yr-text-primary; font-size: 14px; font-weight: 900; }
+.checkin-progress-heading text:last-child { color: @yr-brand-primary; font-size: 13px; }
+.checkin-progress { height: 9px; margin-top: 10px; overflow: hidden; border-radius: 6px; background: @yr-track; }
+.checkin-progress view { height: 100%; border-radius: 6px; background: linear-gradient(90deg,@yr-brand-sky-soft,@yr-brand-primary); }
+.checkin-section-head { display: flex; align-items: center; gap: 13px; }
+.checkin-section-head g0-icon { flex: 0 0 48px; }
+.checkin-section-head > view { flex: 1; min-width: 0; }
+.checkin-heading { display: block; color: @yr-text-primary; font-size: 20px; font-weight: 900; }
+.checkin-help { display: block; margin-top: 5px; color: @yr-text-secondary; font-size: 12px; line-height: 1.45; }
+.requirement-card { display: flex; align-items: center; gap: 12px; box-sizing: border-box;
+  min-height: 96px; margin-top: 12px; padding: 15px 13px; border: 1px solid rgba(23,100,216,.10);
+  border-radius: 18px; background: rgba(255,255,255,.92); box-shadow: 0 4px 12px rgba(7,30,73,.05); }
+.checkin-section-head + .requirement-card { margin-top: 20px; }
+.requirement-card.is-actionable.requirement-card--pressed { background: @yr-surface-blue-50; transform: scale(.99); }
+.requirement-card.is-unavailable { background: rgba(241,248,251,.92); }
+.requirement-card.is-unavailable g0-icon { opacity: .58; }
+.requirement-card g0-icon { flex: 0 0 56px; }
+.requirement-copy { flex: 1; min-width: 0; }
+.requirement-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 7px; }
+.requirement-heading > view { flex: 1; min-width: 0; }
+.requirement-index { display: block; color: @yr-brand-primary; font-size: 10px; font-weight: 900; }
+.requirement-title { display: block; min-width: 0; margin-top: 4px; color: @yr-text-primary;
+  font-size: 17px; font-weight: 900; line-height: 1.35; overflow-wrap: break-word; }
+.requirement-status { flex: none; padding: 5px 8px; border-radius: 12px; background: @yr-surface-blue;
+  color: @yr-brand-primary; font-size: 11px; font-weight: 800; line-height: 1.15; }
+.requirement-status.is-complete { background: @yr-surface-green; color: @yr-success; }
+.requirement-detail, .requirement-note { display: block; margin-top: 6px; color: @yr-text-secondary;
+  font-size: 12px; line-height: 1.45; }
+.requirement-arrow { flex: none; width: 34px; height: 34px; border-radius: 50%;
+  background: @yr-surface-blue; position: relative; }
+.requirement-arrow::after { content: ""; position: absolute; left: 11px; top: 11px;
+  width: 9px; height: 9px; border-top: 3px solid @yr-brand-primary;
+  border-right: 3px solid @yr-brand-primary; transform: rotate(45deg); }
+.checkin-refresh text, .checkin-board text { display: block; line-height: 1.2; }
+.checkin-error { display: block; margin: 8px 0 14px; color: @yr-danger; font-size: 13px; }
+.checkin-actions { position: fixed; z-index: 15; right: 0; bottom: 0; left: 0;
+  display: flex; gap: 12px; box-sizing: border-box; padding: 13px 20px calc(13px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0; background: rgba(255,249,240,.96);
+  box-shadow: 0 -6px 20px rgba(7,30,73,.12); }
+.checkin-refresh, .checkin-board { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: center;
+  box-sizing: border-box; min-height: 50px; margin: 0; padding: 0 12px;
+  border-radius: 25px; font-size: 14px; font-weight: 900; line-height: 1.2; text-align: center; }
+.checkin-refresh { background: @yr-brand-primary; color: @yr-white; }
+.checkin-board { border: 1px solid @yr-brand-primary; background: @yr-white; color: @yr-brand-primary; }
+.checkin-refresh::after, .checkin-board::after { border: 0; }

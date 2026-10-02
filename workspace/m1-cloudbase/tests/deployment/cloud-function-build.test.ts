@@ -5,12 +5,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCloudFunctions, CLOUD_FUNCTIONS } from '../../tools/build-cloud-functions.mjs';
+import { FUNCTION_NAMES } from '../../src/shared/protocol';
 
 const SDK_PACKAGE = '@cloudbase/node-sdk';
 const SDK_VERSION = '3.18.3';
 const CONFIG_TEMPLATE = fileURLToPath(
   new URL('../../../../docs/m1-cloudbase/templates/cloudbaserc.example.json', import.meta.url),
 );
+const TIMER_TEMPLATE = fileURLToPath(
+  new URL('../../../../docs/m2-maintenance-timer-trigger.example.json', import.meta.url),
+);
+const FUNCTION_SECURITY_TEMPLATE = fileURLToPath(
+  new URL('../../../../docs/m1-cloudbase/templates/function-security-rules.example.json', import.meta.url),
+);
+const STORAGE_FRAGMENTS = [
+  fileURLToPath(new URL('../../../../docs/m2-task-recording-storage-rule.example.json', import.meta.url)),
+  fileURLToPath(new URL('../../../../docs/m2-student-work-storage-rule.example.json', import.meta.url)),
+] as const;
 const SECRET_ENVIRONMENT_VARIABLES = [
   'YAREI_SUBJECT_PEPPER',
   'YAREI_QUERY_CURSOR_SIGNING_KEY',
@@ -34,8 +45,8 @@ afterAll(async () => {
 });
 
 describe('CloudBase deployment packages', () => {
-  it('builds sixteen independent CommonJS packages with bundled internal code', async () => {
-    expect(CLOUD_FUNCTIONS).toHaveLength(16);
+  it('builds an independent CommonJS package for every registered function', async () => {
+    expect(CLOUD_FUNCTIONS.map(({ name }) => name).sort()).toEqual([...FUNCTION_NAMES].sort());
     const expectedNames = CLOUD_FUNCTIONS.map(({ name }) => name).sort();
     const packageNames = (await readdir(outputRoot, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
@@ -57,7 +68,10 @@ describe('CloudBase deployment packages', () => {
       expect(bundle).toMatch(/module\.exports|exports\.main/);
       expect(bundle).not.toMatch(/require\(["']\.{1,2}[\\/]/);
       expect(bundle).not.toContain('sourceMappingURL');
-      expect(externalRequires.every((name) => name === SDK_PACKAGE || name.startsWith('node:'))).toBe(true);
+      expect(externalRequires.every((name) => name === SDK_PACKAGE || name.startsWith('node:')
+        || name === 'tty' || name === 'util'
+        || ((functionName === 'student-work-command' || functionName === 'task-recording-command') && name === 'supports-color'
+          && bundle.includes('try {\n      const supportsColor = require("supports-color")')))).toBe(true);
       expect(typeof deploymentModule.main).toBe('function');
       expect(packageJson).toEqual({
         name: `yarei-cloud-function-${functionName}`,
@@ -96,12 +110,32 @@ describe('CloudBase deployment packages', () => {
         runtime: 'Nodejs20.19',
         handler: 'index.main',
         timeout: expected?.timeout,
-        memorySize: 256,
+        memorySize: expected?.memorySize ?? 256,
         installDependency: true,
         envVariables: Object.fromEntries(
           SECRET_ENVIRONMENT_VARIABLES.map((name) => [name, `{{env.${name}}}`]),
         ),
       });
+    }
+    expect(template.functions.find((entry: { name: string }) => entry.name === 'maintenance-timer')?.triggers)
+      .toBeUndefined();
+    expect(JSON.parse(await readFile(TIMER_TEMPLATE, 'utf8'))).toEqual({
+      functionName: 'maintenance-timer', trigger: { name: 'yarei_maintenance_minute',
+        type: 'timer', config: '0 * * * * * *' },
+    });
+    expect(JSON.parse(await readFile(FUNCTION_SECURITY_TEMPLATE, 'utf8'))).toEqual({
+      '*': { invoke: "auth != null && auth.loginType != 'ANONYMOUS'" },
+      'maintenance-timer': { invoke: false },
+    });
+  });
+
+  it('keeps recording storage examples non-deployable until merged with existing environment rules', async () => {
+    for (const path of STORAGE_FRAGMENTS) {
+      const fragment = JSON.parse(await readFile(path, 'utf8'));
+      expect(fragment).toMatchObject({ deployable: false, privateClientReadWrite: false });
+      expect(fragment).not.toHaveProperty('read');
+      expect(fragment).not.toHaveProperty('write');
+      expect(fragment.stagingClientWriteCondition).toContain(fragment.scope.replace('/', '\\/'));
     }
   });
 });

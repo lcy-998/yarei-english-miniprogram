@@ -8,7 +8,7 @@
     "visual:check": "node tools/check-visual-contract.mjs",
     "visual:status": "node tools/check-visual-contract.mjs",
     "admin:check": "npm --prefix admin-console run check",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run tests --exclude **/.runtime/** --passWithNoTests --maxWorkers 4",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run visual:check && npm run test && npm run admin:check"
   },

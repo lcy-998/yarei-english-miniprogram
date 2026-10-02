@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CLOUD_FUNCTIONS } from './build-cloud-functions.mjs';
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_ROOT = resolve(PROJECT_ROOT, '..', '..');
@@ -76,10 +77,15 @@ function replaceVariables(value, variables) {
 }
 
 function assertPreparedConfig(config) {
+  const expectedNames = new Set(CLOUD_FUNCTIONS.map((item) => item.name));
   if (config === null || typeof config !== 'object' || Array.isArray(config)
-    || !Array.isArray(config.functions) || config.functions.length !== 16
+    || !Array.isArray(config.functions) || config.functions.length !== expectedNames.size
     || typeof config.envId !== 'string' || config.envId.length === 0) {
-    throw new Error('Prepared CloudBase config does not match the reviewed 16-function template.');
+    throw new Error('Prepared CloudBase config does not match the reviewed function template.');
+  }
+  const names = config.functions.map((definition) => definition?.name);
+  if (new Set(names).size !== expectedNames.size || names.some((name) => !expectedNames.has(name))) {
+    throw new Error('Prepared CloudBase config function names differ from the build manifest.');
   }
   if (JSON.stringify(config).includes('{{env.')) throw new Error('Prepared CloudBase config still contains unresolved variables.');
   for (const definition of config.functions) {

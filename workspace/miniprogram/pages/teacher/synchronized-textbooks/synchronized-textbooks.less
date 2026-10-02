@@ -1,0 +1,54 @@
+@import "../textbook-pages.less";
+
+.sync-page { padding-bottom: 108px; }
+.sync-content { padding: 10px 16px 28px; }
+.sync-filter-card { margin-top: 0; padding: 14px; }
+.sync-search-row { display: flex; align-items: center; gap: 8px; }
+.sync-search-field { flex: 1; min-width: 0; height: 47px; display: flex; align-items: center; gap: 10px; box-sizing: border-box; padding: 0 14px; border-radius: 15px; background: @yr-surface-blue-75; }
+.sync-search-field input { flex: 1; min-width: 0; height: 100%; color: @yr-text-primary; font-size: 14px; font-weight: 700; }
+.sync-search-icon { position: relative; flex: none; width: 16px; height: 16px; margin-right: 4px; box-sizing: border-box; border: 2px solid @yr-text-secondary; border-radius: 50%; }
+.sync-search-icon::after { content: ""; position: absolute; right: -7px; bottom: -4px; width: 8px; height: 2px; border-radius: 2px; background: @yr-text-secondary; transform: rotate(45deg); }
+.sync-search-button { flex: none; width: 56px; min-width: 56px; height: 44px; margin: 0; padding: 0 6px; display: flex; align-items: center; justify-content: center; border-radius: 15px; background: @yr-brand-primary; color: #fff; font-size: 14px; font-weight: 800; line-height: 1.2; box-sizing: border-box; }
+.sync-filter-heading { display: flex; align-items: center; justify-content: space-between; min-height: 36px; margin-top: 9px; }
+.sync-filter-caption { color: @yr-text-primary; font-size: 14px; font-weight: 850; }
+.sync-filter-heading button { margin: 0; padding: 0 2px; background: transparent; color: @yr-brand-primary; font-size: 13px; font-weight: 800; line-height: 32px; }
+.sync-filter-heading button::after { border: 0; }
+.sync-filter-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.sync-filter-grid picker { display: block; min-width: 0; }
+.sync-filter-grid picker:last-child { grid-column: 1 / -1; }
+.sync-filter-item { display: flex; flex-direction: column; justify-content: center; min-width: 0; min-height: 62px; padding: 9px 12px; border: 1px solid @yr-border-subtle; border-radius: 14px; background: @yr-surface-blue-75; box-sizing: border-box; }
+.sync-filter-label { color: @yr-text-secondary; font-size: 12px; font-weight: 800; line-height: 1.3; }
+.sync-filter-value { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 5px; color: @yr-text-primary; font-size: 14px; font-weight: 800; line-height: 1.3; }
+.sync-filter-value text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-results-heading { margin: 19px 2px 9px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sync-results-heading text:first-child { color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.sync-results-heading text:last-child { color: @yr-text-secondary; font-size: 13px; font-weight: 700; }
+.sync-book-card { margin-top: 11px; padding: 15px; }
+.sync-book-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; width: 100%; }
+.book-select { flex: 0 0 30px; min-width: 30px; max-width: 30px; width: 30px; height: 30px; margin: 8px 0 0; padding: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid @yr-text-tertiary; border-radius: 8px; background: #fff; color: #fff; font-size: 18px; font-weight: 900; line-height: 1; }
+.book-select.active { border-color: @yr-brand-primary; background: @yr-brand-primary; }
+.book-select--pressed { opacity: .75; }
+.sync-book-cover { flex: none; width: 65px; height: 84px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 3px solid #cbe5ff; border-radius: 8px 12px 12px 8px; background: linear-gradient(145deg,#81ccff,#3189e3); box-shadow: 3px 4px 8px rgba(23,100,216,.13); }
+.sync-book-cover-image { border-color: #d6eaff; background: #f3f8ff; }
+.sync-book-cover g0-icon { display: block; }
+.sync-book-copy { flex: 1 1 0; min-width: 0; }
+.sync-book-copy .textbook-card-title { font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+.sync-book-copy .textbook-card-meta { margin-top: 5px; font-size: 13px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.sync-book-badge { display: inline-block; margin-top: 7px; padding: 4px 8px; border-radius: 11px; background: @yr-surface-green; color: @yr-success; font-size: 12px; font-weight: 800; }
+.sync-book-summary { margin-top: 13px; padding: 9px 11px; border-radius: 12px; background: @yr-surface-blue-75; color: @yr-text-secondary; font-size: 13px; font-weight: 700; }
+.sync-book-card .textbook-card-actions { margin-top: 12px; }
+.sync-book-card .textbook-card-actions button { flex: 1; min-height: 40px; font-size: 14px; }
+.sync-book-card .textbook-card-actions button:last-child { background: @yr-brand-primary; color: #fff; }
+.sync-empty { padding: 27px 18px; text-align: center; }
+.sync-empty-title, .sync-empty-note { display: block; }
+.sync-empty-title { color: @yr-text-primary; font-size: 16px; font-weight: 900; }
+.sync-empty-note { margin-top: 7px; color: @yr-text-secondary; font-size: 13px; font-weight: 700; line-height: 1.5; }
+.sync-more { margin-top: 13px; }
+.sync-footer { min-height: 72px; }
+.sync-selected-count { flex: 1; color: @yr-text-primary; font-size: 14px; font-weight: 800; }
+.sync-selected-count text { color: @yr-brand-primary; font-size: 20px; font-weight: 900; }
+.sync-footer .primary { flex: 1.3; min-height: 48px; line-height: 1.2; }
+.sync-footer .sync-clear { flex: none; min-width: 44px; margin: 0; padding: 0 5px; background: transparent; color: @yr-brand-primary; font-size: 14px; font-weight: 800; }
+.sync-footer .sync-clear::after { border: 0; }
+.preview-shade { position: fixed; z-index: 40; inset: 0; display: flex; align-items: flex-end; background: rgba(4,22,61,.4); }
+.preview-panel { box-sizing: border-box; width: 100%; max-height: 78vh; overflow-y: auto; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: #fff; }

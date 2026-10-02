@@ -1,22 +1,22 @@
 <view class="page">
   <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
   <app-header title="任务中心"></app-header>
-  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
-  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTasks"></state-panel>
-  <view wx:else class="content">
-    <view class="overview"><view><text class="overview-label">课堂任务</text><text class="overview-title">今天从这里开始工作</text><text class="overview-note">布置、检查和点评集中处理</text></view><view class="overview-count"><text>{{pendingCount}}</text><text>待检查</text></view></view>
+  <view class="content">
+    <view class="overview"><view><text class="overview-label">课堂任务</text><text class="overview-title">今天从这里开始工作</text><text class="overview-note">布置、检查和点评集中处理</text></view><view class="overview-count"><text>{{loading ? '…' : pendingCount}}</text><text>待检查</text></view></view>
     <view class="entry-grid">
-      <view class="entry entry--blue" bindtap="publish" aria-role="button"><g0-icon name="publish" size="68"></g0-icon><text>布置任务</text><text>创建课堂任务</text></view>
-      <view class="entry entry--green" bindtap="focusTasks" aria-role="button"><g0-icon name="check" tone="success" size="68"></g0-icon><text>检查任务</text><text>{{pendingCount}} 份待处理</text></view>
+      <view class="entry entry--blue" bindtap="publish" aria-role="button"><g0-icon name="publish" size="68"></g0-icon><text>布置任务</text><text>课堂或打卡活动</text></view>
+      <view class="entry entry--green" bindtap="focusTasks" aria-role="button"><g0-icon name="check" tone="success" size="68"></g0-icon><text>检查任务</text><text>{{loading ? '正在更新' : pendingCount + ' 份待处理'}}</text></view>
       <view class="entry entry--purple" bindtap="quickReview" aria-role="button"><g0-icon name="review" tone="ai" size="68"></g0-icon><text>快速点评</text><text>评分与反馈</text></view>
     </view>
-    <view class="section-head" id="teacher-task-list"><view><text>最近任务</text><text>当前显示 {{tasks.length}} 项</text></view><button class="filter-pill" bindtap="toggleStatusFilter">{{statusFilter}}</button></view>
+    <view class="section-head" id="teacher-task-list"><view><text>最近任务</text><text>{{loading ? '正在加载任务' : error ? '加载失败' : '当前显示 ' + tasks.length + ' 项'}}</text></view><button class="filter-pill" bindtap="toggleStatusFilter">{{statusFilter}}</button></view>
     <input class="task-search" value="{{keyword}}" bindinput="onSearch" placeholder="搜索任务名称"/>
-    <view wx:for="{{tasks}}" wx:key="id" class="task-card">
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTasks"></state-panel>
+    <block wx:else><view wx:for="{{tasks}}" wx:key="id" class="task-card">
       <view class="task-status"></view><view class="task-copy"><text class="title">{{item.title}}</text><text class="meta">截止 {{item.dueLabel}}　完成率 {{item.progressPercent}}%　待检查 {{item.pendingReviewCount}}</text><view class="task-progress"><view style="width: {{item.progressPercent}}%;"></view></view></view>
       <button class="{{item.pendingReviewCount ? '' : 'secondary'}}" data-id="{{item.id}}" bindtap="review">{{item.status === 'draft' ? '继续编辑' : item.pendingReviewCount ? '检查点评' : '查看完成情况'}}</button>
     </view>
-    <view wx:if="{{!tasks.length}}" class="empty">暂无已发布任务，使用上方入口创建第一项课堂任务。</view>
+    <view wx:if="{{!tasks.length}}" class="empty">暂无已发布任务，使用上方入口创建第一项课堂任务。</view></block>
   </view>
   <g0-tab-bar role="teacher" active="tasks"></g0-tab-bar>
 </view>

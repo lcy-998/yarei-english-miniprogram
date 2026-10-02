@@ -15,7 +15,8 @@ export type PermissionKey =
   | 'user.disable'
   | 'permission.view'
   | 'permission.manage'
-  | 'audit.view';
+  | 'audit.view'
+  | 'student_work.restore';
 
 export interface School {
   id: string;
@@ -106,6 +107,7 @@ export const ALL_PERMISSIONS: PermissionKey[] = [
   'permission.view',
   'permission.manage',
   'audit.view',
+  'student_work.restore',
 ];
 
 export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: PermissionKey; label: string }> }> = [
@@ -129,6 +131,7 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: Permi
       { key: 'user.bind', label: '绑定关系' },
       { key: 'user.resetPassword', label: '重置密码' },
       { key: 'user.disable', label: '停用用户' },
+      { key: 'student_work.restore', label: '恢复已删作品草稿' },
     ],
   },
   {

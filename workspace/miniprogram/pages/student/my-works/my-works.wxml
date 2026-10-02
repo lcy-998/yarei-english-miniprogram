@@ -1,0 +1,11 @@
+<g0-page-shell nature="{{true}}" tone="nature"><view class="my-works-page"><app-header title="我的作品" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadWorks"></state-panel>
+  <view wx:else class="my-works-content"><view class="works-heading"><text>我的配音作品</text><text>查看已提交作品和未完成草稿</text></view>
+    <view class="work-filters"><button class="{{statusFilter === 'all' ? 'active' : ''}}" data-status="all" bindtap="chooseStatus">全部</button><button class="{{statusFilter === 'draft' ? 'active' : ''}}" data-status="draft" bindtap="chooseStatus">草稿</button><button class="{{statusFilter === 'submitted' ? 'active' : ''}}" data-status="submitted" bindtap="chooseStatus">已提交</button></view>
+    <view wx:if="{{!visibleRows.length}}" class="works-empty"><text>{{statusFilter === 'all' ? '还没有作品或草稿' : '当前分类暂无作品'}}</text><button bindtap="openDubbing">去配音</button></view>
+    <text wx:if="{{playbackError}}" class="playback-error">{{playbackError}}</text>
+    <text wx:if="{{deleteError}}" class="playback-error">{{deleteError}}</text>
+    <view wx:for="{{visibleRows}}" wx:key="id" class="work-card"><text class="work-title">{{item.materialTitle}}</text><text class="work-status">{{item.statusLabel}}</text><text class="work-meta">{{item.submittedLabel}}　{{item.durationLabel}}</text><text wx:if="{{item.note}}" class="work-note">{{item.note}}</text><text wx:if="{{item.isDraft}}" class="work-note">草稿尚未提交，无法试听。</text><text wx:elif="{{item.mediaExpired}}" class="work-note">作品记录仍保留，原始录音已过保留期，无法试听。</text><view class="work-actions"><button wx:if="{{!item.isDraft && !item.mediaExpired}}" class="play-work" data-id="{{item.id}}" bindtap="playWork">{{playingId === item.id ? '停止试听' : '试听作品'}}</button><button class="play-work" data-id="{{item.id}}" bindtap="redoWork">{{item.isDraft ? '继续配音' : '重新配音'}}</button><button wx:if="{{item.isDraft}}" class="delete-draft" disabled="{{!!deletingId}}" loading="{{deletingId === item.id}}" data-id="{{item.id}}" bindtap="confirmDeleteDraft">删除草稿</button></view></view>
+  </view>
+</view></g0-page-shell>

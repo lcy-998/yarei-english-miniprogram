@@ -8,6 +8,8 @@ import { createCloudBaseRuntimeAdapter } from '../../src/runtime/cloudbase-runti
 import { InMemoryBusinessSessionRepository, InMemoryIdentityRepository, type AuthorizationFixture } from '../../src/runtime/memory-ports';
 import { createNodeCryptoCapabilities, type NodeCryptoSecrets } from '../../src/runtime/node-crypto-capabilities';
 import { DocumentDatabasePlatformError } from '../../src/repositories/document-database-port';
+import { FakeDocumentDatabase } from '../../src/repositories/fake-document-database';
+import { StudentWorkAdminService } from '../../src/student-work/admin-service';
 import type { BusinessSessionRepository } from '../../src/runtime/ports';
 import type { RoleAssignmentRecord, UserRecord } from '../../src/runtime/records';
 
@@ -140,6 +142,7 @@ describe('独立管理后台服务端会话', () => {
       clock: harness.clock,
       requestIds: { next: () => 'req_organization_admin' },
       handler: organizationHandler(),
+      studentWorks: new StudentWorkAdminService(new FakeDocumentDatabase(), harness.clock),
     });
 
     expect(await adminMain({
@@ -148,6 +151,25 @@ describe('独立管理后台服务端会话', () => {
       payload: {},
       businessSessionToken: bootstrap.data.token,
     })).toMatchObject({ ok: true, data: [{ id: 'cls_demo', name: '三年级 2 班' }] });
+    expect(await adminMain({ apiVersion: 'm1.v1', action: 'listDeletedWorkDrafts',
+      payload: { studentId: 'student_demo', page: { limit: 20, offset: 0 } },
+      businessSessionToken: bootstrap.data.token })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+
+    const privilegedIdentities = new InMemoryIdentityRepository({ ...harness.fixture,
+      roles: harness.fixture.roles.map(role => role.role === 'admin'
+        ? { ...role, permissions: [...role.permissions, 'student_work.restore'] } : role) });
+    const privilegedMain = createOrganizationAdminFunction({
+      runtime: adminRuntime,
+      actorResolver: new RepositoryTrustedActorResolver(privilegedIdentities, harness.sessions,
+        harness.crypto.subjectDigest, harness.clock, { next: () => 'req_restore_actor' }),
+      clock: harness.clock, requestIds: { next: () => 'req_restore_result' },
+      handler: organizationHandler(),
+      studentWorks: new StudentWorkAdminService(new FakeDocumentDatabase(), harness.clock),
+    });
+    expect(await privilegedMain({ apiVersion: 'm1.v1', action: 'listDeletedWorkDrafts',
+      payload: { studentId: 'student_demo', page: { limit: 20, offset: 0 } },
+      businessSessionToken: bootstrap.data.token })).toMatchObject({ ok: true,
+      data: { items: [], nextOffset: null } });
 
     const miniSessionId = 'ses_0123456789abcdef0123456789abcdef';
     await harness.sessions.startOrResume({
@@ -176,10 +198,14 @@ describe('独立管理后台服务端会话', () => {
       clock: harness.clock,
       requestIds: { next: () => 'req_mini_transport' },
       handler: organizationHandler(),
+      studentWorks: new StudentWorkAdminService(new FakeDocumentDatabase(), harness.clock),
     });
     expect(await miniMain({
       apiVersion: 'm1.v1', action: 'listClasses', payload: {}, businessSessionToken: miniToken,
     })).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } });
+    expect(await miniMain({ apiVersion: 'm1.v1', action: 'listDeletedWorkDrafts',
+      payload: { studentId: 'student_demo', page: { limit: 20, offset: 0 } },
+      businessSessionToken: miniToken })).toMatchObject({ ok: false, error: { code: 'UNAUTHENTICATED' } });
   });
 
   it.each([

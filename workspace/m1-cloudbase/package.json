@@ -17,15 +17,17 @@
     "cloud:smoke:capacity": "node tools/run-cloud-capacity-smoke.mjs",
     "cloud:smoke:admin-update-user": "node tools/run-cloud-admin-update-user-smoke.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run tests --exclude **/.runtime/** --passWithNoTests --maxWorkers 4",
     "check": "npm run typecheck && npm run test"
   },
   "devDependencies": {
     "@cloudbase/adapter-node": "2.0.0",
+    "@types/node": "20.19.43",
     "esbuild": "0.28.2"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "3.9.3",
-    "@cloudbase/node-sdk": "3.18.3"
+    "@cloudbase/node-sdk": "3.18.3",
+    "music-metadata": "11.16.1"
   }
 }

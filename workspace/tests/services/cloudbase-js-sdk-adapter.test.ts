@@ -135,6 +135,18 @@ describe('@cloudbase/js-sdk v3 client adapter', () => {
     expect(JSON.stringify(result)).not.toContain('private-env-id')
     expect(JSON.stringify(result)).not.toContain('sensitive provider detail')
   })
+
+  it('treats the SDK unauthenticated envelope as an expired login and clears the old session', async () => {
+    const expired = vi.fn()
+    const client = createCloudRepositoryClient({
+      async call() { throw { error: 'unauthenticated', error_description: 'private access token detail' } },
+    }, () => ({ sessionId: 'old-business-session' }), expired)
+    const result = await client.call('notification-query', 'list', { filter: 'all' })
+    expect(result).toEqual({ ok: false, error: { code: 'UNAUTHENTICATED',
+      message: '登录状态已失效，请重新登录', retryable: false } })
+    expect(expired).toHaveBeenCalledOnce()
+    expect(JSON.stringify(result)).not.toContain('private access token detail')
+  })
 })
 
 function fakeApp(

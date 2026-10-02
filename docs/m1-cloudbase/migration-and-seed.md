@@ -113,7 +113,7 @@ npm run seed:hash
 - 每个 class membership/grant/link 的两端对象存在且同 organization。
 - 每个 published task 至少一个 item 快照；资源下架不影响快照读取。
 - `(taskId, studentId)` 无重复 assignment。
-- `(assignmentId, submission.version)` 无重复且版本连续。
+- `(assignmentId, submission.version)` 在历史种子包内无重复且连续；导入运行态后对应业务字段 `submissionVersion`。数据库文档 CAS `version` 不参与提交唯一键。
 - `latestSubmissionId/latestSubmissionVersion` 指向该 assignment 的最新有效提交。
 - 每条 feedback 指向明确 submission/version，M1 每版本最多一个正式反馈。
 - 完成、未完成、待检查、待点评统计从底层记录重算后与预期一致。

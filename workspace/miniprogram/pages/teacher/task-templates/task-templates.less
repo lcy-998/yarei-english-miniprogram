@@ -1,0 +1,22 @@
+@import "../../../styles/m1-pages.less";
+.template-page{min-height:100vh;padding-bottom:108px}
+.template-content{position:relative;z-index:2;padding:12px 12px 26px}
+.template-hero,.template-card,.template-empty{margin-bottom:11px;padding:17px;border:@yr-card-border;border-radius:19px;background:rgba(255,255,255,.97);box-shadow:0 5px 15px rgba(7,30,73,.07)}
+.template-hero text:first-child{display:block;color:@yr-text-primary;font-size:20px;font-weight:900}
+.template-hero text:last-child{display:block;margin-top:8px;color:@yr-text-secondary;font-size:14px;font-weight:700;line-height:1.5}
+.template-filters{display:flex;gap:0;margin-bottom:12px;padding:4px;border-radius:16px;background:rgba(228,240,255,.8)}
+.template-filters button{flex:1;min-height:42px;margin:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:transparent;color:@yr-text-secondary;font-size:14px;font-weight:800;line-height:1.2}
+.template-filters button.active{background:#fff;color:@yr-brand-primary;box-shadow:0 3px 9px rgba(7,30,73,.09)}
+.template-filters button::after,.template-actions button::after,.rename-row button::after{border:0}
+.template-empty{color:@yr-text-secondary;font-size:14px}
+.template-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.template-title{min-width:0;color:@yr-text-primary;font-size:17px;font-weight:900}
+.template-scope{flex:none;padding:5px 8px;border-radius:10px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:12px;font-weight:800}
+.template-meta,.template-desc{display:block;margin-top:8px;color:@yr-text-secondary;font-size:13px;font-weight:700;line-height:1.5}
+.template-desc{color:@yr-text-primary;font-size:13px}
+.template-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.template-actions button{min-height:40px;margin:0;padding:0 11px;display:flex;align-items:center;justify-content:center;border:1px solid @yr-border-subtle;border-radius:13px;background:#fff;color:@yr-brand-primary;font-size:13px;font-weight:800;line-height:1.2}
+.template-actions button:first-child{background:@yr-gradient-primary;color:#fff}
+.rename-row{display:flex;gap:6px;margin-top:12px}
+.rename-row input{flex:1;min-width:0;height:38px;padding:0 10px;border:1px solid @yr-border-subtle;border-radius:12px;background:#fff}
+.rename-row button{min-height:40px;margin:0;padding:0 10px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:13px;font-weight:800;line-height:1.2}

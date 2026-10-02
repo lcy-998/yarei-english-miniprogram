@@ -35,6 +35,8 @@ import {
 } from './cloudbase-composition';
 import type { TrustedBusinessSessionSource } from '../../src/runtime/cloudbase-runtime-adapter';
 import type { DocumentDatabasePort } from '../../src/repositories/document-database-port';
+import type { CloudBaseWorkStoragePort } from '../../src/student-work/cloudbase-recording-seal';
+import type { CloudBasePlaybackSdkPort } from '../../src/student-work/cloudbase-playback';
 import type { RequestIdGenerator, ResultClock } from '../../src/shared/result';
 
 export interface CloudBaseApplicationHandlers {
@@ -63,6 +65,9 @@ export interface CloudBaseFunctionRuntimeCapabilities {
   readonly subjectDigest: SubjectDigestPort;
   readonly identifiers: IdentifierGenerator;
   readonly documents?: DocumentDatabasePort;
+  readonly recordingStorage?: CloudBaseWorkStoragePort;
+  readonly playbackStorage?: CloudBasePlaybackSdkPort;
+  readonly environmentId?: string;
   readonly clock?: Clock & ResultClock;
   readonly requestIds?: RequestIdGenerator;
   readonly businessSession?: TrustedBusinessSessionSource;

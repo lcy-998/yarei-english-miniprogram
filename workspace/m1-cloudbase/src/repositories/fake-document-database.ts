@@ -48,6 +48,21 @@ export class FakeDocumentDatabase implements DocumentDatabasePort {
       .map(cloneDocument);
   }
 
+  public async findPage(collection: string, criteria: DocumentData, page: Readonly<{ limit: number; offset: number }>): Promise<Readonly<{
+    items: readonly VersionedDocument[];
+    hasMore: boolean;
+  }>> {
+    validatePage(page);
+    this.throwIfArmed('find', collection);
+    const matching = [...(this.collections.get(collection)?.values() ?? [])]
+      .filter((document) => matches(document, criteria))
+      .sort((left, right) => left._id < right._id ? -1 : left._id > right._id ? 1 : 0);
+    return {
+      items: matching.slice(page.offset, page.offset + page.limit).map(cloneDocument),
+      hasMore: matching.length > page.offset + page.limit,
+    };
+  }
+
   public async runTransaction<T>(work: (transaction: DocumentDatabaseTransactionPort) => Promise<T>): Promise<T> {
     let release: () => void = () => undefined;
     const previous = this.transactionTail;
@@ -84,6 +99,13 @@ export class FakeDocumentDatabase implements DocumentDatabasePort {
       failure.kind,
       failure.diagnosticMessage ?? `simulated ${operation} failure`,
     );
+  }
+}
+
+function validatePage(page: Readonly<{ limit: number; offset: number }>): void {
+  if (!Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 50
+    || !Number.isSafeInteger(page.offset) || page.offset < 0 || page.offset > 10000) {
+    throw new DocumentDatabasePlatformError('invalid-data', 'Invalid document page request.');
   }
 }
 

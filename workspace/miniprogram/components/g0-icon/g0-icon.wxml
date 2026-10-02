@@ -1,1 +1,1 @@
-<view class="g0-icon g0-icon--{{name}} g0-icon--{{tone}}" style="width: {{size}}px; height: {{size}}px;" aria-hidden="true"><view class="g0-icon__shape"><text wx:if="{{name === 'word'}}">A</text></view></view>
+<view class="g0-icon g0-icon--{{name}} g0-icon--{{tone}}" style="width: {{size}}px; height: {{size}}px;" aria-hidden="true"><view class="g0-icon__shape"><text wx:if="{{name === 'word'}}">A</text><text wx:elif="{{name === 'vocabulary'}}">Aa</text></view></view>

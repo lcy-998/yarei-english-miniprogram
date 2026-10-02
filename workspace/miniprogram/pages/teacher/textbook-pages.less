@@ -1,0 +1,33 @@
+@import "../../styles/m1-pages.less";
+.textbook-page { padding-bottom: 104px; }
+.textbook-content { position: relative; z-index: 2; padding: 12px 12px 28px; }
+.textbook-title { display: block; color: @yr-text-primary; font-size: 24px; font-weight: 900; }
+.textbook-subtitle { display: block; margin-top: 6px; color: @yr-text-secondary; font-size: 14px; font-weight: 700; line-height: 1.5; }
+.textbook-card { margin-top: 11px; padding: 15px; border: @yr-card-border; border-radius: 19px; background: rgba(255,255,255,.97); box-shadow: 0 5px 15px rgba(7,30,73,.07); }
+.textbook-card-title { display: block; color: @yr-text-primary; font-size: 17px; font-weight: 850; }
+.textbook-card-meta { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 14px; font-weight: 700; line-height: 1.5; }
+.textbook-card-actions { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+.textbook-card-actions button, .textbook-secondary { margin: 0; padding: 0 12px; min-height: 38px; border: 1px solid @yr-brand-primary; border-radius: 17px; background: #fff; color: @yr-brand-primary; font-size: 14px; font-weight: 800; line-height: 36px; }
+.textbook-card-actions button[disabled] { border-color: #b8c5d9; color: #8794a9; }
+.textbook-input { box-sizing: border-box; width: 100%; min-height: 44px; margin-top: 9px; padding: 0 13px; border: @yr-card-border; border-radius: 12px; background: #f3f8ff; color: @yr-text-primary; font-size: 14px; font-weight: 700; }
+.textbook-filter-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.textbook-primary { width: 100%; margin: 12px 0 0; border-radius: 20px; background: @yr-gradient-primary; color: #fff; font-size: 15px; font-weight: 850; }
+.textbook-empty { padding: 24px; color: @yr-text-secondary; font-size: 14px; line-height: 1.6; text-align: center; }
+.textbook-error { display: block; margin-top: 10px; color: #a53230; font-size: 13px; }
+.textbook-chip { display: inline-block; margin: 7px 6px 0 0; padding: 5px 9px; border-radius: 13px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.textbook-footer { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: flex; align-items: center; gap: 8px; min-height: 67px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); box-sizing: border-box; border-radius: 18px 18px 0 0; background: #fff; box-shadow: 0 -6px 24px rgba(31,66,120,.12); }
+.textbook-footer button { flex: 1; margin: 0; border-radius: 18px; font-size: 14px; font-weight: 850; }
+.textbook-footer .primary { background: @yr-gradient-primary; color: #fff; }
+.textbook-footer .secondary { border: 1px solid @yr-brand-primary; background: #fff; color: @yr-brand-primary; }
+.textbook-row { display: flex; gap: 9px; justify-content: space-between; align-items: center; }
+.textbook-row-main { flex: 1; min-width: 0; }
+.textbook-reorder { display: flex; gap: 4px; }
+.textbook-reorder button { min-width: 34px; height: 34px; margin: 0; padding: 0; border-radius: 10px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 14px; line-height: 34px; }
+.textbook-footer .secondary { min-width: 0; }
+.textbook-card-actions button { min-height: 38px; line-height: 36px; }
+.textbook-card-actions button:active, .textbook-secondary:active { background: @yr-surface-blue; }
+.textbook-primary { min-height: 46px; box-shadow: 0 5px 12px rgba(23,100,216,.15); }
+.textbook-title { font-size: 21px; }
+.textbook-subtitle { margin-top: 4px; }
+.textbook-card-title { line-height: 1.4; }
+.textbook-chevron { flex: none; width: 10px; height: 10px; margin: -5px 2px 0 0; border-right: 3px solid @yr-brand-primary; border-bottom: 3px solid @yr-brand-primary; border-radius: 1px; transform: rotate(45deg); }

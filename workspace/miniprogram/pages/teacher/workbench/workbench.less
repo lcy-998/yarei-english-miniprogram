@@ -9,9 +9,10 @@ button { margin: 0; padding: 0; background: transparent; line-height: normal; }
 button::after { border: 0; }
 
 .greeting-row { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.greeting-row > text { color: @yr-text-primary; font-size: 28px; font-weight: 900; white-space: nowrap; }
-.greeting-row button { flex: 0 0 auto; min-height: 42px; padding: 0 13px; display: flex; align-items: center; gap: 7px; border-radius: 21px; background: rgba(255,255,255,.9); color: @yr-text-secondary; font-size: 13px; font-weight: 800; box-shadow: @yr-card-shadow; }
-.filter-arrow { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.greeting-row > text { flex: 1; min-width: 0; overflow: hidden; color: @yr-text-primary; font-size: 28px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+.greeting-row button { flex: 0 0 98px; width: 98px; min-width: 0; min-height: 42px; padding: 0 9px; display: flex; align-items: center; justify-content: space-between; gap: 5px; border-radius: 21px; background: rgba(255,255,255,.9); color: @yr-text-secondary; font-size: 13px; font-weight: 800; box-shadow: @yr-card-shadow; }
+.filter-label { flex: 1; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.filter-arrow { flex: 0 0 8px; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
 
 .quick-grid { padding: 8px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; border: @yr-card-border; border-radius: @yr-radius-role-card; background: rgba(255,249,240,.96); box-shadow: @yr-card-shadow-strong; }
 .quick { width: 100%; min-width: 0; min-height: 90px; padding: 6px 2px 8px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-radius: 17px; }
@@ -40,6 +41,7 @@ button::after { border: 0; }
 .task-row > view:nth-child(2) text:last-child { margin-top: 2px; color: @yr-text-secondary; font-size: 11px; }
 .task-row > text { flex: 0 0 auto; color: @yr-text-secondary; font-size: 12px; white-space: nowrap; }
 .task-row > text text { color: @yr-brand-primary; font-size: 18px; font-weight: 900; }
+.task-empty { padding: 17px 7px 6px; border-top: 1px solid @yr-border-subtle; color: @yr-text-secondary; font-size: 14px; font-weight: 700; text-align: center; }
 .row-arrow { flex: 0 0 auto; width: 9px; height: 9px; border-right: 3px solid @yr-brand-primary; border-top: 3px solid @yr-brand-primary; border-radius: 2px; transform: rotate(45deg); }
 
 .ongoing-grid { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -54,10 +56,14 @@ button::after { border: 0; }
 .class-update > view:nth-child(2) { flex: 1; min-width: 0; }
 .class-update > view:nth-child(2) text { display: block; }
 .class-update > view:nth-child(2) text:first-child { color: @yr-text-primary; font-size: 17px; font-weight: 900; }
-.class-update > view:nth-child(2) text:last-child { margin-top: 3px; color: @yr-text-secondary; font-size: 11px; }
-.class-update > text { flex: 0 0 auto; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.class-update > view:nth-child(2) text:last-child { margin-top: 3px; overflow: hidden; color: @yr-text-secondary; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.class-update > text { flex: 0 0 auto; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
 .workbench-class-filter { position: relative; z-index: 20; }
 .workbench-class-menu { position: absolute; z-index: 30; top: 50px; right: 0; width: 150px; padding: 6px; border-radius: 14px; background: #fff; box-shadow: 0 8px 18px rgba(7,30,73,.16); }
 .workbench-class-option { min-height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: @yr-text-primary; font-size: 12px; font-weight: 800; }
 .workbench-class-option.selected { background: @yr-surface-blue; color: @yr-brand-primary; }
 .greeting-row .filter-arrow.is-open { transform: rotate(225deg) translate(-1px,-1px); }
+@media screen and (max-width: 360px) {
+  .greeting-row > text { font-size: 24px; }
+  .greeting-row button { flex-basis: 92px; width: 92px; }
+}

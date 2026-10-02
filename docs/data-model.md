@@ -170,7 +170,7 @@ Submission 1 ── 0..1 ReviewFeedback（M0 每版本至多一个正式结果�
 ## 4. 一致性规则
 
 - 发布任务时在同一写操作中固化任务项快照并为目标学生创建 assignment；部分成功必须回滚。
-- `(taskId, studentId)` 唯一，`(assignmentId, version)` 唯一。
+- `(taskId, studentId)` 唯一，`(assignmentId, submissionVersion)` 唯一；文档 CAS `version` 独立递增。
 - 完成数来自 assignment 状态，不从页面缓存累加；待点评数为有效提交中尚无正式反馈的数量。
 - 反馈必须指向明确提交版本；新版本不会覆盖旧反馈。
 - 家长列表、学生详情和教师完成情况通过同一 assignment/submission/feedback 生成视图，不保存互相独立的统计副本。

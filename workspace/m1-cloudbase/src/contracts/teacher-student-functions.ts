@@ -47,7 +47,7 @@ export function validateTeacherStudentQueryRequest(
   const pageObject = parseExactObject(exact.value.page, ['limit'], ['cursor']);
   if (!pageObject.ok) return prefixErrors(pageObject, 'page');
   const status = filtersObject.value.status;
-  if (status !== 'all' && status !== 'normal' && status !== 'attention' && status !== 'disabled') {
+  if (status !== 'all' && status !== 'active' && status !== 'normal' && status !== 'attention' && status !== 'disabled') {
     return invalid('filters.status', '学员状态筛选无效。');
   }
   const classId = optionalString(filtersObject.value.classId, 'filters.classId', 128);

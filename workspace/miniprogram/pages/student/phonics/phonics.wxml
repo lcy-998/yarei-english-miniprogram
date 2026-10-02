@@ -1,0 +1,26 @@
+<g0-page-shell nature="{{true}}" tone="nature"><view class="phonics-page"><app-header title="自然拼读" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadCourses"></state-panel>
+  <view wx:else class="phonics-content">
+    <view wx:if="{{mode === 'catalog'}}" class="phonics-card catalog-card"><view class="catalog-heading"><view><text class="section-title">拼读课程</text><text class="section-hint">选择课程，学习音素并完成练习。</text></view><text class="course-count">{{visibleCourses.length}} 门课程</text></view>
+      <scroll-view scroll-x="{{true}}" class="grade-tabs"><button wx:for="{{grades}}" wx:key="*this" class="grade-chip {{gradeFilter === item ? 'active' : ''}}" data-grade="{{item}}" bindtap="chooseGrade">{{item}}</button></scroll-view>
+      <view wx:if="{{!visibleCourses.length}}" class="empty-course">当前条件下暂无可学课程</view>
+      <view wx:for="{{visibleCourses}}" wx:key="id" class="course-row" data-id="{{item.id}}" bindtap="openCourse" aria-role="button" aria-label="开始学习 {{item.title}}"><g0-icon name="reading" size="{{52}}"></g0-icon><view class="course-copy"><text class="course-title">{{item.title}}</text><text class="course-meta">{{item.grade}}　{{item.unit}}　{{item.questionCount}} 题</text></view><view class="course-arrow" aria-hidden="true"><text>›</text></view></view>
+    </view>
+    <block wx:elif="{{course}}"><view class="phonics-card"><button class="back-courses" bindtap="backToCourses">‹ 全部课程</button><view class="course-hero"><g0-icon name="reading" size="{{60}}"></g0-icon><view><text class="course-heading">{{course.title}}</text><text class="section-hint">{{course.grade}}　{{course.unit}}</text></view></view>
+      <text class="progress-label">第 {{practiceRound}} 轮　已练 {{practiceRound > state.currentRound ? 0 : state.completedCount}}/{{course.questions.length}}　{{practiceRound > state.currentRound ? '新一轮待开始' : state.score === null ? '继续完成练习' : '本轮得分 ' + state.score + ' 分'}}</text>
+      <view class="progress-track"><view style="width:{{(practiceRound > state.currentRound ? 0 : state.completedCount) * 100 / course.questions.length}}%"></view></view>
+      <view class="mode-tabs"><button class="{{mode === 'lesson' ? 'active' : ''}}" bindtap="backToLesson">学习</button><button class="{{mode === 'practice' ? 'active' : ''}}" bindtap="startPractice">练习</button><button class="{{mode === 'wrong' ? 'active' : ''}}" bindtap="openWrong">错题 {{wrongQuestions.length}}</button></view>
+      <view wx:if="{{state.history.length}}" class="score-history"><text>练习记录</text><text wx:for="{{state.history}}" wx:key="round">第 {{item.round}} 轮　{{item.score}} 分</text></view>
+    </view>
+      <view wx:if="{{mode === 'lesson'}}" class="phonics-card"><text class="section-title">音素与示例词</text><view wx:for="{{course.phonemes}}" wx:key="id" class="phoneme-row"><view><text class="phoneme-label">{{item.label}}</text><text class="example-words">{{item.exampleLabel}}</text></view><button wx:if="{{item.audioAvailable}}" data-id="{{item.id}}" bindtap="playPhoneme">播放发音</button><text wx:else class="no-audio">音频待接入</text></view><button class="primary-button" bindtap="startPractice">开始练习</button></view>
+      <view wx:elif="{{mode === 'wrong'}}" class="phonics-card"><text class="section-title">错题复习</text><text wx:if="{{!wrongQuestions.length}}" class="section-hint">当前没有待复习错题</text><button wx:for="{{wrongQuestions}}" wx:key="id" class="wrong-row" data-id="{{item.id}}" bindtap="practiceWrong">{{item.stem}}　›</button></view>
+      <view wx:elif="{{currentQuestion}}" class="phonics-card"><text class="section-hint">第 {{currentQuestionIndex + 1}}/{{course.questions.length}} 题</text><text class="question-stem">{{currentQuestion.stem}}</text>
+        <view class="option-list"><button wx:for="{{currentQuestion.options}}" wx:key="id" class="option-button {{selectedOptionId === item.id ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="chooseOption">{{item.text}}</button></view>
+        <view wx:if="{{answerResult}}" class="answer-result"><text class="{{answerResult.isCorrect ? 'correct' : 'incorrect'}}">{{answerResult.isCorrect ? '回答正确' : '回答错误'}}</text><text>{{answerResult.explanation}}</text></view>
+        <text wx:if="{{answerError}}" class="answer-error">{{answerError}}</text>
+        <button wx:if="{{!answerResult}}" class="primary-button" disabled="{{submitting || !selectedOptionId}}" loading="{{submitting}}" bindtap="submitAnswer">提交答案</button><button wx:else class="primary-button" bindtap="nextQuestion">{{state.score === null ? '下一题' : '再练一轮'}}</button>
+      </view>
+    </block>
+  </view>
+</view></g0-page-shell>

@@ -1,0 +1,34 @@
+@import "../textbook-pages.less";
+.textbook-content { padding: 10px 16px 28px; }
+.class-filters { margin-top: 0; padding: 14px; background: linear-gradient(145deg,@yr-surface-warm,@yr-surface-blue-50); }
+.class-search { box-sizing: border-box; width: 100%; height: 46px; padding: 0 14px; border-radius: 12px; background: @yr-surface-blue; color: @yr-text-primary; font-size: 15px; font-weight: 700; }
+.class-filters .textbook-filter-row { margin-top: 10px; }
+.class-filters picker { display: block; min-width: 0; }
+.class-filter-value { box-sizing: border-box; min-height: 46px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: @yr-card-border; border-radius: 12px; background: #fff; color: @yr-text-primary; font-size: 15px; font-weight: 800; line-height: 1.2; }
+.class-filter-value text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.class-summary { display: flex; gap: 8px; margin-top: 12px; padding: 8px; border: @yr-card-border; border-radius: 18px; background: rgba(255,249,240,.97); box-shadow: 0 5px 15px rgba(7,30,73,.07); }
+.class-summary view { flex: 1; min-width: 0; padding: 11px 3px; border-radius: 12px; background: @yr-surface-blue; color: @yr-text-secondary; font-size: 13px; font-weight: 800; text-align: center; }
+.class-summary view:nth-child(2) { background: @yr-surface-green; }
+.class-summary view:nth-child(3) { background: @yr-surface-warning; }
+.class-summary text { display: block; margin-top: 3px; color: @yr-brand-primary; font-size: 23px; font-weight: 900; }
+.class-summary view:nth-child(2) text { color: @yr-success; }
+.class-summary view:nth-child(3) text { color: @yr-urgent; }
+.class-book-card { padding: 16px; border-color: rgba(23,100,216,.15); }
+.class-book-card.tone-blue { background: linear-gradient(145deg,@yr-surface-blue-50,@yr-surface-warm); }
+.class-book-card.tone-warm { background: linear-gradient(145deg,@yr-surface-warm,#fff); }
+.class-card-head { display: flex; align-items: center; gap: 11px; }
+.class-avatar { flex: none; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 17px; font-weight: 900; }
+.tone-warm .class-avatar { background: @yr-surface-purple; color: @yr-accent-purple; }
+.class-card-copy { flex: 1; min-width: 0; }
+.class-card-copy .textbook-card-title { font-size: 18px; font-weight: 900; }
+.class-card-copy .textbook-card-meta { margin-top: 3px; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.class-status { flex: none; padding: 6px 9px; border-radius: 11px; background: @yr-surface-warning; color: @yr-urgent; font-size: 12px; font-weight: 800; }
+.class-status.configured { background: @yr-surface-green; color: @yr-success; }
+.class-book-summary { margin-top: 14px; padding: 11px 12px; border-radius: 12px; color: @yr-text-primary; font-size: 14px; font-weight: 800; }
+.class-book-summary.book-configured { background: @yr-surface-green; }
+.class-book-summary.book-unconfigured { background: @yr-surface-warning; }
+.class-progress, .class-updated { margin-top: 10px; font-size: 14px; font-weight: 700; }
+.class-book-card .textbook-card-actions { margin-top: 13px; }
+.class-book-card .textbook-card-actions button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 800; line-height: 1.2; }
+.class-book-card .textbook-card-actions button.configure-book { border-color: @yr-brand-primary; background: @yr-gradient-primary; color: #fff; }
+.class-book-card .textbook-card-actions button.view-book { background: @yr-surface-blue; }

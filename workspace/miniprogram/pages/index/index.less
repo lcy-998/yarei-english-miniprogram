@@ -9,6 +9,8 @@
 
 /* 0.14.0：按学生端视觉母版统一层级、材质和留白。 */
 .brand-row{height:56px;gap:11px;font-size:25px}.crest{width:46px;height:52px}.notice{width:44px;height:44px;border-radius:22px;background:rgba(255,255,255,.96)}
+.notice { position: relative; }
+.notice-count { position: absolute; right: -7px; top: -5px; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 10px; background: #e45a22; color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 800; box-sizing: border-box; }
 .welcome{margin-top:18px}.class-name{margin-top:8px}.mascot{width:106px;margin-right:3px;margin-top:-8px}
 .task-card{min-height:244px;box-sizing:border-box;border-radius:@yr-radius-student-card;background:rgba(255,249,240,.98)}.task-heading{display:flex;align-items:center;gap:8px}.task-heading g0-icon{flex:0 0 auto}.progress{padding:6px 11px;border-radius:15px}.thin-progress{margin-top:14px}.task-body{min-height:108px;margin-top:18px;padding:14px 16px;gap:12px;border:1px solid @yr-border-subtle;background:@yr-surface-blue-50}.task-body g0-icon{flex:0 0 68px}.task-copy{gap:9px}.task-title{font-size:19px;white-space:nowrap}.due{display:flex;align-items:center;gap:7px;font-size:13px}.clock{position:relative;flex:0 0 18px;width:18px;height:18px;box-sizing:border-box;border:2px solid @yr-warning;border-radius:50px}.clock::before{content:"";position:absolute;left:7px;top:3px;width:2px;height:6px;border-radius:2px;background:@yr-warning}.clock::after{content:"";position:absolute;left:7px;top:8px;width:5px;height:2px;border-radius:2px;background:@yr-warning;transform:rotate(25deg);transform-origin:left center}
 .chevron{position:relative;flex:0 0 44px;width:44px;height:44px;color:@yr-brand-primary;font-size:0}.chevron::after{content:"";position:absolute;left:14px;top:14px;width:11px;height:11px;border-right:3px solid currentColor;border-top:3px solid currentColor;border-radius:2px;transform:rotate(45deg)}.chevron--round{border-radius:50%;background:rgba(255,255,255,.72)}
@@ -18,3 +20,11 @@
 .nature-top{overflow:visible}.brand-row{height:62px}.crest{width:58px;height:66px}.welcome{height:135px;min-height:135px;padding-top:12px;box-sizing:border-box;align-items:flex-start}.mascot{position:absolute;right:-4px;top:-35px;width:150px;margin:0}.hello{font-size:32px}.class-name{margin-top:10px;padding:0;border-radius:0;background:transparent;box-shadow:none}
 .task-card{overflow:hidden;border:2px solid rgba(255,255,255,.92);box-shadow:0 14px 32px rgba(7,30,73,.16)}.task-card::before{content:"";position:absolute;right:-44px;top:-52px;width:132px;height:132px;border-radius:50%;background:@yr-surface-blue;opacity:.36}.task-head,.thin-progress,.task-body{position:relative;z-index:1}.task-heading{gap:10px}.task-body{background:linear-gradient(120deg,@yr-surface-blue-50,@yr-surface-blue-150);box-shadow:inset 0 0 0 1px rgba(255,255,255,.8)}
 .vocabulary-card{overflow:hidden;border:2px solid rgba(255,255,255,.92);box-shadow:0 12px 26px rgba(7,30,73,.13)}.vocabulary-card::before{content:"";position:absolute;right:-32px;bottom:-54px;width:146px;height:146px;border-radius:50%;background:@yr-surface-green;opacity:.72}.vocabulary-card::after{content:"";position:absolute;right:48px;top:-42px;width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,.36)}.vocabulary-card g0-icon{position:relative;z-index:1;flex-basis:70px}.vocabulary-copy,.vocabulary-card .chevron{position:relative;z-index:1}
+
+/* 打卡条目沿用通知中心的黄色日历和白色通知卡，完成进度保持公共蓝色。 */
+.task-card--checkin{background:@yr-white;border-color:rgba(23,100,216,.07);box-shadow:0 4px 12px rgba(7,30,73,.05)}
+.task-card--checkin::before{display:none}
+.task-card--checkin .task-body,.task-body--checkin{border-color:@yr-border-subtle;background:@yr-white;box-shadow:none}
+.task-body--pressed{transform:scale(.99);opacity:.86}
+.task-body--completed .task-title{color:@yr-text-secondary}
+.task-card .task-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;white-space:normal;line-height:1.35}

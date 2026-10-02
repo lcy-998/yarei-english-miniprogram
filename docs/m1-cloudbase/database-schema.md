@@ -192,11 +192,11 @@ M1 只包含基础阅读和单词的虚构/已授权占位内容。
 
 ### 3.13 `submissions`
 
-最小字段：`_id`、`organizationId`、`taskId`、`assignmentId`、`studentId`、`version`、`status: draft|submitted|reviewed|returned|superseded`、`answers[]`、`isLate`、`submittedAt?`、`supersedesSubmissionId?`、通用字段。
+最小字段：`_id`、`organizationId`、`taskId`、`assignmentId`、`studentId`、`submissionVersion`、`recordVersion`、文档 CAS `version`、`status: draft|submitted|reviewed|returned|superseded`、`answers[]`、`isLate`、`submittedAt?`、`supersedesSubmissionId?`、通用字段。
 
 索引：
 
-- `organizationId + assignmentId + version`（唯一）
+- `organizationId + assignmentId + submissionVersion`（唯一）。这里使用业务提交版本；文档的 `version` 仅用于该文档 CAS，退回/检查会递增，不可作为提交唯一键。
 - `organizationId + studentId + status + updatedAt`
 - `organizationId + taskId + status + submittedAt`
 

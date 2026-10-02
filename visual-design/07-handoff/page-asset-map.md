@@ -11,9 +11,12 @@
 | S-05 | `mascot-speaking-pink.png` | 顶部口语引导；直接使用官方透明素材 | 不从效果图裁切，不修改身份、服装、颜色或面部 |
 | T-19、A-08 | `media-library-empty-v1.png` | 媒体列表空状态 | 正常有数据主稿不展示；不得烘焙说明文字或按钮 |
 | S-05、S-07、T-20 | `recording-ai-retry-v1.png` | 录音保留、AI/上传重试等复杂空状态 | 不代替状态文字、进度或真实录音波形 |
+| S-07 | `recording-ai-retry-thumb-v1.png` | 仅在作品提交失败时显示的轻量运行时缩略图，保留错误文字和重试操作 | 不在无素材的正常空状态中误报故障 |
 | S-03、S-04、T-16、T-18 | `demo-zoo-picture-book-cover-v1.png` | 虚构《A Day at the Zoo》封面缩略图 | 不把书名烘焙进封面；标题由组件渲染 |
+| T-16、T-18 | `demo-zoo-cover-thumb-v1.png` | 仅对既有虚构绘本 ID 显示透明运行时缩略图 | 不将虚构封面套用到其他授权书籍 |
 | S-04、T-16 | `demo-zoo-page-02-v1.png` | M1 虚构绘本高清页图 | 不在页图外显示 OCR 正文；不得当作真实教材 |
 | T-12/T-13/T-14/T-18/A-05 | `demo-sync-textbook-cover-v1.png` | 同步教材虚构封面 | 不显示真实出版社、年级文字或版本标识 |
+| T-18 | `demo-sync-textbook-cover-thumb-v1.png` | 仅对虚构同步教材 ID 显示透明运行时缩略图 | 不将演示封面套用到其他教材 |
 | S-03、T-16、T-18 | `demo-original-reader-cover-v1.png` | 原版材料分类虚构封面 | 开发/测试专用，不宣称真实授权 |
 | S-03、T-16、T-18 | `demo-current-affairs-cover-v1.png` | 时文阅读分类虚构封面 | 不使用真实新闻照片、媒体品牌或文字 |
 | S-03、T-16、T-18 | `demo-chapter-reader-cover-v1.png` | 英语章节阅读分类虚构封面 | 标题、等级和章节由 UI 组件显示 |
@@ -21,6 +24,6 @@
 
 M0 次级任务页允许复用 `student-public-natural-background-v1.png` 作为统一环境底图，但必须通过公共暖白遮罩保持内容可读；T-05/T-07 任务中心可保留更完整景深，S-08/S-09、G-03/G-05、T-06/T-08/T-17 使用“顶部天空与底部植物清晰、中部暖白”的统一次级页规则。
 
-所有相对路径以 `visual-design/03-assets/production/` 为根。工程接入前可复制到工程资源目录，但不得引用 `asset/` 原始文件或 `04-pages/current/` 效果图。
+上表原始生产素材的相对路径以 `visual-design/03-assets/production/` 为根；带 `thumb` 的运行时缩略图位于 `workspace/miniprogram/assets/content/` 或 `workspace/miniprogram/assets/g0/`，并已在资产清单中登记。页面不得引用 `asset/` 原始文件或 `04-pages/current/` 效果图。
 
 基础功能图标、播放器控件、波形、时间轴、评分环、状态标签、表格和图表均使用 SVG/WXML/CSS/Canvas 实现，不从页面或状态板截图裁切。

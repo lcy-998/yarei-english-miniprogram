@@ -7,6 +7,7 @@ import {
   type LearningProgressOperationRecord,
   type LearningResourceAccessRecord,
   type ReadingProgressRecord,
+  type ReadingPageEventRecord,
   type ReadingProgressView,
   type VocabularyProgressRecord,
   type VocabularyProgressView,
@@ -77,6 +78,11 @@ export class LearningProgressService {
         updatedAt: this.clock.nowIso(),
       };
       await transaction.saveReadingProgress(next);
+      const pageEvent: ReadingPageEventRecord = { id: this.ids.next('reading_page_event'), organizationId: actor.organizationId,
+        studentId: actor.actorUserId, resourceId: input.resourceId, chapterId: page.chapterId, pageId: page.id,
+        pageNumber: page.pageNumber, progressVersion: next.version, contentVersion: resource.contentVersion ?? null,
+        operationId: input.operationId, visitedAt: next.updatedAt };
+      await transaction.appendReadingPageEvent(pageEvent);
       return readingView(next);
     });
   }

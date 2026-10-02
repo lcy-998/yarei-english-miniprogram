@@ -33,6 +33,13 @@ const CALL_SHAPES: Readonly<Record<OrganizationAdminCall['action'], Readonly<{ r
   listRoleAssignments: { required: ['filter', 'page'], write: false },
   listAuditLogs: { required: ['filter', 'page'], write: false },
   listUsers: { required: [], optional: ['classId', 'role', 'status', 'keyword'], write: false },
+  listDeletedWorkDrafts: { required: ['studentId', 'page'], write: false },
+  restoreWorkDraft: { required: ['studentId', 'workId', 'reason'], write: true },
+  listAdminQuestions: { required: ['filters', 'page'], write: false },
+  getAdminQuestion: { required: ['id'], write: false },
+  setQuestionVisibility: { required: ['id', 'visibility', 'reason'], write: true },
+  batchSetQuestionVisibility: { required: ['items', 'visibility', 'reason'], write: true },
+  batchSetQuestionStatus: { required: ['items', 'status', 'reason'], write: true },
   createClass: { required: ['name', 'grade', 'term', 'reason'], write: true },
   updateClass: { required: ['classId', 'name', 'grade', 'term', 'reason'], write: true },
   disableClass: { required: ['classId', 'reason'], write: true },
@@ -160,6 +167,27 @@ function validateCall(call: OrganizationAdminCall): string | null {
     const timeError = validateTimeRange(filter.from, filter.to);
     if (timeError !== null) return timeError;
   }
+  if (action === 'listAdminQuestions') {
+    if (!hasAllowedKeys(payload.filters, ['keyword', 'status', 'questionType', 'classId']) || !validatePage(payload.page)) return '题目筛选或分页无效。';
+  }
+  if (action === 'listDeletedWorkDrafts'
+    && (!requiredId(payload.studentId) || !validateWorkPage(payload.page))) return '作品草稿查询条件或分页无效。';
+  if (action === 'restoreWorkDraft'
+    && (!requiredId(payload.studentId) || !requiredId(payload.workId)
+      || typeof payload.reason !== 'string' || !payload.reason.trim() || payload.reason.trim().length > 200)) {
+    return '作品草稿恢复参数无效。';
+  }
+  if (action === 'getAdminQuestion' && !optionalId(payload.id)) return '题目标识无效。';
+  if (action === 'setQuestionVisibility' || action === 'batchSetQuestionVisibility') {
+    if (action === 'setQuestionVisibility' && !optionalId(payload.id) || !isRecord(payload.visibility)
+      || payload.visibility.type !== 'organization' && payload.visibility.type !== 'classes') return '可见范围无效。';
+  }
+  if (action === 'batchSetQuestionVisibility'
+    && (!Array.isArray(payload.items) || !payload.items.length || payload.items.length > 20)) return '批量授权参数无效。';
+  if (action === 'batchSetQuestionStatus') {
+    if (!Array.isArray(payload.items) || !payload.items.length || payload.items.length > 20
+      || !['published', 'offline'].includes(String(payload.status))) return '批量操作参数无效。';
+  }
   return null;
 }
 
@@ -167,6 +195,16 @@ function validatePage(value: unknown): boolean {
   if (!isRecord(value) || !hasExactKeys(value, ['limit', 'offset'])) return false;
   return typeof value.limit === 'number' && Number.isSafeInteger(value.limit) && value.limit >= 1 && value.limit <= 50
     && typeof value.offset === 'number' && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= 1_000;
+}
+
+function validateWorkPage(value: unknown): boolean {
+  return isRecord(value) && hasExactKeys(value, ['limit', 'offset'])
+    && typeof value.limit === 'number' && Number.isSafeInteger(value.limit) && value.limit >= 1 && value.limit <= 50
+    && typeof value.offset === 'number' && Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset <= 10000;
+}
+
+function requiredId(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 128;
 }
 
 function validateTimeRange(from: unknown, to: unknown): string | null {

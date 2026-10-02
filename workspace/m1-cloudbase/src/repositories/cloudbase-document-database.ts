@@ -76,6 +76,27 @@ class CloudBaseDocumentDatabase implements DocumentDatabasePort {
     return readDocuments(this.database, collection, criteria, this.pageSize, this.maxPages);
   }
 
+  public async findPage(collection: string, criteria: DocumentData, page: Readonly<{ limit: number; offset: number }>): Promise<Readonly<{
+    items: readonly VersionedDocument[];
+    hasMore: boolean;
+  }>> {
+    if (!Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 50
+      || !Number.isSafeInteger(page.offset) || page.offset < 0 || page.offset > 10000) {
+      throw new DocumentDatabasePlatformError('invalid-data', 'Invalid document page request.');
+    }
+    const data = await executeSdkOperation('find', async () => this.database.collection(collection)
+      .where(cloneDocumentData(criteria))
+      .orderBy('_id', 'asc')
+      .limit(page.limit + 1)
+      .skip(page.offset)
+      .get());
+    const rows = readResultRows(data);
+    return {
+      items: rows.slice(0, page.limit).map(decodeVersionedDocument),
+      hasMore: rows.length > page.limit,
+    };
+  }
+
   public async runTransaction<T>(
     work: (transaction: DocumentDatabaseTransactionPort) => Promise<T>,
   ): Promise<T> {

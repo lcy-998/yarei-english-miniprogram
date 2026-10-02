@@ -102,6 +102,24 @@ describe('M1 教师学员目录查询', () => {
     expect(JSON.stringify(result)).not.toContain('不得返回的教师备注');
   });
 
+  it('发布对象的 active 筛选排除停用学员，仍包含需跟进的有效学员', async () => {
+    const { organizations, tasks } = fixtures();
+    await organizations.transaction(async transaction => {
+      const user = await transaction.findUser('org_demo', 'student_b');
+      const membership = await transaction.findMembership('org_demo', 'student_b', 'class_a');
+      if (!user || !membership) throw new Error('missing fixture');
+      await transaction.saveUser({ ...user, status: 'disabled', version: user.version + 1 });
+      await transaction.saveMembership({ ...membership, status: 'inactive', version: membership.version + 1 });
+    });
+    const service = new TeacherStudentQueryService({ organizationRepository: organizations, taskRepository: tasks, clock, requestIds, cursorCodec });
+    const findUser = vi.spyOn(organizations, 'findUser');
+    const active = await service.listStudents(teacher, { status: 'active' }, { limit: 20 });
+    expect(active).toMatchObject({ ok: true, data: { total: 1, items: [{ studentId: 'student_a', needsAttention: true }] } });
+    expect(findUser).not.toHaveBeenCalled();
+    expect(await service.listStudents(teacher, { status: 'disabled' }, { limit: 20 }))
+      .toMatchObject({ ok: true, data: { total: 1, items: [{ studentId: 'student_b' }] } });
+  });
+
   it('详情只向当前授权教师返回脱敏家长摘要和安全任务记录', async () => {
     const { organizations, tasks } = fixtures();
     const service = new TeacherStudentQueryService({ organizationRepository: organizations, taskRepository: tasks, clock, requestIds, cursorCodec });
@@ -169,6 +187,7 @@ describe('M1 教师学员查询函数边界', () => {
     };
     const main = createTeacherStudentQueryFunction({ runtime, actorResolver, clock, requestIds, handler });
     expect(await main({ apiVersion: 'm1.v1', action: 'listStudents', payload: { filters: { status: 'all' }, page: { limit: 20 } } })).toMatchObject({ ok: true });
+    expect(await main({ apiVersion: 'm1.v1', action: 'listStudents', payload: { filters: { status: 'active' }, page: { limit: 20 } } })).toMatchObject({ ok: true });
     expect(handler.listStudents).toHaveBeenCalledWith(teacher, { status: 'all' }, { limit: 20 });
     expect(await main({ apiVersion: 'm1.v1', action: 'listStudents', payload: { filters: { status: 'all', actorRole: 'admin' }, page: { limit: 20 } } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { 'filters.actorRole': expect.any(String) } } });
     expect(await main({ apiVersion: 'm1.v1', action: 'getStudent', payload: { studentId: 'student_a', organizationId: 'org_other' } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });

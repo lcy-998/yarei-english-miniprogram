@@ -1,5 +1,8 @@
 import {
   HomeView,
+  InboxNotice,
+  InboxPage,
+  NotificationFilter,
   ParentChildLinkView,
   ReviewFeedback,
   ReadingListItem,
@@ -8,7 +11,26 @@ import {
   Role,
   ServiceResult,
   Session,
+  SchoolQuestionDetail,
+  SchoolQuestionFilters,
+  SchoolQuestionFacet,
+  SchoolQuestionPage,
+  SchoolQuestionType,
+  TaskCatalogFilters,
+  TaskCatalogListItem,
+  TaskCatalogPage,
+  TaskCatalogFacet,
+  StudentCatalogFilters,
+  StudentCatalogPage,
+  StudentCatalogFacet,
+  ActivityDraftInput,
+  ActivityView,
+  ActivityDayView,
+  ActivityOverrideView,
+  ActivityOverrideState,
+  ActivityLeaderboardView,
   Submission,
+  StudentClassView,
   Task,
   TaskAssignment,
   TaskCompletionRule,
@@ -21,12 +43,41 @@ import {
   UserAccount,
   VocabularyPack,
   VocabularyProgress,
+  VocabularyAttemptState,
+  VocabularyPackAttemptSummary,
+  VocabularyPackScope,
+  VocabularyAttemptView,
+  VocabularyAnswerInput,
+  VocabularyAnswerScope,
+  WorkMaterial,
+  WorkMaterialFacet,
+  WorkMaterialFilters,
+  WorkMaterialPage,
+  StudentWork,
+  WorkPlayback,
+  MaterialPlayback,
+  PhonicsAnswerView,
+  PhonicsAudioView,
+  PhonicsCourseListItem,
+  PhonicsCourseState,
+  PhonicsCourseView,
+  TaskTemplateInput,
+  TaskTemplateView,
+  TeacherTextbookClass,
+  TextbookSummary,
+  TextbookFilters,
+  TextbookPage,
+  ClassTextbookConfig,
+  ClassTextbookItem,
+  TextbookCenterLayout,
 } from '../domain/types'
 import {
   CloudAuthenticationPort,
   CloudClientContextProvider,
   CloudRepositoryClient,
 } from '../repositories/cloudbase/protocol'
+import type { StatsExport, StatsFilters, StatsView } from '../domain/learning-stats'
+import type { RecordingPromptPage, RecordingPromptView, TaskRecordingMediaState, TaskRecordingPlayback, TaskRecordingView } from '../domain/task-recording'
 import type {
   BindChildCommand,
   PublishClassroomTaskCommand as CloudPublishTaskCommand,
@@ -46,7 +97,9 @@ export interface CloudReviewCommand {
   assignmentId?: string
   decision: 'approved' | 'returned'
   score?: number
+  itemScores?: Array<{ itemId: string; score: number }>
   comment: string
+  overrideReason?: string
 }
 
 export interface CloudReviewAssignmentView {
@@ -66,12 +119,51 @@ export interface CloudReviewAssignmentView {
 }
 
 export interface CloudAppService {
+  listNotifications(userId: string, filter: NotificationFilter, offset: number, limit: number, days: 7 | 30 | 90): Promise<ServiceResult<InboxPage>>
+  markNotificationRead(userId: string, noticeId: string, operationId: string): Promise<ServiceResult<InboxNotice>>
+  markAllNotificationsRead(userId: string, operationId: string): Promise<ServiceResult<{ readAt: string }>>
   login(mobile: string, password: string): Promise<ServiceResult<Session>>
   requestPasswordResetCode(mobile: string): Promise<ServiceResult<{ expiresInMinutes: number }>>
   resetPassword(mobile: string, code: string, newPassword: string): Promise<ServiceResult<null>>
   listRoles(userId: string): Promise<ServiceResult<Role[]>>
   selectRole(userId: string, role: Role): Promise<ServiceResult<Session>>
   getUser(userId: string): Promise<ServiceResult<UserAccount>>
+  getMyClass(userId: string): Promise<ServiceResult<StudentClassView>>
+  listSchoolQuestions(userId: string, filters: SchoolQuestionFilters, limit: number, offset: number): Promise<ServiceResult<SchoolQuestionPage>>
+  listSchoolQuestionFacets(userId: string, targetClassIds?: string[]): Promise<ServiceResult<SchoolQuestionFacet[]>>
+  getSchoolQuestion(userId: string, resourceId: string, targetClassIds?: string[]): Promise<ServiceResult<SchoolQuestionDetail>>
+  listTaskCatalogResources(userId: string, filters: TaskCatalogFilters, limit: number, offset: number): Promise<ServiceResult<TaskCatalogPage>>
+  listStudentCatalog(userId: string, filters: StudentCatalogFilters, limit: number, offset: number): Promise<ServiceResult<StudentCatalogPage>>
+  listStudentCatalogFacets(userId: string, type: StudentCatalogFilters['type'], category?: StudentCatalogFilters['category']): Promise<ServiceResult<StudentCatalogFacet[]>>
+  listTaskCatalogFacets(userId: string, type: TaskCatalogFilters['type'], targetClassIds?: string[]): Promise<ServiceResult<TaskCatalogFacet[]>>
+  getTaskCatalogResource(userId: string, resourceId: string, targetClassIds?: string[]): Promise<ServiceResult<TaskCatalogListItem>>
+  listRecordingPrompts(userId: string, targetClassIds: string[] | undefined, keyword: string, limit: number, offset: number): Promise<ServiceResult<RecordingPromptPage>>
+  getRecordingPrompt(userId: string, promptId: string, targetClassIds?: string[]): Promise<ServiceResult<RecordingPromptView>>
+  beginTaskRecording(userId: string, taskId: string, itemId: string, operationId: string): Promise<ServiceResult<TaskRecordingView>>
+  submitTaskRecording(userId: string, recordingId: string, stagingFileId: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskRecordingView>>
+  listTaskRecordings(userId: string, taskId: string, itemId: string): Promise<ServiceResult<TaskRecordingView[]>>
+  getTaskRecordingPlayback(userId: string, recordingId: string): Promise<ServiceResult<TaskRecordingPlayback>>
+  getTaskRecordingMediaState(userId: string, recordingId: string): Promise<ServiceResult<TaskRecordingMediaState>>
+  getTeacherTextbookCenterSettings(userId: string): Promise<ServiceResult<TextbookCenterLayout>>
+  listTeacherTextbookClasses(userId: string): Promise<ServiceResult<TeacherTextbookClass[]>>
+  getTeacherTextbookClass(userId: string, classId: string): Promise<ServiceResult<TeacherTextbookClass>>
+  listSynchronizedTextbooks(userId: string, filters: TextbookFilters, limit: number, offset: number, targetClassId?: string): Promise<ServiceResult<TextbookPage>>
+  getSynchronizedTextbook(userId: string, textbookId: string, targetClassId?: string): Promise<ServiceResult<TextbookSummary>>
+  saveClassTextbooks(userId: string, classId: string, textbooks: ClassTextbookItem[], note: string,
+    expectedVersion: number, operationId: string, publish: boolean): Promise<ServiceResult<ClassTextbookConfig>>
+  saveActivityDraft(userId: string, draft: ActivityDraftInput, expectedVersion: number, operationId: string): Promise<ServiceResult<ActivityView>>
+  publishActivity(userId: string, activityId: string, expectedVersion: number, operationId: string): Promise<ServiceResult<ActivityView>>
+  addActivityFutureRestDay(userId: string, activityId: string, date: string, reason: string,
+    expectedVersion: number, operationId: string): Promise<ServiceResult<ActivityView>>
+  listTeacherActivities(userId: string): Promise<ServiceResult<ActivityView[]>>
+  listStudentActivities(userId: string): Promise<ServiceResult<ActivityView[]>>
+  getStudentActivity(userId: string, activityId: string): Promise<ServiceResult<ActivityView>>
+  getMyActivityDay(userId: string, activityId: string, date: string): Promise<ServiceResult<ActivityDayView>>
+  setActivityOverride(userId: string, input: { activityId: string; studentId: string; date: string;
+    active: boolean; reason: string }, expectedVersion: number, operationId: string): Promise<ServiceResult<ActivityOverrideView>>
+  getActivityOverrideForTeacher(userId: string, activityId: string, studentId: string, date: string): Promise<ServiceResult<ActivityOverrideState>>
+  getActivityLeaderboard(userId: string, activityId: string): Promise<ServiceResult<ActivityLeaderboardView>>
   updateProfile(userId: string, displayName: string): Promise<ServiceResult<UserAccount>>
   getHome(userId: string): Promise<ServiceResult<HomeView>>
   getTaskDetail(userId: string, taskId: string): Promise<ServiceResult<TaskDetailView>>
@@ -82,12 +174,16 @@ export interface CloudAppService {
   getTeacherWorkbench(userId: string, date: string, classId?: string): Promise<ServiceResult<TeacherWorkbenchView>>
   previewTeacherTask(userId: string, taskId: string, version: number): Promise<ServiceResult<TeacherTaskPreviewView>>
   getTeacherTaskForEdit(userId: string, taskId: string): Promise<ServiceResult<TeacherTaskEditView>>
+  copyTeacherTaskSnapshot(userId: string, sourceTaskId: string, sourceVersion: number, operationId: string): Promise<ServiceResult<{ taskId: string; version: number }>>
   updatePublishedTeacherTask(userId: string, command: CloudPublishTaskCommand, status: Task['status'], previousDueAt: string): Promise<ServiceResult<{ taskId: string; version: number }>>
   updateTeacherTaskDescription(userId: string, taskId: string, version: number, description: string, operationId: string): Promise<ServiceResult<{ taskId: string; version: number }>>
   recycleTeacherTask(userId: string, taskId: string, version: number, reason: string, operationId: string): Promise<ServiceResult<{ taskId: string }>>
-  getDraftOptions(userId: string, nowIso: string): Promise<ServiceResult<TaskDraftOptionsView>>
+  getDraftOptions(userId: string, nowIso: string, catalogMode?: 'selector'): Promise<ServiceResult<TaskDraftOptionsView>>
   getCompletion(userId: string, taskId: string): Promise<ServiceResult<CloudReviewAssignmentView[]>>
   getReviewSubmission(userId: string, submissionId: string): Promise<ServiceResult<TeacherReviewSubmissionView>>
+  previewBatchComment(userId: string, taskId: string, submissionIds: readonly string[], comment: string): Promise<ServiceResult<BatchCommentPreview>>
+  publishBatchComment(userId: string, previewToken: string, previewVersion: number, textComment: string,
+    operationId: string): Promise<ServiceResult<BatchCommentReceipt>>
   listTeacherStudents(userId: string, filters: Readonly<{ classId?: string; keyword?: string; status: TeacherStudentStatusFilter }>, cursor?: string): Promise<ServiceResult<TeacherStudentPage>>
   getTeacherStudent(userId: string, studentId: string): Promise<ServiceResult<TeacherStudentDetail>>
   updateTeacherStudent(userId: string, command: TeacherStudentUpdateCommand): Promise<ServiceResult<TeacherStudentMutationView>>
@@ -102,6 +198,9 @@ export interface CloudAppService {
   getParentHome(userId: string): Promise<ServiceResult<ParentHomeView>>
   getParentTask(userId: string, taskId: string): Promise<ServiceResult<TaskDetailView>>
   getParentFeedback(userId: string, taskId: string): Promise<ServiceResult<ReviewFeedback>>
+  getTeacherStats(userId: string, filters: StatsFilters): Promise<ServiceResult<StatsView>>
+  getParentStats(userId: string, childId: string, filters: StatsFilters): Promise<ServiceResult<StatsView>>
+  exportTeacherStats(userId: string, filters: StatsFilters): Promise<ServiceResult<StatsExport>>
   listReadingResources(userId: string): Promise<ServiceResult<ReadingListItem[]>>
   getReadingResource(userId: string, resourceId: string): Promise<ServiceResult<ReadingResource>>
   listVocabularyPacks(userId: string): Promise<ServiceResult<VocabularyPack[]>>
@@ -109,6 +208,43 @@ export interface CloudAppService {
   getReadingProgress(userId: string, resourceId: string): Promise<ServiceResult<ReadingProgress | null>>
   saveReadingProgress(userId: string, command: SaveReadingProgressCommand): Promise<ServiceResult<ReadingProgress>>
   getVocabularyProgress(userId: string, packId: string): Promise<ServiceResult<VocabularyProgress | null>>
+  getWordAttemptState(userId: string, scope: VocabularyAnswerScope): Promise<ServiceResult<VocabularyAttemptState>>
+  getPackAttemptSummary(userId: string, scope: VocabularyPackScope): Promise<ServiceResult<VocabularyPackAttemptSummary>>
+  submitWordAnswer(userId: string, input: VocabularyAnswerInput, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<VocabularyAttemptView>>
+  listWorkMaterials(userId: string): Promise<ServiceResult<WorkMaterial[]>>
+  searchWorkMaterials(userId: string, keyword: string, limit: number, offset: number,
+    filters?: WorkMaterialFilters): Promise<ServiceResult<WorkMaterialPage>>
+  listWorkMaterialFacets(userId: string): Promise<ServiceResult<WorkMaterialFacet[]>>
+  getWorkMaterial(userId: string, materialId: string): Promise<ServiceResult<WorkMaterial>>
+  beginWorkDraft(userId: string, materialId: string, operationId: string): Promise<ServiceResult<StudentWork>>
+  submitWork(userId: string, input: { workId: string; stagingFileId: string; note: string },
+    expectedVersion: number, operationId: string): Promise<ServiceResult<StudentWork>>
+  deleteWorkDraft(userId: string, workId: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<StudentWork>>
+  listMyWorks(userId: string): Promise<ServiceResult<StudentWork[]>>
+  getWorkPlayback(userId: string, workId: string): Promise<ServiceResult<WorkPlayback>>
+  getMaterialPlayback(userId: string, materialId: string): Promise<ServiceResult<MaterialPlayback>>
+  listPhonicsCourses(userId: string): Promise<ServiceResult<PhonicsCourseListItem[]>>
+  getPhonicsCourse(userId: string, courseId: string): Promise<ServiceResult<PhonicsCourseView>>
+  getPhonicsState(userId: string, courseId: string): Promise<ServiceResult<PhonicsCourseState>>
+  submitPhonicsAnswer(userId: string, input: { courseId: string; questionId: string; selectedOptionId: string; round: number },
+    expectedVersion: number, operationId: string): Promise<ServiceResult<PhonicsAnswerView>>
+  getPhonicsAudio(userId: string, courseId: string, phonemeId: string): Promise<ServiceResult<PhonicsAudioView>>
+  listTaskTemplates(userId: string): Promise<ServiceResult<TaskTemplateView[]>>
+  getTaskTemplate(userId: string, templateId: string): Promise<ServiceResult<TaskTemplateView>>
+  saveTaskTemplate(userId: string, input: TaskTemplateInput, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskTemplateView>>
+  renameTaskTemplate(userId: string, templateId: string, title: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskTemplateView>>
+  copyTaskTemplate(userId: string, templateId: string, title: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskTemplateView>>
+  removeTaskTemplate(userId: string, templateId: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskTemplateView>>
+  useTaskTemplate(userId: string, templateId: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<TaskTemplateView>>
+  instantiateTaskTemplate(userId: string, templateId: string, expectedVersion: number,
+    operationId: string): Promise<ServiceResult<{ taskId: string; version: number; templateVersion: number }>>
   saveVocabularyProgress(userId: string, command: SaveVocabularyProgressCommand): Promise<ServiceResult<VocabularyProgress>>
   logout(userId: string): Promise<ServiceResult<null>>
 }
@@ -122,29 +258,58 @@ interface TeacherTasksView {
 
 export interface TeacherWorkbenchView {
   activeTaskCount: number; pendingReviewCount: number; pendingCommentCount: number;
-  recentTasks: Array<{ taskId: string }>
+  recentTasks: Array<{ taskId: string; title: string; classIds: string[];
+    completedCount: number; totalCount: number; pendingReviewCount: number }>
 }
 
 export interface TeacherTaskPreviewView {
   taskId: string | null; title: string; description: string | null; startsAt: string; dueAt: string;
-  classIds: string[]; items: Array<{ id: string; resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise'; completionRule: Record<string, unknown> }>;
+  classIds: string[]; items: Array<{ id: string; resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording'; completionRule: Record<string, unknown> }>;
   version: number
   target?: { type: 'classes' | 'students'; classIds: string[]; studentIds: string[] }
 }
 
 export interface TeacherTaskEditView {
   taskId: string; title: string; status: Task['status']; version: number; description: string | null; teacherNote: string | null;
+  copiedFromTaskId?: string | null;
+  copiedFromTemplateId?: string | null;
   startsAt: string; dueAt: string; latePolicy: { allowLate: boolean; lateDays: number };
   target: { type: 'classes' | 'students'; classIds: string[]; studentIds: string[] };
   itemRefs: Array<{ id: string; resourceId: string; completionRule?: Record<string, unknown>; scoringRule?: Record<string, unknown>; order: number }>
-  items: Array<{ resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' }>
+  items: Array<{ resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording' }>
   publication?: { operationId: string; originalVersion: number; completedCount: number; totalCount: number }
 }
 
 export interface TeacherReviewSubmissionView {
-  taskTitle: string; submittedAt: string; submissionVersion: number;
+  taskTitle: string; submittedAt: string; submissionId?: string; submissionVersion: number;
+  submissionHistory?: Array<{ id: string; version: number; status: Submission['status']; submittedAt: string }>
+  taskItems?: Array<{ id: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording';
+    completionRule: Record<string, unknown>; order: number; recordingPrompt?: string }>
+  readingPages?: Array<{ itemId: string; pageId: string; pageNumber: number; chapterTitle: string;
+    imageAssetKey: string; thumbnailAssetKey: string }>
+  automaticScore?: number | null
+  scoringItems?: Array<{ itemId: string; weightPercent: number; automaticScore: number | null;
+    teacherScoreRequired: boolean; complete: boolean }>
   answers: Array<{ itemId: string; value: unknown }>
+  exerciseEvidence?: Array<{ itemId: string; questionId: string; questionType: SchoolQuestionType; stem: string; options: string[];
+    studentResponse: unknown; correctAnswer: unknown; explanation: string; isCorrect: boolean | null; recorded: boolean }>
+  vocabularyEvidence?: Array<{ itemId: string; wordId: string; targetWord: string; meaning?: string; example?: string; syllables?: string[]; firstCorrect: boolean | null;
+    attempts: Array<{ studentInput: string; isCorrect: boolean; firstAttempt: boolean; attemptNumber: number; attemptedAt: string }> }>
   feedback?: FeedbackWire | null
+}
+
+export interface BatchCommentPreview {
+  previewToken: string
+  previewVersion: number
+  eligibleCount: number
+  excludedCount: number
+  commentSummary: { length: number }
+}
+
+export interface BatchCommentReceipt {
+  taskId: string
+  reviewedCount: number
+  submissionIds: string[]
 }
 
 interface ParentHomeView { user: UserAccount; child: UserAccount; tasks: TaskDetailView[] }
@@ -178,6 +343,7 @@ interface StudentListItemWire {
   startsAt: string
   dueAt: string
   submittedAt: string | null
+  redoDueAt?: string | null
 }
 
 interface StudentHomeWire {
@@ -185,33 +351,49 @@ interface StudentHomeWire {
   completedCount: number
   totalCount: number
   nextTask: StudentListItemWire | null
+  todayTasks?: StudentListItemWire[]
 }
 
 interface SafeTaskItemWire {
   id: string
   resourceId: string
   title: string
-  type: 'reading' | 'vocabulary' | 'exercise'
+  type: 'reading' | 'vocabulary' | 'exercise' | 'recording'
   completionRule: object
+  readingPageNumbers?: number[]
+  recordingPrompt?: string
+  snapshotSchemaVersion?: 1 | 2
+  vocabularyWordIds?: string[]
+  vocabularyPack?: VocabularyPack
+  exerciseQuestion?: { questionId: string; questionType: SchoolQuestionType; stem: string; options: string[] }
 }
 
 interface FeedbackWire {
   id: string
+  submissionId?: string
   decision: 'approved' | 'returned'
   score: number | null
+  itemScores?: Array<{ itemId: string; score: number }>
   textComment: string | null
   returnReason: string | null
   publishedAt: string
+  originalAutomaticScore?: number | null
+  overrideReason?: string | null
 }
 
 interface StudentTaskDetailWire {
   taskId: string
   title: string
   description: string | null
+  status?: Task['status']
   startsAt: string
   dueAt: string
+  latePolicy?: { allowLate: boolean; lateDays: number }
   items: SafeTaskItemWire[]
+  readingPageProgress?: Array<{ itemId: string; completedPageCount: number }>
+  automaticScore?: number | null
   assignment: {
+    classId?: string
     status: TaskAssignment['status']
     submittedAt: string | null
     redoCount: number
@@ -227,7 +409,8 @@ interface StudentTaskDetailWire {
     recordVersion: number
     assignmentVersion: number
   } | null
-  submissionHistory?: { version: number; status: Submission['status']; submittedAt: string }[]
+  submissionHistory?: { version: number; status: Submission['status']; submittedAt: string;
+    answers?: { itemId: string; value: unknown }[]; feedback?: FeedbackWire | null }[]
   feedback: FeedbackWire | null
 }
 
@@ -278,6 +461,7 @@ interface SubmissionReceiptWire {
 }
 
 interface TaskDraftReceiptWire { taskId: string; status: Task['status']; version: number }
+interface TemplateDraftReceiptWire extends TaskDraftReceiptWire { templateVersion: number }
 interface TaskPublishReceiptWire { taskId: string; status: Task['status'] | 'publishing'; version: number; assignmentCount?: number; totalCount?: number }
 
 interface TaskDraftOptionsWire {
@@ -285,7 +469,7 @@ interface TaskDraftOptionsWire {
   resources: {
     id: string
     title: string
-    type: 'reading' | 'vocabulary' | 'exercise'
+    type: 'reading' | 'vocabulary' | 'exercise' | 'recording'
     allowedClassIds: string[]
     completionRule: Record<string, unknown>
     scoringRule: Record<string, unknown>
@@ -305,6 +489,7 @@ interface ParentTaskWire {
   title: string
   studentId: string
   assignmentStatus: TaskAssignment['status']
+  automaticScore?: number | null
   submission: { id: string; version: number; answers: { itemId: string; value: unknown }[]; submittedAt: string } | null
   feedback: FeedbackWire | null
 }
@@ -537,12 +722,15 @@ export function createCloudAppService(
       const localDate = contextProvider().localDate ?? new Date().toISOString().slice(0, 10)
       const result = await repository.call<'getHome', { localDate: string }, StudentHomeWire>('student-task-query', 'getHome', { localDate })
       if (!result.ok) return result
+      const todayTasks = result.data.todayTasks ?? (result.data.nextTask ? [result.data.nextTask] : [])
       if (result.data.nextTask === null) {
-        return { ok: true, data: { user: currentContextUser(userId, 'student'), task: null, assignment: null, completedCount: result.data.completedCount, totalCount: result.data.totalCount }, meta: result.meta }
+        return { ok: true, data: { user: currentContextUser(userId, 'student'), task: null, assignment: null,
+          completedCount: result.data.completedCount, totalCount: result.data.totalCount, todayTasks }, meta: result.meta }
       }
       const detail = await getStudentDetail(result.data.nextTask.taskId)
       if (!detail.ok) return detail
-      return { ok: true, data: { user: currentContextUser(userId, 'student'), ...detail.data, completedCount: result.data.completedCount, totalCount: result.data.totalCount }, meta: result.meta }
+      return { ok: true, data: { user: currentContextUser(userId, 'student'), ...detail.data,
+        completedCount: result.data.completedCount, totalCount: result.data.totalCount, todayTasks }, meta: result.meta }
     },
 
     async getTaskDetail(_userId, taskId) { return getStudentDetail(taskId) },
@@ -631,9 +819,9 @@ export function createCloudAppService(
       return repository.call<'recycleTask', { taskId: string; reason: string }, { taskId: string }>('task-command', 'recycleTask', { taskId, reason }, { operationId, expectedVersion: version })
     },
 
-    async getDraftOptions(_userId, nowIso) {
-      const result = await repository.call<'getDraftOptions', Record<string, never>, TaskDraftOptionsWire>(
-        'task-query', 'getDraftOptions', {},
+    async getDraftOptions(_userId, nowIso, catalogMode) {
+      const result = await repository.call<'getDraftOptions', { catalogMode?: 'selector' }, TaskDraftOptionsWire>(
+        'task-query', 'getDraftOptions', catalogMode === undefined ? {} : { catalogMode },
       )
       if (!result.ok) return result
       const mapped = mapDraftOptions(result.data, nowIso)
@@ -644,6 +832,23 @@ export function createCloudAppService(
 
     async getReviewSubmission(_userId, submissionId) {
       return repository.call<'getSubmissionForReview', { submissionId: string }, TeacherReviewSubmissionView>('review-query', 'getSubmissionForReview', { submissionId })
+    },
+
+    async previewBatchComment(_userId, taskId, submissionIds, comment) {
+      return repository.call<'previewBatchComment', {
+        taskId: string; filter: Record<string, never>;
+        selection: { mode: 'ids'; submissionIds: string[] }; comment: string
+      }, BatchCommentPreview>('review-query', 'previewBatchComment', {
+        taskId, filter: {}, selection: { mode: 'ids', submissionIds: [...submissionIds] }, comment,
+      })
+    },
+
+    async publishBatchComment(_userId, previewToken, previewVersion, textComment, operationId) {
+      return repository.call<'publishBatchComment', {
+        previewToken: string; previewVersion: number; textComment: string
+      }, BatchCommentReceipt>('review-command', 'publishBatchComment', {
+        previewToken, previewVersion, textComment,
+      }, { operationId })
     },
 
     async listTeacherStudents(_userId, filters, cursor) {
@@ -751,6 +956,13 @@ export function createCloudAppService(
       }, meta: result.meta }
     },
 
+    async copyTeacherTaskSnapshot(_userId, sourceTaskId, sourceVersion, operationId) {
+      const result = await repository.call<'copyTaskSnapshot', { sourceTaskId: string }, TaskDraftReceiptWire>(
+        'task-command', 'copyTaskSnapshot', { sourceTaskId }, { expectedVersion: sourceVersion, operationId },
+      )
+      return result.ok ? { ok: true, data: { taskId: result.data.taskId, version: result.data.version }, meta: result.meta } : result
+    },
+
     async reviewSubmission(userId, command) {
       const completion = await getCompletionRows(command.taskId)
       if (!completion.ok) return completion
@@ -767,8 +979,10 @@ export function createCloudAppService(
         decision: command.decision,
         expectedSubmissionVersion: command.expectedVersion,
         ...(command.score === undefined ? {} : { score: command.score }),
+        ...(command.itemScores === undefined ? {} : { itemScores: command.itemScores.map(item => ({ ...item })) }),
         textComment: command.comment.trim(),
         ...(command.decision === 'returned' ? { returnReason: command.comment.trim() } : {}),
+        ...(command.overrideReason?.trim() ? { overrideReason: command.overrideReason.trim() } : {}),
       }, { operationId: command.operationId, expectedVersion: target.data.assignmentVersion })
       if (!result.ok) return result
       const refreshed = await repository.call<'getSubmissionForReview', { submissionId: string }, ReviewSubmissionWire>(
@@ -786,6 +1000,7 @@ export function createCloudAppService(
         teacherId: userId,
         decision: result.data.decision,
         ...(command.score === undefined ? {} : { score: command.score }),
+        ...(command.itemScores === undefined ? {} : { itemScores: command.itemScores.map(item => ({ ...item })) }),
         textComment: command.comment.trim(),
         ...(command.decision === 'returned' ? { returnReason: command.comment.trim() } : {}),
         publishedAt: new Date().toISOString(),
@@ -834,6 +1049,24 @@ export function createCloudAppService(
         'relationship-command', 'unbindChild',
         { childId: command.childId, reason: command.reason.trim() },
         { operationId: command.operationId, expectedVersion: command.expectedVersion },
+      )
+    },
+
+    async getTeacherStats(_userId, filters) {
+      return repository.call<'teacherReport', { filters: StatsFilters }, StatsView>(
+        'learning-stats-query', 'teacherReport', { filters },
+      )
+    },
+
+    async getParentStats(_userId, childId, filters) {
+      return repository.call<'parentReport', { childId: string; filters: StatsFilters }, StatsView>(
+        'learning-stats-query', 'parentReport', { childId, filters },
+      )
+    },
+
+    async exportTeacherStats(_userId, filters) {
+      return repository.call<'exportTeacherCsv', { filters: StatsFilters }, StatsExport>(
+        'learning-stats-query', 'exportTeacherCsv', { filters },
       )
     },
 
@@ -898,6 +1131,185 @@ export function createCloudAppService(
       )
     },
 
+    async getMyClass(_userId) {
+      return repository.call<'getMyClass', Record<string, never>, StudentClassView>(
+        'content-query', 'getMyClass', {},
+      )
+    },
+
+    async listSchoolQuestions(_userId, filters, limit, offset) {
+      return repository.call<'listSchoolQuestions', { filters: SchoolQuestionFilters; page: { limit: number; offset: number } }, SchoolQuestionPage>(
+        'content-query', 'listSchoolQuestions', { filters, page: { limit, offset } },
+      )
+    },
+
+    async listSchoolQuestionFacets(_userId, targetClassIds) {
+      return repository.call<'listSchoolQuestionFacets', { targetClassIds?: string[] }, SchoolQuestionFacet[]>(
+        'content-query', 'listSchoolQuestionFacets', targetClassIds === undefined ? {} : { targetClassIds },
+      )
+    },
+
+    async getSchoolQuestion(_userId, resourceId, targetClassIds) {
+      return repository.call<'getSchoolQuestion', { resourceId: string; targetClassIds?: string[] }, SchoolQuestionDetail>(
+        'content-query', 'getSchoolQuestion', { resourceId, ...(targetClassIds === undefined ? {} : { targetClassIds }) },
+      )
+    },
+
+    async getTeacherTextbookCenterSettings(_userId) {
+      return repository.call<'getCenterSettings', Record<string, never>, TextbookCenterLayout>(
+        'teacher-textbook-query', 'getCenterSettings', {},
+      )
+    },
+
+    async listTeacherTextbookClasses(_userId) {
+      return repository.call<'listClasses', Record<string, never>, TeacherTextbookClass[]>(
+        'teacher-textbook-query', 'listClasses', {},
+      )
+    },
+
+    async getTeacherTextbookClass(_userId, classId) {
+      return repository.call<'getClass', { classId: string }, TeacherTextbookClass>(
+        'teacher-textbook-query', 'getClass', { classId },
+      )
+    },
+
+    async listSynchronizedTextbooks(_userId, filters, limit, offset, targetClassId) {
+      return repository.call<'listTextbooks', { filters: TextbookFilters; page: { limit: number; offset: number }; targetClassId?: string }, TextbookPage>(
+        'teacher-textbook-query', 'listTextbooks', { filters, page: { limit, offset },
+          ...(targetClassId === undefined ? {} : { targetClassId }) },
+      )
+    },
+
+    async getSynchronizedTextbook(_userId, textbookId, targetClassId) {
+      return repository.call<'getTextbook', { textbookId: string; targetClassId?: string }, TextbookSummary>(
+        'teacher-textbook-query', 'getTextbook', { textbookId,
+          ...(targetClassId === undefined ? {} : { targetClassId }) },
+      )
+    },
+
+    async saveClassTextbooks(_userId, classId, textbooks, note, expectedVersion, operationId, publish) {
+      return repository.call<'saveClassTextbooks' | 'publishClassTextbooks', {
+        classId: string; textbooks: ClassTextbookItem[]; note: string }, ClassTextbookConfig>(
+        'teacher-textbook-command', publish ? 'publishClassTextbooks' : 'saveClassTextbooks',
+        { classId, textbooks, note }, { expectedVersion, operationId },
+      )
+    },
+
+    async listRecordingPrompts(_userId, targetClassIds, keyword, limit, offset) {
+      return repository.call<'listPrompts', object, RecordingPromptPage>('task-recording-query', 'listPrompts',
+        { ...(targetClassIds === undefined ? {} : { targetClassIds }), ...(keyword.trim() ? { keyword: keyword.trim() } : {}), page: { limit, offset } })
+    },
+    async getRecordingPrompt(_userId, promptId, targetClassIds) {
+      return repository.call<'getPrompt', object, RecordingPromptView>('task-recording-query', 'getPrompt',
+        { promptId, ...(targetClassIds === undefined ? {} : { targetClassIds }) })
+    },
+    async beginTaskRecording(_userId, taskId, itemId, operationId) {
+      return repository.call<'begin', object, TaskRecordingView>('task-recording-command', 'begin',
+        { taskId, itemId }, { operationId })
+    },
+    async submitTaskRecording(_userId, recordingId, stagingFileId, expectedVersion, operationId) {
+      return repository.call<'submit', object, TaskRecordingView>('task-recording-command', 'submit',
+        { recordingId, stagingFileId }, { operationId, expectedVersion })
+    },
+    async listTaskRecordings(_userId, taskId, itemId) {
+      return repository.call<'listRound', object, TaskRecordingView[]>('task-recording-query', 'listRound',
+        { taskId, itemId })
+    },
+    async getTaskRecordingPlayback(_userId, recordingId) {
+      return repository.call<'getPlayback', object, TaskRecordingPlayback>('task-recording-query', 'getPlayback',
+        { recordingId })
+    },
+    async getTaskRecordingMediaState(_userId, recordingId) {
+      return repository.call<'getMediaState', object, TaskRecordingMediaState>('task-recording-query', 'getMediaState',
+        { recordingId })
+    },
+    async listTaskCatalogResources(_userId, filters, limit, offset) {
+      return repository.call<'listTaskCatalogResources', { filters: TaskCatalogFilters; page: { limit: number; offset: number } }, TaskCatalogPage>(
+        'content-query', 'listTaskCatalogResources', { filters, page: { limit, offset } },
+      )
+    },
+    async listStudentCatalog(_userId, filters, limit, offset) {
+      return repository.call<'listStudentCatalog', { filters: StudentCatalogFilters; page: { limit: number; offset: number } }, StudentCatalogPage>(
+        'content-query', 'listStudentCatalog', { filters, page: { limit, offset } },
+      )
+    },
+    async listStudentCatalogFacets(_userId, type, category) {
+      return repository.call<'listStudentCatalogFacets', { type: StudentCatalogFilters['type']; category?: StudentCatalogFilters['category'] }, StudentCatalogFacet[]>(
+        'content-query', 'listStudentCatalogFacets', { type, ...(category === undefined ? {} : { category }) },
+      )
+    },
+
+    async listTaskCatalogFacets(_userId, type, targetClassIds) {
+      return repository.call<'listTaskCatalogFacets', { type: TaskCatalogFilters['type']; targetClassIds?: string[] }, TaskCatalogFacet[]>(
+        'content-query', 'listTaskCatalogFacets', { type, ...(targetClassIds === undefined ? {} : { targetClassIds }) },
+      )
+    },
+
+    async getTaskCatalogResource(_userId, resourceId, targetClassIds) {
+      return repository.call<'getTaskCatalogResource', { resourceId: string; targetClassIds?: string[] }, TaskCatalogListItem>(
+        'content-query', 'getTaskCatalogResource', { resourceId, ...(targetClassIds === undefined ? {} : { targetClassIds }) },
+      )
+    },
+
+    async saveActivityDraft(_userId, draft, expectedVersion, operationId) {
+      return repository.call<'saveDraft', ActivityDraftInput, ActivityView>(
+        'activity-command', 'saveDraft', draft, { expectedVersion, operationId },
+      )
+    },
+
+    async publishActivity(_userId, activityId, expectedVersion, operationId) {
+      return repository.call<'publish', { activityId: string }, ActivityView>(
+        'activity-command', 'publish', { activityId }, { expectedVersion, operationId },
+      )
+    },
+    async addActivityFutureRestDay(_userId, activityId, date, reason, expectedVersion, operationId) {
+      return repository.call<'addFutureRestDay', { activityId: string; date: string; reason: string }, ActivityView>(
+        'activity-command', 'addFutureRestDay', { activityId, date, reason }, { expectedVersion, operationId },
+      )
+    },
+
+    async listTeacherActivities(_userId) {
+      return repository.call<'listForTeacher', Record<string, never>, ActivityView[]>(
+        'activity-query', 'listForTeacher', {},
+      )
+    },
+
+    async listStudentActivities(_userId) {
+      return repository.call<'listForStudent', Record<string, never>, ActivityView[]>(
+        'activity-query', 'listForStudent', {},
+      )
+    },
+
+    async getStudentActivity(_userId, activityId) {
+      return repository.call<'getForStudent', { activityId: string }, ActivityView>(
+        'activity-query', 'getForStudent', { activityId },
+      )
+    },
+
+    async getMyActivityDay(_userId, activityId, date) {
+      return repository.call<'getMyDay', { activityId: string; date: string }, ActivityDayView>(
+        'activity-query', 'getMyDay', { activityId, date },
+      )
+    },
+
+    async setActivityOverride(_userId, input, expectedVersion, operationId) {
+      return repository.call<'setOverride', typeof input, ActivityOverrideView>(
+        'activity-command', 'setOverride', input, { expectedVersion, operationId },
+      )
+    },
+
+    async getActivityOverrideForTeacher(_userId, activityId, studentId, date) {
+      return repository.call<'getOverrideForTeacher', { activityId: string; studentId: string; date: string }, ActivityOverrideState>(
+        'activity-query', 'getOverrideForTeacher', { activityId, studentId, date },
+      )
+    },
+
+    async getActivityLeaderboard(_userId, activityId) {
+      return repository.call<'getLeaderboard', { activityId: string }, ActivityLeaderboardView>(
+        'activity-query', 'getLeaderboard', { activityId },
+      )
+    },
+
     async getReadingResource(_userId, resourceId) {
       return repository.call<'getReadingResource', { resourceId: string }, ReadingResource>(
         'content-query', 'getReadingResource', { resourceId },
@@ -941,6 +1353,160 @@ export function createCloudAppService(
       return repository.call<'getVocabularyProgress', { packId: string }, VocabularyProgress | null>(
         'learning-progress-query', 'getVocabularyProgress', { packId },
       )
+    },
+
+    async getWordAttemptState(_userId, scope) {
+      return repository.call<'getWordAttemptState', VocabularyAnswerScope, VocabularyAttemptState>(
+        'vocabulary-evidence-query', 'getWordAttemptState', scope,
+      )
+    },
+
+    async getPackAttemptSummary(_userId, scope) {
+      return repository.call<'getPackAttemptSummary', VocabularyPackScope, VocabularyPackAttemptSummary>(
+        'vocabulary-evidence-query', 'getPackAttemptSummary', scope,
+      )
+    },
+
+    async submitWordAnswer(_userId, input, expectedVersion, operationId) {
+      return repository.call<'submitWordAnswer', VocabularyAnswerInput, VocabularyAttemptView>(
+        'vocabulary-evidence-command', 'submitWordAnswer', input, { expectedVersion, operationId },
+      )
+    },
+
+    async listWorkMaterials(_userId) {
+      return repository.call<'listMaterials', Record<string, never>, WorkMaterial[]>(
+        'student-work-query', 'listMaterials', {},
+      )
+    },
+    async searchWorkMaterials(_userId, keyword, limit, offset, filters = {}) {
+      return repository.call<'searchMaterials', { keyword: string; offset: number; limit: number } & WorkMaterialFilters, WorkMaterialPage>(
+        'student-work-query', 'searchMaterials', { keyword, offset, limit,
+          ...(filters.grade ? { grade: filters.grade } : {}),
+          ...(filters.textbook ? { textbook: filters.textbook } : {}),
+          ...(filters.unit ? { unit: filters.unit } : {}) },
+      )
+    },
+    async listWorkMaterialFacets(_userId) {
+      return repository.call<'listMaterialFacets', Record<string, never>, WorkMaterialFacet[]>(
+        'student-work-query', 'listMaterialFacets', {},
+      )
+    },
+    async getWorkMaterial(_userId, materialId) {
+      return repository.call<'getMaterial', { materialId: string }, WorkMaterial>(
+        'student-work-query', 'getMaterial', { materialId },
+      )
+    },
+    async beginWorkDraft(_userId, materialId, operationId) {
+      return repository.call<'beginDraft', { materialId: string }, StudentWork>(
+        'student-work-command', 'beginDraft', { materialId }, { operationId, expectedVersion: 0 },
+      )
+    },
+    async submitWork(_userId, input, expectedVersion, operationId) {
+      return repository.call<'submitWork', typeof input, StudentWork>(
+        'student-work-command', 'submitWork', input, { operationId, expectedVersion },
+      )
+    },
+    async deleteWorkDraft(_userId, workId, expectedVersion, operationId) {
+      return repository.call<'deleteDraft', { workId: string }, StudentWork>(
+        'student-work-command', 'deleteDraft', { workId }, { operationId, expectedVersion },
+      )
+    },
+    async listMyWorks(_userId) {
+      return repository.call<'listMine', Record<string, never>, StudentWork[]>(
+        'student-work-query', 'listMine', {},
+      )
+    },
+    async getWorkPlayback(_userId, workId) {
+      return repository.call<'getPlayback', { workId: string }, WorkPlayback>(
+        'student-work-query', 'getPlayback', { workId },
+      )
+    },
+    async getMaterialPlayback(_userId, materialId) {
+      return repository.call<'getMaterialPlayback', { materialId: string }, MaterialPlayback>(
+        'student-work-query', 'getMaterialPlayback', { materialId },
+      )
+    },
+    async listPhonicsCourses(_userId) {
+      return repository.call<'listCourses', Record<string, never>, PhonicsCourseListItem[]>(
+        'phonics-query', 'listCourses', {},
+      )
+    },
+    async getPhonicsCourse(_userId, courseId) {
+      return repository.call<'getCourse', { courseId: string }, PhonicsCourseView>(
+        'phonics-query', 'getCourse', { courseId },
+      )
+    },
+    async getPhonicsState(_userId, courseId) {
+      return repository.call<'getState', { courseId: string }, PhonicsCourseState>(
+        'phonics-query', 'getState', { courseId },
+      )
+    },
+    async submitPhonicsAnswer(_userId, input, expectedVersion, operationId) {
+      return repository.call<'submitAnswer', typeof input, PhonicsAnswerView>(
+        'phonics-command', 'submitAnswer', input, { expectedVersion, operationId },
+      )
+    },
+    async getPhonicsAudio(_userId, courseId, phonemeId) {
+      return repository.call<'getAudio', { courseId: string; phonemeId: string }, PhonicsAudioView>(
+        'phonics-query', 'getAudio', { courseId, phonemeId },
+      )
+    },
+    async listTaskTemplates(_userId) {
+      return repository.call<'listTemplates', Record<string, never>, TaskTemplateView[]>(
+        'task-template-query', 'listTemplates', {},
+      )
+    },
+    async listNotifications(_userId, filter, offset, limit, days) {
+      return repository.call<'list', { filter: NotificationFilter; offset: number; limit: number; days: number }, InboxPage>(
+        'notification-query', 'list', { filter, offset, limit, days },
+      )
+    },
+    async markNotificationRead(_userId, noticeId, operationId) {
+      return repository.call<'markRead', { noticeId: string }, InboxNotice>(
+        'notification-command', 'markRead', { noticeId }, { operationId },
+      )
+    },
+    async markAllNotificationsRead(_userId, operationId) {
+      return repository.call<'markAllRead', Record<string, never>, { readAt: string }>(
+        'notification-command', 'markAllRead', {}, { operationId },
+      )
+    },
+    async getTaskTemplate(_userId, templateId) {
+      return repository.call<'getTemplate', { templateId: string }, TaskTemplateView>(
+        'task-template-query', 'getTemplate', { templateId },
+      )
+    },
+    async saveTaskTemplate(_userId, input, expectedVersion, operationId) {
+      return repository.call<'saveTemplate', TaskTemplateInput, TaskTemplateView>(
+        'task-template-command', 'saveTemplate', input, { expectedVersion, operationId },
+      )
+    },
+    async renameTaskTemplate(_userId, templateId, title, expectedVersion, operationId) {
+      return repository.call<'renameTemplate', { templateId: string; title: string }, TaskTemplateView>(
+        'task-template-command', 'renameTemplate', { templateId, title }, { expectedVersion, operationId },
+      )
+    },
+    async copyTaskTemplate(_userId, templateId, title, expectedVersion, operationId) {
+      return repository.call<'copyTemplate', { templateId: string; title: string }, TaskTemplateView>(
+        'task-template-command', 'copyTemplate', { templateId, title }, { expectedVersion, operationId },
+      )
+    },
+    async removeTaskTemplate(_userId, templateId, expectedVersion, operationId) {
+      return repository.call<'removeTemplate', { templateId: string }, TaskTemplateView>(
+        'task-template-command', 'removeTemplate', { templateId }, { expectedVersion, operationId },
+      )
+    },
+    async useTaskTemplate(_userId, templateId, expectedVersion, operationId) {
+      return repository.call<'useTemplate', { templateId: string }, TaskTemplateView>(
+        'task-template-command', 'useTemplate', { templateId }, { expectedVersion, operationId },
+      )
+    },
+    async instantiateTaskTemplate(_userId, templateId, expectedVersion, operationId) {
+      const result = await repository.call<'instantiateTemplate', { templateId: string }, TemplateDraftReceiptWire>(
+        'task-command', 'instantiateTemplate', { templateId }, { expectedVersion, operationId },
+      )
+      return result.ok ? { ok: true, data: { taskId: result.data.taskId, version: result.data.version,
+        templateVersion: result.data.templateVersion }, meta: result.meta } : result
     },
 
     async saveVocabularyProgress(_userId, command) {
@@ -1002,11 +1568,12 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
     id: value.taskId,
     title: value.title,
     deliveryType: 'classroom',
-    status: 'active',
+    status: value.status ?? 'active',
     creatorTeacherId: '',
-    classId: '',
+    classId: value.assignment.classId ?? '',
     startsAt: value.startsAt,
     dueAt: value.dueAt,
+    ...(value.latePolicy === undefined ? {} : { latePolicy: { ...value.latePolicy } }),
     description: value.description ?? '',
     items: value.items.map(item => {
       const rule = taskCompletionRule(item.type, item.completionRule)
@@ -1017,6 +1584,13 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
         type: item.type,
         completionRule: rule === undefined ? '完成规则暂不可用' : completionRuleLabel(item.type, completionRequiredCount(item.type, item.completionRule as Record<string, unknown>) ?? 0),
         ...(rule === undefined ? {} : { completionRuleData: rule }),
+        ...(item.readingPageNumbers === undefined ? {} : { readingPageNumbers: [...item.readingPageNumbers] }),
+        ...(item.recordingPrompt === undefined ? {} : { recordingPrompt: item.recordingPrompt }),
+        ...(item.snapshotSchemaVersion === undefined ? {} : { snapshotSchemaVersion: item.snapshotSchemaVersion }),
+        ...(item.vocabularyWordIds === undefined ? {} : { vocabularyWordIds: [...item.vocabularyWordIds] }),
+        ...(item.vocabularyPack === undefined ? {} : { vocabularyPack: { ...item.vocabularyPack,
+          words: item.vocabularyPack.words.map(word => ({ ...word, syllables: [...word.syllables] })) } }),
+        ...(item.exerciseQuestion === undefined ? {} : { exerciseQuestion: { ...item.exerciseQuestion, options: [...item.exerciseQuestion.options] } }),
       }
     }),
     version: 1,
@@ -1025,7 +1599,7 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
     id: `asn_${value.taskId}`,
     taskId: value.taskId,
     studentId: '',
-    classId: '',
+    classId: value.assignment.classId ?? '',
     status: value.assignment.status,
     progressPercent: value.assignment.status === 'completed' || value.assignment.status === 'awaiting_review' ? 100 : 0,
     redoCount: value.assignment.redoCount,
@@ -1052,9 +1626,21 @@ function mapStudentTaskDetail(value: StudentTaskDetailWire): TaskDetailView {
     recordVersion: value.submission.recordVersion,
     assignmentVersion: value.submission.assignmentVersion,
   }
-  const feedback = value.feedback === null || submission === undefined ? undefined : mapFeedback(value.feedback, assignment.id, submission.id)
-  return { task, assignment, ...(submission === undefined ? {} : { submission }),
-    submissionHistory: value.submissionHistory ?? (submission?.submittedAt ? [{ version: submission.version, status: submission.status, submittedAt: submission.submittedAt }] : []),
+  const feedback = value.feedback === null || submission === undefined ? undefined
+    : mapFeedback(value.feedback, assignment.id, value.feedback.submissionId ?? submission.id)
+  return { task, assignment, ...(value.automaticScore === undefined ? {} : { automaticScore: value.automaticScore }),
+    ...(value.readingPageProgress === undefined ? {} : { readingPageProgress: value.readingPageProgress }),
+    ...(submission === undefined ? {} : { submission }),
+    submissionHistory: value.submissionHistory?.map(item => ({ version: item.version, status: item.status,
+      submittedAt: item.submittedAt,
+      ...(item.feedback ? { feedback: mapFeedback(item.feedback, assignment.id,
+        item.feedback.submissionId ?? `history_${item.version}`) } : {}),
+      ...(item.answers === undefined ? {} : { answers: item.answers.map(answer => {
+        const structuredValue = taskCompletionValue(answer.value)
+        return { taskItemId: answer.itemId, value: stringValue(answer.value),
+          ...(structuredValue === undefined ? {} : { structuredValue }) }
+      }) }) })) ?? (submission?.submittedAt ? [{ version: submission.version, status: submission.status,
+      submittedAt: submission.submittedAt, answers: submission.answers.map(answer => ({ ...answer })) }] : []),
     ...(feedback === undefined ? {} : { feedback }) }
 }
 
@@ -1110,7 +1696,8 @@ function mapParentTask(value: ParentTaskWire, summary?: ParentTaskListWire): Tas
     submittedAt: value.submission.submittedAt,
   }
   const feedback = value.feedback === null || submission === undefined ? undefined : mapFeedback(value.feedback, assignmentId, submission.id)
-  return { task, assignment, ...(submission === undefined ? {} : { submission }), ...(feedback === undefined ? {} : { feedback }) }
+  return { task, assignment, ...(value.automaticScore === undefined ? {} : { automaticScore: value.automaticScore }),
+    ...(submission === undefined ? {} : { submission }), ...(feedback === undefined ? {} : { feedback }) }
 }
 
 function mapParentSummary(value: ParentTaskListWire, childId: string): TaskDetailView {
@@ -1149,6 +1736,7 @@ function mapFeedback(value: FeedbackWire, assignmentId: string, submissionId: st
     teacherId: '',
     decision: value.decision,
     ...(value.score === null ? {} : { score: value.score }),
+    ...(value.itemScores === undefined ? {} : { itemScores: value.itemScores.map(item => ({ ...item })) }),
     ...(value.textComment === null ? {} : { textComment: value.textComment }),
     ...(value.returnReason === null ? {} : { returnReason: value.returnReason }),
     publishedAt: value.publishedAt,
@@ -1174,6 +1762,21 @@ function mapStructuredTaskDraft(value: StructuredTaskDraft | undefined): Service
     if (!item.id.trim() || !item.resourceId.trim()) return validationFailure(`structuredDraft.items[${index}]`, '任务内容标识不能为空')
     if (!isPositiveInteger(item.requiredCount)) return validationFailure(`structuredDraft.items[${index}].requiredCount`, '完成阈值必须为正整数')
     if (!isPositiveInteger(item.maxScore)) return validationFailure(`structuredDraft.items[${index}].maxScore`, '满分必须为正整数')
+    if (item.weightPercent !== undefined && (!Number.isFinite(item.weightPercent)
+      || item.weightPercent <= 0 || item.weightPercent > 100)) {
+      return validationFailure(`structuredDraft.items[${index}].weightPercent`, '评分权重须在 0 到 100 之间')
+    }
+    if (item.scoringKind !== undefined && item.scoringKind !== 'manual' && item.scoringKind !== 'automatic') {
+      return validationFailure(`structuredDraft.items[${index}].scoringKind`, '评分方式无效')
+    }
+    if (item.type === 'recording' && item.scoringKind === 'automatic') {
+      return validationFailure(`structuredDraft.items[${index}].scoringKind`, '录音任务须由教师人工评分')
+    }
+    if (item.pageIds !== undefined && (item.type !== 'reading' || item.pageIds.length !== item.requiredCount
+      || !item.pageIds.every(id => typeof id === 'string' && !!id.trim())
+      || new Set(item.pageIds).size !== item.pageIds.length)) {
+      return validationFailure(`structuredDraft.items[${index}].pageIds`, '阅读指定页范围无效')
+    }
   }
   return {
     ok: true,
@@ -1181,8 +1784,9 @@ function mapStructuredTaskDraft(value: StructuredTaskDraft | undefined): Service
       itemRefs: value.items.map((item, index) => ({
         id: item.id,
         resourceId: item.resourceId,
-        completionRule: completionRule(item.type, item.requiredCount),
-        scoringRule: { kind: 'manual', maxScore: item.maxScore },
+        completionRule: completionRule(item.type, item.requiredCount, item.pageIds),
+        scoringRule: { kind: item.scoringKind ?? 'manual', maxScore: item.maxScore,
+          ...(item.weightPercent === undefined ? {} : { weightPercent: item.weightPercent }) },
         order: index + 1,
       })),
       target: value.target,
@@ -1246,6 +1850,7 @@ function completionRequiredCount(type: StructuredTaskDraft['items'][number]['typ
   if (type === 'reading' && rule.kind === 'reading_pages' && isPositiveIntegerValue(rule.requiredPageCount)) return rule.requiredPageCount
   if (type === 'vocabulary' && rule.kind === 'vocabulary_words' && isPositiveIntegerValue(rule.requiredWordCount)) return rule.requiredWordCount
   if (type === 'exercise' && rule.kind === 'exercise_questions' && isPositiveIntegerValue(rule.requiredQuestionCount)) return rule.requiredQuestionCount
+  if (type === 'recording' && rule.kind === 'recording_upload') return 1
   return null
 }
 
@@ -1253,14 +1858,27 @@ function taskCompletionRule(type: StructuredTaskDraft['items'][number]['type'], 
   const record = rule as Record<string, unknown>
   const requiredCount = completionRequiredCount(type, record)
   if (requiredCount === null) return undefined
-  if (type === 'reading') return { kind: 'reading_pages', requiredPageCount: requiredCount }
+  if (type === 'reading') {
+    if (record.pageIds !== undefined && (!Array.isArray(record.pageIds)
+      || record.pageIds.length !== requiredCount
+      || !record.pageIds.every(id => typeof id === 'string' && !!id.trim())
+      || new Set(record.pageIds).size !== record.pageIds.length)) return undefined
+    return { kind: 'reading_pages', requiredPageCount: requiredCount,
+      ...(record.pageIds === undefined ? {} : { pageIds: [...record.pageIds] as string[] }) }
+  }
   if (type === 'vocabulary') return { kind: 'vocabulary_words', requiredWordCount: requiredCount }
+  if (type === 'recording') return { kind: 'recording_upload' }
   return { kind: 'exercise_questions', requiredQuestionCount: requiredCount }
 }
 
 function taskCompletionValue(value: unknown): TaskCompletionValue | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const record = value as Record<string, unknown>
+  if (record.kind === 'recording' && typeof record.recordingId === 'string' && record.recordingId.trim()) {
+    return { kind: 'recording', recordingId: record.recordingId,
+      ...(isPositiveIntegerValue(record.durationMs) ? { durationMs: record.durationMs } : {}),
+      ...(isPositiveIntegerValue(record.sizeBytes) ? { sizeBytes: record.sizeBytes } : {}) }
+  }
   if (record.kind === 'reading' && isNonNegativeIntegerValue(record.completedPageCount)) {
     return { kind: 'reading', completedPageCount: record.completedPageCount }
   }
@@ -1271,10 +1889,19 @@ function taskCompletionValue(value: unknown): TaskCompletionValue | undefined {
     return { kind: 'vocabulary', completedWordCount: record.completedWordCount, correctWordCount: record.correctWordCount }
   }
   if (record.kind === 'exercise' && isNonNegativeIntegerValue(record.answeredQuestionCount)) {
+    const responses = Array.isArray(record.questionResponses) ? record.questionResponses.flatMap((entry) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return []
+      const value = entry as Record<string, unknown>
+      if (typeof value.questionId !== 'string' || !(typeof value.response === 'string'
+        || (Array.isArray(value.response) && value.response.every(option => typeof option === 'string')))) return []
+      return [{ questionId: value.questionId, response: value.response as string | string[],
+        ...(typeof value.isCorrect === 'boolean' ? { isCorrect: value.isCorrect } : {}) }]
+    }) : undefined
     return {
       kind: 'exercise',
       answeredQuestionCount: record.answeredQuestionCount,
       ...(isNonNegativeIntegerValue(record.correctQuestionCount) ? { correctQuestionCount: record.correctQuestionCount } : {}),
+      ...(responses === undefined ? {} : { questionResponses: responses }),
     }
   }
   return undefined
@@ -1288,21 +1915,25 @@ function isNonNegativeIntegerValue(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
 
-function completionRule(type: StructuredTaskDraft['items'][number]['type'], requiredCount: number): object {
-  if (type === 'reading') return { kind: 'reading_pages', requiredPageCount: requiredCount }
+function completionRule(type: StructuredTaskDraft['items'][number]['type'], requiredCount: number, pageIds?: readonly string[]): object {
+  if (type === 'reading') return { kind: 'reading_pages', requiredPageCount: requiredCount,
+    ...(pageIds === undefined ? {} : { pageIds: [...pageIds] }) }
   if (type === 'vocabulary') return { kind: 'vocabulary_words', requiredWordCount: requiredCount }
+  if (type === 'recording') return { kind: 'recording_upload' }
   return { kind: 'exercise_questions', requiredQuestionCount: requiredCount }
 }
 
 function taskItemTitle(type: StructuredTaskDraft['items'][number]['type']): string {
   if (type === 'reading') return '阅读练习'
   if (type === 'vocabulary') return '单词练习'
+  if (type === 'recording') return '录音任务'
   return '习题练习'
 }
 
 function completionRuleLabel(type: StructuredTaskDraft['items'][number]['type'], requiredCount: number): string {
   if (type === 'reading') return `完成 ${requiredCount} 页阅读`
   if (type === 'vocabulary') return `完成 ${requiredCount} 个单词`
+  if (type === 'recording') return '提交有效录音'
   return `完成 ${requiredCount} 道习题`
 }
 
@@ -1311,11 +1942,17 @@ function isStructuredAnswers(value: StructuredSubmissionAnswer[] | undefined): v
   return value.every(answer => {
     if (!answer.itemId.trim()) return false
     if (answer.value.kind === 'reading') return isNonNegativeInteger(answer.value.completedPageCount)
+    if (answer.value.kind === 'recording') return answer.value.recordingId.trim().length > 0
     if (answer.value.kind === 'vocabulary') {
       return isNonNegativeInteger(answer.value.completedWordCount)
         && isNonNegativeInteger(answer.value.correctWordCount)
         && answer.value.correctWordCount <= answer.value.completedWordCount
     }
+    if (answer.value.questionResponses !== undefined) return answer.value.answeredQuestionCount === 1
+      && answer.value.questionResponses.length === 1
+      && answer.value.questionResponses.every(response => response.questionId.trim().length > 0
+        && (typeof response.response === 'string' ? response.response.trim().length > 0
+          : response.response.length > 0 && response.response.every(option => option.trim().length > 0)))
     return isNonNegativeInteger(answer.value.answeredQuestionCount)
       && (answer.value.correctQuestionCount === undefined || (
         isNonNegativeInteger(answer.value.correctQuestionCount)

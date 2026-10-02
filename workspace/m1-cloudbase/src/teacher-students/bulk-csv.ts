@@ -463,6 +463,7 @@ function groupLines(
 
 function matchesStatus(item: TeacherStudentListItem, status: TeacherStudentFilters['status']): boolean {
   if (status === 'all') return true;
+  if (status === 'active') return item.accountStatus === 'active';
   if (status === 'attention') return item.accountStatus === 'active' && item.needsAttention;
   if (status === 'normal') return item.accountStatus === 'active' && !item.needsAttention;
   return item.accountStatus === 'disabled';

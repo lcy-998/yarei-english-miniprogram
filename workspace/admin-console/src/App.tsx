@@ -7,6 +7,10 @@ import { DashboardPage } from './pages/dashboard-page';
 import { OrganizationPage } from './pages/organization-page';
 import { PermissionPage } from './pages/permission-page';
 import { UsersPage } from './pages/users-page';
+import { TaskActivitiesPage } from './pages/task-activities-page';
+import { TextbookManagementPage } from './pages/textbook-management-page';
+import { QuestionManagementPage } from './pages/question-management-page';
+import { CloudQuestionAdminService, MemoryQuestionAdminService } from './services/question-admin-service';
 import { MemoryAdminRepository } from './services/admin-repository';
 import { AdminService } from './services/admin-service';
 import { ADMIN_SEED } from './services/seed';
@@ -18,6 +22,9 @@ const TITLES: Record<PageKey, string> = {
   organization: '学校/班级管理',
   users: '用户管理',
   permission: '权限管理',
+  'task-activities': '任务与活动管理',
+  textbooks: '教材中心管理',
+  questions: '学校习题库管理',
 };
 
 const repository = new MemoryAdminRepository(ADMIN_SEED);
@@ -25,6 +32,10 @@ const service = new AdminService(repository, {
   actorId: 'admin-zhou',
   actorName: '周老师',
   schoolIds: ['school-demo-001'],
+  permissions: [...ADMIN_SEED.roles[0]!.permissions],
+});
+const memoryQuestions = new MemoryQuestionAdminService(repository, {
+  actorId: 'admin-zhou', actorName: '周老师', schoolIds: ['school-demo-001'],
   permissions: [...ADMIN_SEED.roles[0]!.permissions],
 });
 
@@ -53,6 +64,8 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' }>();
   const runtime = useMemo(configuredRuntime, []);
   const [activeService, setActiveService] = useState<AdminService>(service);
+  const questionService = useMemo(() => activeService === service || !runtime
+    ? memoryQuestions : new CloudQuestionAdminService(runtime), [activeService, runtime]);
   const [cloudLogin, setCloudLogin] = useState({ mobile: '', password: '' });
   const [cloudLoginError, setCloudLoginError] = useState('');
   const [cloudLoginBusy, setCloudLoginBusy] = useState(false);
@@ -104,8 +117,16 @@ export default function App() {
         ? <DashboardPage snapshot={snapshot} onNavigate={setPage} />
         : page === 'organization'
           ? <OrganizationPage snapshot={snapshot} service={activeService} onChanged={refresh} notify={notify} />
+          : page === 'textbooks'
+            ? <TextbookManagementPage runtime={runtime} cloudReady={activeService !== service} snapshot={snapshot} notify={notify} />
+          : page === 'questions'
+            ? <QuestionManagementPage service={questionService} classes={snapshot.classes} notify={notify} onChanged={refresh} />
+          : page === 'task-activities'
+            ? <TaskActivitiesPage runtime={runtime} cloudReady={activeService !== service} notify={notify} />
           : page === 'users'
-            ? <UsersPage snapshot={snapshot} service={activeService} onChanged={refresh} notify={notify} />
+            ? <UsersPage snapshot={snapshot} service={activeService}
+              workDraftClient={activeService !== service ? runtime?.organization : undefined}
+              onChanged={refresh} notify={notify} />
             : <PermissionPage snapshot={snapshot} service={activeService} onChanged={refresh} notify={notify} />;
 
   return <>

@@ -31,6 +31,7 @@ const readingResource: LearningResourceAccessRecord = {
   organizationId: ORGANIZATION_ID,
   type: 'reading',
   status: 'published',
+  contentVersion: 'demo-v1',
   allowedStudentIds: [STUDENT_ID],
   pages: [
     { id: 'page_1', chapterId: 'chapter_1', pageNumber: 1 },
@@ -90,6 +91,11 @@ describe('learning progress document repository', () => {
     await expect(second.getReadingProgress(student, readingResource.id)).resolves.toEqual(reading);
     await expect(second.getVocabularyProgress(student, vocabularyResource.id)).resolves.toEqual(vocabulary);
     expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.reading]).toHaveLength(1);
+    expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.readingPageEvents]).toHaveLength(1);
+    const storedEvents = await createLearningProgressDocumentRepository(database)
+      .listReadingPageEvents(ORGANIZATION_ID, STUDENT_ID, readingResource.id);
+    expect(storedEvents).toEqual([expect.objectContaining({ pageId: 'page_2', pageNumber: 2, progressVersion: 1,
+      contentVersion: 'demo-v1' })]);
     expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.vocabulary]).toHaveLength(1);
     expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.idempotency]).toEqual([
       expect.objectContaining({
@@ -137,6 +143,7 @@ describe('learning progress document repository', () => {
     const rows = database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.reading] ?? [];
     expect(rows).toHaveLength(1);
     expect(rows[0]?.version).toBe(1);
+    expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.readingPageEvents]).toHaveLength(1);
   });
 
   it('rolls back progress and idempotency when the success audit cannot append', async () => {
@@ -159,10 +166,23 @@ describe('learning progress document repository', () => {
 
     const snapshot = database.snapshot();
     expect(snapshot[LEARNING_PROGRESS_COLLECTIONS.reading] ?? []).toHaveLength(0);
+    expect(snapshot[LEARNING_PROGRESS_COLLECTIONS.readingPageEvents] ?? []).toHaveLength(0);
     expect(snapshot[LEARNING_PROGRESS_COLLECTIONS.idempotency] ?? []).toHaveLength(0);
     expect(snapshot[LEARNING_PROGRESS_COLLECTIONS.audit]).toEqual([
       expect.objectContaining({ result: 'denied', errorCode: 'SERVICE_UNAVAILABLE' }),
     ]);
+  });
+
+  it('rolls back progress if its append-only page visit cannot be written', async () => {
+    const database = seededDatabase();
+    database.failNext({ operation: 'create', collection: LEARNING_PROGRESS_COLLECTIONS.readingPageEvents, kind: 'conflict' });
+    await expect(service(database).saveReadingProgress(student, {
+      resourceId: readingResource.id, chapterId: 'chapter_1', pageId: 'page_1', pageNumber: 1,
+      favorite: false, expectedVersion: 0, operationId: 'operation_page_event_rollback',
+    })).rejects.toThrow();
+    expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.reading] ?? []).toHaveLength(0);
+    expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.readingPageEvents] ?? []).toHaveLength(0);
+    expect(database.snapshot()[LEARNING_PROGRESS_COLLECTIONS.idempotency] ?? []).toHaveLength(0);
   });
 
   it('maps unavailable reads safely and returns deep copies', async () => {

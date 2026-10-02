@@ -21,7 +21,7 @@ type Valid<T> = { readonly ok: true; readonly value: T } | { readonly ok: false;
 export type TaskQueryInput =
   | Readonly<{ action: 'getTeacherWorkbench'; date: string; classId?: string }>
   | Readonly<{ action: 'listTeacherTasks'; filters: TeacherTaskFilters; page: PageRequest }>
-  | Readonly<{ action: 'getDraftOptions' }>
+  | Readonly<{ action: 'getDraftOptions'; catalogMode?: 'selector' }>
   | Readonly<{ action: 'previewTask'; preview: Readonly<{ taskId: string; expectedVersion: number }> | Readonly<{ draft: DraftPreviewInput }> }>
   | Readonly<{ action: 'getTaskForEdit'; taskId: string }>
   | Readonly<{ action: 'getCompletion'; taskId: string; filter: CompletionFilters; page: PageRequest }>;
@@ -64,8 +64,13 @@ export function validateTaskQueryRequest(request: FunctionRequest<TaskQueryActio
     return { ok: true, value: { action: request.action, filters: filters.value, page: page.value } };
   }
   if (request.action === 'getDraftOptions') {
-    const exact = parseExactObject(request.payload, []);
-    return exact.ok ? { ok: true, value: { action: request.action } } : exact;
+    const exact = parseExactObject(request.payload, [], ['catalogMode']);
+    if (!exact.ok) return exact;
+    if (exact.value.catalogMode !== undefined && exact.value.catalogMode !== 'selector') {
+      return invalid('catalogMode', '目录模式无效。');
+    }
+    return { ok: true, value: { action: request.action,
+      ...(exact.value.catalogMode === undefined ? {} : { catalogMode: 'selector' }) } };
   }
   if (request.action === 'previewTask') {
     if ('taskId' in request.payload) {

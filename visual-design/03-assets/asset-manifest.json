@@ -1,6 +1,6 @@
 {
-  "version": "1.4.0",
-  "updatedAt": "2026-09-16",
+  "version": "1.4.1",
+  "updatedAt": "2026-09-28",
   "assets": [
     {
       "id": "brand-logo",
@@ -80,6 +80,9 @@
       "production": "visual-design/03-assets/production/recording-ai-retry-v1.png",
       "role": "recording-ai-retry-empty-state",
       "productionDimensions": "1536x1024",
+      "runtimeCopy": "workspace/miniprogram/assets/g0/recording-ai-retry-thumb-v1.png",
+      "runtimeDimensions": "420x280",
+      "runtimeBytes": 76159,
       "alpha": true,
       "references": ["S-05", "S-07", "T-20"],
       "constraints": "No text, logo, mascot, person, score, button or business state is embedded.",
@@ -91,6 +94,9 @@
       "production": "visual-design/03-assets/production/demo-zoo-picture-book-cover-v1.png",
       "role": "fictional-picture-book-cover",
       "productionDimensions": "1183x1330",
+      "runtimeThumbnail": "workspace/miniprogram/assets/content/demo-zoo-cover-thumb-v1.png",
+      "runtimeThumbnailDimensions": "356x400",
+      "runtimeThumbnailBytes": 219165,
       "alpha": true,
       "references": ["S-03", "S-04", "T-16", "T-18"],
       "constraints": "Synthetic development-only content; no text, logo, publisher or copyrighted character.",
@@ -113,6 +119,9 @@
       "production": "visual-design/03-assets/production/demo-sync-textbook-cover-v1.png",
       "role": "fictional-sync-textbook-cover",
       "productionDimensions": "1218x1291",
+      "runtimeThumbnail": "workspace/miniprogram/assets/content/demo-sync-textbook-cover-thumb-v1.png",
+      "runtimeThumbnailDimensions": "360x382",
+      "runtimeThumbnailBytes": 92949,
       "alpha": true,
       "references": ["T-12", "T-13", "T-14", "T-18", "A-05"],
       "constraints": "Synthetic development-only cover; no text, logo, grade, publisher or copyrighted content.",

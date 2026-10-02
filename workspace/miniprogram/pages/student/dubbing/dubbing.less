@@ -1,0 +1,62 @@
+@import "../../../styles/m1-pages.less";
+.dubbing-page{min-height:100vh;padding-bottom:36px}
+.dubbing-content{padding:18px 16px 28px}
+.dubbing-hero,.dubbing-card{margin-bottom:14px;padding:20px;border-radius:24px;background:rgba(255,249,240,.97);box-shadow:@yr-card-shadow}
+.dubbing-title{display:block;color:@yr-text-primary;font-size:24px;font-weight:900}
+.dubbing-subtitle{display:block;margin-top:8px;color:@yr-text-secondary;font-size:13px;line-height:1.5}
+.dubbing-section-title{display:block;color:@yr-text-primary;font-size:17px;font-weight:900}
+.dubbing-section-row{display:flex;align-items:center;justify-content:space-between}
+.material-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.material-current{flex:1;min-width:0}
+.material-current-title{display:block;margin-top:6px;color:@yr-text-secondary;font-size:13px;line-height:1.4;word-break:break-all}
+.material-current-meta{display:block;margin-top:5px;color:@yr-brand-primary;font-size:11px;line-height:1.4;word-break:break-all}
+.material-switch{flex:0 0 96px;min-height:44px;margin:0;padding:0 8px;border-radius:16px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:12px;font-weight:800}
+.material-selector{margin-top:14px;padding-top:14px;border-top:1px solid @yr-border-subtle}
+.material-search{height:42px;padding:0 14px;border:1px solid @yr-border-subtle;border-radius:16px;background:#fff;color:@yr-text-primary;font-size:14px}
+.material-filter-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.material-filter{position:relative;min-width:0}
+.material-filter > button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-height:44px;margin:0;padding:0 2px;overflow:hidden;border:0;border-bottom:2px solid rgba(23,100,216,.35);border-radius:0;background:transparent;color:@yr-brand-primary;font-size:11px;font-weight:800;white-space:nowrap;text-overflow:ellipsis}
+.material-filter-menu{position:absolute;z-index:20;top:46px;left:0;min-width:100%;max-height:190px;overflow-y:auto;padding:4px;border:1px solid @yr-border-subtle;border-radius:12px;background:#fff;box-shadow:0 8px 18px rgba(7,30,73,.16)}
+.material-filter-menu view{padding:10px 6px;color:@yr-text-primary;font-size:12px;font-weight:800;white-space:nowrap}
+.material-results-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;color:@yr-text-secondary;font-size:12px;font-weight:800}
+.material-results-head button{min-height:44px;margin:0;padding:0 2px;background:transparent;color:@yr-brand-primary;font-size:12px}
+.material-options{display:block;margin-top:8px}
+.material-option{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;box-sizing:border-box;width:100%;min-height:60px;margin:0 0 8px;padding:9px 13px;border:1px solid @yr-border-subtle;border-radius:14px;background:#fff;color:@yr-text-primary;text-align:left}
+.material-option.selected{border-color:@yr-brand-primary;background:@yr-surface-blue}
+.material-option-title{display:block;width:100%;font-size:14px;font-weight:800;white-space:normal;word-break:break-all}
+.material-option-meta{display:block;width:100%;margin-top:4px;overflow:hidden;color:@yr-brand-primary;font-size:11px;white-space:nowrap;text-overflow:ellipsis}
+.material-option-subtitle{display:block;width:100%;margin-top:4px;overflow:hidden;color:@yr-text-secondary;font-size:11px;white-space:nowrap;text-overflow:ellipsis}
+.material-empty{display:block;padding:16px 4px;color:@yr-text-secondary;font-size:12px;text-align:center}
+.material-more{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;margin:0 0 8px;border-radius:13px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:13px;font-weight:800}
+.material-switch::after,.material-filter > button::after,.material-option::after,.material-results-head button::after,.material-more::after,.speed-button::after,.record-actions button::after,.submit-work::after,.my-works-link::after{border:0}
+.speed-button{min-height:34px;margin:0;padding:0 12px;border-radius:17px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:12px}
+.demonstration-video,.material-unavailable{width:100%;height:200px;margin-top:14px;border-radius:16px;overflow:hidden}
+.material-unavailable{display:flex;align-items:center;justify-content:center;background:@yr-surface-blue;color:@yr-text-secondary;font-size:13px}
+.subtitle-text{display:block;margin-top:12px;color:@yr-text-primary;font-size:15px;line-height:1.6}
+.recording-status{display:flex;align-items:center;justify-content:space-between;min-height:64px;margin-top:14px;padding:0 16px;border-radius:17px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:14px;font-weight:800}
+.recording-status.is-recording{background:@yr-danger;color:#fff;box-shadow:0 6px 18px rgba(217,52,43,.22)}
+.recording-status.is-invalid{background:#ffe8e5;color:@yr-danger;border:1px solid rgba(217,52,43,.35)}
+.recording-issue{display:block;margin:9px 2px 0;color:@yr-danger;font-size:13px;font-weight:800;line-height:1.5}
+.record-actions{display:flex;gap:10px;margin-top:12px}
+.record-actions button{flex:1;min-height:44px;margin:0;border-radius:22px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:14px;font-weight:800}
+.record-actions button:first-child{background:@yr-gradient-primary;color:#fff}
+.record-actions button.recording-active{background:@yr-danger;color:#fff;box-shadow:0 6px 18px rgba(217,52,43,.28)}
+.work-note{width:100%;height:80px;margin-top:14px;padding:12px;box-sizing:border-box;border:1px solid @yr-border-subtle;border-radius:14px;background:#fff;color:@yr-text-primary;font-size:14px}
+.submit-error{display:block;margin-top:10px;color:@yr-danger;font-size:13px;line-height:1.5}
+.submit-retry{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border:1px solid @yr-border-subtle;border-radius:15px;background:@yr-surface-warm}
+.submit-retry image{flex:none;width:72px;height:58px}
+.submit-retry .submit-error{flex:1;margin-top:0}
+.submit-work{min-height:48px;margin-top:14px;border-radius:24px;background:@yr-gradient-primary;color:#fff;font-size:16px;font-weight:900}
+.submit-work[disabled]{opacity:.55}
+.my-works-link{min-height:42px;margin:0 auto;background:transparent;color:@yr-brand-primary;font-size:14px;font-weight:800}
+
+.dubbing-page .material-switch,
+.dubbing-page .speed-button,
+.dubbing-page .record-actions button,
+.dubbing-page .submit-work,
+.dubbing-page .my-works-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;line-height:1.2;text-align:center}
+.dubbing-page .material-switch{min-height:44px;line-height:1.2}
+.dubbing-page .speed-button{flex:0 0 96px;width:96px;min-height:44px;padding:0 8px}
+.dubbing-page .record-actions button{min-height:48px;padding:0 12px}
+.dubbing-page .submit-work{min-height:50px;margin:14px 0 0;padding:0 16px}
+.dubbing-page .my-works-link{min-height:44px}

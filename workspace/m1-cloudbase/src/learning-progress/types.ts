@@ -19,6 +19,7 @@ export interface LearningResourceAccessRecord {
   readonly organizationId: string;
   readonly type: 'reading' | 'vocabulary';
   readonly status: 'published' | 'offline';
+  readonly contentVersion?: string;
   readonly allowedStudentIds: readonly string[];
   readonly pages: readonly Readonly<{
     id: string;
@@ -39,6 +40,20 @@ export interface ReadingProgressRecord {
   readonly favorite: boolean;
   readonly version: number;
   readonly updatedAt: string;
+}
+
+export interface ReadingPageEventRecord {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly studentId: string;
+  readonly resourceId: string;
+  readonly chapterId: string;
+  readonly pageId: string;
+  readonly pageNumber: number;
+  readonly progressVersion: number;
+  readonly contentVersion: string | null;
+  readonly operationId: string;
+  readonly visitedAt: string;
 }
 
 export interface VocabularyProgressRecord {

@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 import { Icon } from './ui';
 
-export type PageKey = 'dashboard' | 'organization' | 'users' | 'permission';
+export type PageKey = 'dashboard' | 'organization' | 'users' | 'permission' | 'textbooks' | 'questions' | 'task-activities';
 
 const menus: Array<{ key?: PageKey; label: string; icon: string }> = [
   { key: 'dashboard', label: '工作台', icon: 'dashboard' },
   { key: 'organization', label: '学校/班级管理', icon: 'organization' },
   { key: 'users', label: '用户管理', icon: 'users' },
   { key: 'permission', label: '权限管理', icon: 'permission' },
-  { label: '教材中心管理', icon: 'book' },
-  { label: '学校习题库管理', icon: 'exercise' },
-  { label: '任务与活动管理', icon: 'tasks' },
+  { key: 'textbooks', label: '教材中心管理', icon: 'book' },
+  { key: 'questions', label: '学校习题库管理', icon: 'exercise' },
+  { key: 'task-activities', label: '任务与活动管理', icon: 'tasks' },
   { label: '音视频审核管理', icon: 'media' },
 ];
 

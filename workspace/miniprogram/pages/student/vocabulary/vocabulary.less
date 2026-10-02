@@ -33,3 +33,34 @@
 .pack-selector .pack-options button.selected { border-color: @yr-brand-primary; background: @yr-surface-blue; }
 .pack-selector .pack-options button text:last-child { margin-top: 4px; color: @yr-text-secondary; font-size: 11px; }
 .pack-empty { display: block; padding: 18px 4px; color: @yr-text-secondary; text-align: center; font-size: 12px; }
+
+/* Keep native button labels centered across simulator and device text metrics. */
+.page .pack-switch,
+.page .mode-tabs button,
+.page .pack-filter > button,
+.page .pack-results-head button,
+.page .choices button,
+.page .primary { display: flex; align-items: center; justify-content: center; box-sizing: border-box; line-height: 1.2; text-align: center; }
+.page .pack-switch { flex: 0 0 96px; width: 96px; min-height: 44px; padding: 0 6px; border-radius: 16px; }
+.page .mode-tabs button { min-height: 44px; margin: 0; padding: 0 8px; }
+.page .choices button { min-height: 48px; margin: 0; padding: 8px 4px; }
+.page .primary { min-height: 50px; margin: 18px 0 0; padding: 0 14px; }
+.page .pack-results-head button { min-height: 44px; padding: 0 2px; }
+
+/* Filters read as lightweight links, with no individual boxed backgrounds. */
+.pack-filter-row { gap: 10px; margin-top: 12px; }
+.page .pack-filter > button { min-height: 44px; padding: 0 2px; border: 0; border-bottom: 2px solid rgba(23,100,216,.35); border-radius: 0; background: transparent; color: @yr-brand-primary; font-size: 12px; }
+.pack-filter-menu { top: 46px; }
+
+.teacher-review-context { margin-bottom: 14px; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.teacher-review-context text { display: block; }
+.teacher-review-context text + text { margin-top: 5px; color: @yr-text-secondary; font-weight: 600; }
+.spelling-input.review-correct { border-color: @yr-success; background: @yr-surface-green; color: @yr-success; }
+.spelling-input.review-incorrect { border-color: @yr-danger; background: @yr-surface-warning; color: @yr-danger; }
+.spelling-input.review-correct[disabled],.spelling-input.review-incorrect[disabled] { opacity: 1; }
+.teacher-word-attempts { margin-top: 12px; padding: 12px; border-radius: 14px; background: @yr-surface-blue-50; }
+.teacher-word-attempts text { display: block; margin-top: 5px; font-size: 13px; }
+.teacher-word-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 18px; color: @yr-text-primary; font-weight: 800; }
+.teacher-word-nav button { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 44px; margin: 0; padding: 0 6px; border-radius: 16px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 13px; line-height: 1.2; text-align: center; white-space: nowrap; }
+.teacher-word-position { min-width: 44px; text-align: center; white-space: nowrap; }
+.teacher-word-nav button::after { border: 0; }

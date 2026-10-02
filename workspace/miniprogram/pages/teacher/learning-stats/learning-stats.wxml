@@ -1,0 +1,32 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="stats-page">
+    <app-header title="学员统计" back="{{true}}" backUrl="/pages/teacher/workbench/workbench"></app-header>
+    <view class="stats-content">
+      <view class="filter-card m1-card">
+        <view class="filter-row class-filter"><text>班级</text><picker range="{{classNames}}" value="{{classIndex}}" bindchange="onClassChange"><view class="picker-value"><text class="picker-label">{{classNames[classIndex]}}</text><text class="filter-chevron"></text></view></picker></view>
+        <view class="filter-row student-filter"><text>学员</text><picker range="{{studentNames}}" value="{{studentIndex}}" bindchange="onStudentChange"><view class="picker-value"><text class="picker-label">{{studentNames[studentIndex]}}</text><text class="filter-chevron"></text></view></picker></view>
+        <view class="filter-row period-filter"><text>时间</text><picker range="{{periodNames}}" value="{{periodIndex}}" bindchange="onPeriodChange"><view class="picker-value"><text class="picker-label">{{periodNames[periodIndex]}}</text><text class="filter-chevron"></text></view></picker></view>
+        <view wx:if="{{periodIndex === 2}}" class="date-row"><picker mode="date" value="{{startsOn}}" bindchange="onStartChange"><view class="picker-value">{{startsOn}}</view></picker><text>至</text><picker mode="date" value="{{endsOn}}" bindchange="onEndChange"><view class="picker-value">{{endsOn}}</view></picker></view>
+      </view>
+      <state-panel wx:if="{{loading}}" state="loading" message="正在整理授权班级记录"></state-panel>
+      <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadReport"></state-panel>
+      <view wx:elif="{{report}}">
+        <view class="metric-grid">
+          <view class="metric metric--completion m1-card" bindtap="jumpDetails" aria-role="button"><text>任务完成率</text><text class="metric-value">{{report.summary.completionRate === null ? '未记录' : report.summary.completionRate + '%'}}</text><text class="metric-note">{{report.summary.completedCount}}/{{report.summary.assignedCount}} 项</text></view>
+          <view class="metric metric--overdue m1-card" bindtap="jumpDetails" aria-role="button"><text>逾期任务</text><text class="metric-value">{{report.summary.overdueCount}}</text><text class="metric-note">按任务记录</text></view>
+          <view class="metric metric--submissions m1-card" bindtap="jumpDetails" aria-role="button"><text>任务提交次数</text><text class="metric-value">{{report.summary.taskSubmissionCount}}</text><text class="metric-note">含重交版本</text></view>
+          <view class="metric metric--score m1-card" bindtap="jumpDetails" aria-role="button"><text>已记录平均成绩</text><text class="metric-value">{{report.summary.averageScore === null ? '未记录' : report.summary.averageScore + ' 分'}}</text><text class="metric-note">仅有分数的记录</text></view>
+          <view class="metric metric--duration m1-card"><text>学习时长</text><text class="metric-value">未记录</text><text class="metric-note">暂无可核对事件</text></view>
+          <view class="metric metric--dubbing m1-card"><text>配音提交</text><text class="metric-value">{{report.summary.dubbingCount === null ? '未记录' : report.summary.dubbingCount + ' 次'}}</text><text class="metric-note">按已保存作品</text></view>
+        </view>
+        <view class="trend-card m1-card"><view class="section-head"><text>截止日前 7 天完成趋势</text><text>按截止日</text></view><view class="trend-bars"><view wx:for="{{trend}}" wx:key="date" class="trend-item"><view class="bar-track"><view wx:if="{{item.completed}}" class="bar" style="height: {{item.percent}}%"></view></view><text>{{item.date}}</text><text class="trend-count">{{item.completed}}</text></view></view></view>
+        <view class="unrecorded m1-card"><text>其他学习指标</text><view><text>练习正确率　未记录</text><text>跟读记录　未记录</text></view></view>
+        <view id="stats-details" class="detail-section"><view class="section-head"><text>任务明细</text><button loading="{{exporting}}" disabled="{{exporting || !report.canExport}}" bindtap="exportCsv">导出 CSV</button></view><text class="subnote">导出当前筛选下的已有指标；CSV 会复制到剪贴板。</text><text wx:if="{{exportError}}" class="error-text">{{exportError}}</text>
+          <view wx:for="{{rows}}" wx:key="key" class="detail-card m1-card" data-student-id="{{item.studentId}}" bindtap="openStudent"><view class="detail-title"><text>{{item.studentName}}</text><text>{{item.scoreLabel}}</text></view><text>{{item.className}}　{{item.taskTitle}}</text><text>{{item.dueOn}} 截止　{{item.statusLabel}}　{{item.submissionCount}} 次提交</text></view>
+          <view wx:if="{{!rows.length}}" class="empty-card m1-card">当前日期与筛选条件下暂无任务记录。</view>
+        </view>
+      </view>
+    </view>
+    <g0-tab-bar role="teacher" active="students"></g0-tab-bar>
+  </view>
+</g0-page-shell>

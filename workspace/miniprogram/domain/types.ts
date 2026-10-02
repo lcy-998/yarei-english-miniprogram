@@ -1,4 +1,15 @@
 export type Role = 'student' | 'teacher' | 'parent'
+export type NotificationFilter = 'all' | 'task' | 'feedback' | 'checkin'
+export interface InboxNotice {
+  id: string
+  kind: 'task_published' | 'activity_published' | 'task_due' | 'task_returned' | 'task_reviewed' | 'checkin_reminder'
+  title: string
+  summary: string
+  occurredAt: string
+  target: { kind: 'student_task' | 'parent_task' | 'teacher_task' | 'student_activity'; id: string; childId?: string }
+  readAt: string | null
+}
+export interface InboxPage { items: InboxNotice[]; unreadCount: number; total: number; hasMore: boolean }
 export type TaskStatus = 'draft' | 'scheduled' | 'active' | 'expired' | 'withdrawn' | 'closed' | 'completed'
 export type AssignmentStatus = 'not_started' | 'in_progress' | 'awaiting_review' | 'completed' | 'redo_required' | 'overdue'
 export type SubmissionStatus = 'draft' | 'submitted' | 'reviewed' | 'returned'
@@ -10,6 +21,242 @@ export interface UserAccount {
   role: Role
   classId?: string
   className?: string
+}
+
+export interface StudentClassView {
+  id: string
+  name: string
+  organizationName: string
+  grade: string
+  term: string
+  studentCount: number
+  teacherNames: string[]
+}
+
+export type SchoolQuestionType = 'single_choice' | 'multiple_choice' | 'fill' | 'subjective'
+
+export interface SchoolQuestionFilters {
+  grade?: string
+  textbook?: string
+  unit?: string
+  knowledgePoint?: string
+  questionType?: SchoolQuestionType
+  difficulty?: string
+  keyword?: string
+  targetClassIds?: string[]
+}
+
+export interface SchoolQuestionSummary {
+  id: string
+  title: string
+  grade: string
+  textbook?: string
+  unit?: string
+  knowledgePoint?: string
+  questionType: SchoolQuestionType
+  difficulty?: string
+  stemSummary: string
+  contentVersion: string
+}
+
+export interface SchoolQuestionDetail extends SchoolQuestionSummary {
+  stem: string
+  options: string[]
+  correctAnswer: unknown
+  explanation: string
+}
+
+export interface SchoolQuestionPage {
+  items: SchoolQuestionSummary[]
+  nextOffset: number | null
+}
+
+export interface SchoolQuestionFacet {
+  grade: string
+  textbook?: string
+  unit?: string
+  knowledgePoint?: string
+  questionType: SchoolQuestionType
+  difficulty?: string
+}
+
+export interface TaskCatalogFilters {
+  type: 'reading' | 'vocabulary'
+  category?: 'original' | 'synchronized' | 'picture_book' | 'current_events' | 'chapter_book'
+  source?: TaskCatalogListItem['source']
+  grade?: string
+  term?: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+  keyword?: string
+  targetClassIds?: string[]
+}
+
+export interface TaskCatalogListItem {
+  id: string
+  type: TaskCatalogFilters['type']
+  title: string
+  source: 'reading_book' | 'synchronized_textbook' | 'word_pack'
+  category?: TaskCatalogFilters['category']
+  grade: string
+  term?: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+  contentVersion: string
+  requiredCount: number
+}
+
+export interface TaskCatalogFacet {
+  source: TaskCatalogListItem['source']
+  grade: string
+  term?: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+}
+
+export interface StudentCatalogFilters {
+  type: 'reading' | 'vocabulary'
+  category?: 'original' | 'synchronized' | 'picture_book' | 'current_events' | 'chapter_book'
+  grade?: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+  theme?: string
+  keyword?: string
+}
+export interface StudentCatalogItem {
+  id: string
+  type: StudentCatalogFilters['type']
+  title: string
+  category?: StudentCatalogFilters['category']
+  grade: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+  theme?: string
+  contentVersion: string
+  itemCount: number
+}
+export interface StudentCatalogPage { items: StudentCatalogItem[]; total: number; nextOffset: number | null }
+export interface StudentCatalogFacet {
+  category?: StudentCatalogFilters['category']
+  grade: string
+  textbook?: string
+  unit?: string
+  difficulty?: string
+  theme?: string
+}
+
+export interface TextbookChapter { id: string; title: string; lessons: Array<{ id: string; title: string }> }
+export interface TextbookSummary { id: string; title: string; grade: string; term: string; edition: string;
+  contentVersion: string; chapters: TextbookChapter[] }
+export interface ClassTextbookItem { textbookId: string; chapterIds: string[]; lessonIds: string[]; contentVersion: string }
+export interface ClassTextbookConfig { id: string; organizationId: string; classId: string; status: 'draft' | 'published';
+  textbooks: ClassTextbookItem[]; note: string; publishedTextbooks: ClassTextbookItem[]; publishedNote: string;
+  version: number; createdAt: string; updatedAt: string; publishedAt: string | null }
+export interface TeacherTextbookClass { id: string; name: string; grade: string; term: string; studentCount: number;
+  config: ClassTextbookConfig | null }
+export interface TextbookFilters { grade?: string; term?: string; edition?: string; unit?: string; lesson?: string; keyword?: string }
+export interface TextbookPage { items: TextbookSummary[]; nextOffset: number | null }
+export interface TextbookCenterLayout { classTextbooksEnabled: boolean; synchronizedTextbooksEnabled: boolean;
+  visibleClassIds: string[]; dashboardFields: Array<'grade' | 'studentCount' | 'configuredBookCount' | 'progress' | 'updatedAt'> }
+
+export type ActivityDailyCondition =
+  | { kind: 'reading'; resourceId: string }
+  | { kind: 'vocabulary'; resourceId: string; requiredWordCount: number }
+  | { kind: 'exercise'; resourceId: string; minimumScore: number }
+  | { kind: 'work'; resourceId: string }
+
+export interface ActivityDraftInput {
+  activityId?: string
+  title: string
+  description?: string
+  classId: string
+  startsOn: string
+  endsOn: string
+  restDates: string[]
+  conditions: ActivityDailyCondition[]
+}
+
+export interface ActivityView {
+  id: string
+  organizationId: string
+  creatorTeacherId: string
+  title: string
+  description: string
+  schedule: { classId: string; startsOn: string; endsOn: string; restDates: string[];
+    conditions: ActivityDailyCondition[]; schoolTimeZone: string }
+  status: 'draft' | 'published' | 'closed'
+  participants: Array<{ studentId: string; displayNameMasked: string }>
+  conditionSnapshots: Array<{ kind: ActivityDailyCondition['kind']; resourceId: string; contentVersion: string;
+    pageIds?: string[]; wordIds?: string[]; questionIds?: string[] }>
+  restDayChanges?: Array<{ id: string; date: string; reason: string; teacherId: string;
+    changedAt: string; activityVersion: number }>
+  version: number
+  createdAt: string
+  updatedAt: string
+  publishedAt: string | null
+  closedAt: string | null
+}
+
+export interface ActivityDayView {
+  activityId: string
+  date: string
+  restDay: boolean
+  complete: boolean | null
+  evidenceStatus: 'available' | 'not_available'
+  verifiedConditions: number
+  totalConditions: number
+  completedAt: string | null
+  supplemented: boolean
+  conditionProgress?: Array<{ index: number; kind: ActivityDailyCondition['kind']; resourceId: string;
+    complete: boolean; completedAt: string | null }>
+}
+
+export interface ActivityOverrideView {
+  id: string
+  organizationId: string
+  activityId: string
+  studentId: string
+  classId: string
+  date: string
+  active: boolean
+  reason: string
+  teacherId: string
+  changedAt: string
+  version: number
+}
+
+export interface ActivityOverrideState {
+  activityId: string
+  studentId: string
+  date: string
+  version: number
+  active: boolean
+  reason: string | null
+  changedAt: string | null
+}
+
+export interface ActivityLeaderboardView {
+  activityId: string
+  title: string
+  startsOn: string
+  endsOn: string
+  schoolToday: string
+  restDayCount: number
+  updatedAt: string
+  evidenceStatus: 'available' | 'not_available'
+  leaderboard: { classId: string; effectiveDayCount: number; finalized: boolean;
+    ranks: Array<{ studentId: string; displayNameMasked: string; completedDays: number; rank: number }> } | null
+  myRank: { studentId: string; displayNameMasked: string; completedDays: number; rank: number } | null
+}
+
+export interface TaskCatalogPage {
+  items: TaskCatalogListItem[]
+  nextOffset: number | null
 }
 
 export interface ParentStudentLink {
@@ -24,21 +271,31 @@ export interface ParentStudentLink {
 export interface TaskItem {
   id: string
   resourceId?: string
-  type: 'reading' | 'vocabulary' | 'exercise'
+  type: 'reading' | 'vocabulary' | 'exercise' | 'recording'
   title: string
   completionRule: string
   completionRuleData?: TaskCompletionRule
+  readingPageNumbers?: number[]
+  recordingPrompt?: string
+  snapshotSchemaVersion?: 1 | 2
+  vocabularyWordIds?: string[]
+  vocabularyPack?: VocabularyPack
+  exerciseQuestion?: { questionId: string; questionType: SchoolQuestionType; stem: string; options: string[] }
 }
 
 export type TaskCompletionRule =
-  | { kind: 'reading_pages'; requiredPageCount: number }
+  | { kind: 'reading_pages'; requiredPageCount: number; pageIds?: string[] }
   | { kind: 'vocabulary_words'; requiredWordCount: number }
   | { kind: 'exercise_questions'; requiredQuestionCount: number }
+  | { kind: 'recording_upload' }
 
 export type TaskCompletionValue =
   | { kind: 'reading'; completedPageCount: number }
   | { kind: 'vocabulary'; completedWordCount: number; correctWordCount: number }
-  | { kind: 'exercise'; answeredQuestionCount: number; correctQuestionCount?: number }
+  | { kind: 'exercise'; answeredQuestionCount: number; correctQuestionCount?: number; questionResponses?: Array<{
+      questionId: string; response: string | string[]; isCorrect?: boolean
+    }> }
+  | { kind: 'recording'; recordingId: string; durationMs?: number; sizeBytes?: number }
 
 export interface Task {
   id: string
@@ -50,6 +307,7 @@ export interface Task {
   classIds?: string[]
   startsAt: string
   dueAt: string
+  latePolicy?: { allowLate: boolean; lateDays: number }
   description: string
   items: TaskItem[]
   version: number
@@ -86,6 +344,7 @@ export interface Submission {
   submittedAt?: string
   recordVersion?: number
   assignmentVersion?: number
+  automaticScore?: number | null
 }
 
 export interface ReviewFeedback {
@@ -95,9 +354,18 @@ export interface ReviewFeedback {
   teacherId: string
   decision: ReviewDecision
   score?: number
+  itemScores?: Array<{ itemId: string; score: number }>
   textComment?: string
   returnReason?: string
   publishedAt: string
+  originalAutomaticScore?: number | null
+  overrideReason?: string | null
+}
+
+export interface MemoryExerciseSnapshot {
+  taskId: string
+  itemId: string
+  question: SchoolQuestionDetail
 }
 
 export type WriteOperationKind = 'publish_task' | 'save_teacher_draft' | 'save_submission_draft' | 'submit_task' | 'publish_review'
@@ -123,10 +391,11 @@ export interface AppState {
   readingProgress: ReadingProgress[]
   vocabularyProgress: VocabularyProgress[]
   learningOperationReceipts: Array<{ operationId: string; fingerprint: string; result: ReadingProgress | VocabularyProgress }>
+  exerciseSnapshots?: MemoryExerciseSnapshot[]
 }
 
 export interface ServiceError {
-  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'TASK_NOT_SUBMITTABLE' | 'REDO_LIMIT_REACHED' | 'DUPLICATE_OPERATION' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'
+  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'MEDIA_INVALID' | 'TASK_NOT_SUBMITTABLE' | 'REDO_LIMIT_REACHED' | 'DUPLICATE_OPERATION' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'
   message: string
   retryable: boolean
   fieldErrors?: Record<string, string>
@@ -223,7 +492,176 @@ export interface VocabularyProgress {
   updatedAt: string
 }
 
-export type TeacherStudentStatusFilter = 'all' | 'normal' | 'attention' | 'disabled'
+export interface VocabularyAttemptView {
+  id: string
+  packId: string
+  taskId: string | null
+  itemId: string | null
+  round: number
+  contentVersion: string
+  wordId: string
+  studentInput: string
+  isCorrect: boolean
+  firstAttempt: boolean
+  attemptNumber: number
+  attemptedAt: string
+}
+
+export interface VocabularyAttemptState {
+  wordId: string
+  firstCorrect: boolean | null
+  version: number
+  attempts: VocabularyAttemptView[]
+}
+
+export interface VocabularyWordAttemptSummary {
+  wordId: string
+  firstCorrect: boolean | null
+  lastCorrect: boolean | null
+  version: number
+}
+
+export interface VocabularyPackAttemptSummary {
+  packId: string
+  contentVersion: string
+  round: number
+  words: VocabularyWordAttemptSummary[]
+}
+
+export interface VocabularyPackScope {
+  packId: string
+  taskId?: string
+  itemId?: string
+}
+
+export interface VocabularyAnswerScope extends VocabularyPackScope {
+  wordId: string
+  taskId?: string
+  itemId?: string
+}
+
+export interface VocabularyAnswerInput extends VocabularyAnswerScope {
+  studentInput: string
+}
+
+export interface WorkMaterial {
+  id: string
+  title: string
+  contentVersion: string
+  subtitle: string
+  grade?: string
+  textbook?: string
+  unit?: string
+}
+export interface WorkMaterialFilters { grade?: string; textbook?: string; unit?: string }
+export interface WorkMaterialFacet extends WorkMaterialFilters {}
+export interface WorkMaterialPage { items: WorkMaterial[]; total: number; nextOffset: number | null }
+
+export interface StudentWork {
+  id: string
+  materialId: string
+  materialVersion: string
+  stagingPath: string
+  status: 'draft' | 'submitted'
+  fileId: string | null
+  sizeBytes: number | null
+  durationMs: number | null
+  note: string
+  version: number
+  createdAt: string
+  submittedAt: string | null
+  deletedAt?: string | null
+  recoverableUntil?: string | null
+  deletedByUserId?: string | null
+  mediaDeletedAt?: string | null
+  mediaExpired?: boolean
+}
+
+export interface WorkPlayback {
+  workId: string
+  temporaryUrl: string
+  expiresAt: string
+}
+
+export interface MaterialPlayback {
+  materialId: string
+  temporaryUrl: string
+  expiresAt: string
+}
+
+export interface PhonicsCourseListItem {
+  id: string
+  title: string
+  grade: string
+  unit: string
+  contentVersion: string
+  phonemeCount: number
+  questionCount: number
+}
+
+export interface PhonicsCourseView {
+  id: string
+  title: string
+  grade: string
+  unit: string
+  contentVersion: string
+  phonemes: Array<{ id: string; label: string; examples: string[]; exampleLabel?: string; audioAvailable: boolean }>
+  questions: Array<{ id: string; stem: string; options: Array<{ id: string; text: string }> }>
+}
+
+export interface PhonicsCourseState {
+  courseId: string
+  contentVersion: string
+  currentRound: number
+  completedCount: number
+  firstCorrectCount: number
+  score: number | null
+  history: Array<{ round: number; score: number; completedAt: string }>
+  wrongQuestionIds: string[]
+  questions: Array<{ questionId: string; firstCorrect: boolean | null; lastCorrect: boolean | null; version: number }>
+}
+
+export interface PhonicsAnswerView {
+  round: number
+  questionId: string
+  selectedOptionId: string
+  correctOptionId: string
+  explanation: string
+  isCorrect: boolean
+  firstAttempt: boolean
+  attemptNumber: number
+  attemptedAt: string
+}
+
+export interface PhonicsAudioView { courseId: string; phonemeId: string; temporaryUrl: string; expiresAt: string }
+
+export interface TaskTemplateView {
+  id: string
+  organizationId: string
+  ownerTeacherId: string | null
+  scope: 'system' | 'personal'
+  title: string
+  description: string
+  itemRefs: Array<{ id: string; resourceId: string; completionRule: Record<string, unknown>;
+    scoringRule: Record<string, unknown>; order: number }>
+  items: Array<{ id: string; resourceId: string; resourceVersion: number;
+    resourceSnapshot: { title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording'; payload: Record<string, unknown> };
+    completionRule: Record<string, unknown>; scoringRule: Record<string, unknown>; order: number }>
+  status: 'active' | 'deleted'
+  useCount: number
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TaskTemplateInput {
+  templateId?: string
+  title: string
+  description: string
+  itemRefs: TaskTemplateView['itemRefs']
+}
+
+export type TeacherStudentStatusFilter = 'all' | 'active' | 'normal' | 'attention' | 'disabled'
 export interface TeacherStudentClassOption { id: string; name: string; grade: string; term: string; version?: number }
 export interface TeacherStudentPerformanceSummary {
   assignedCount: number; completedCount: number; overdueCount: number; redoCount: number
@@ -253,12 +691,25 @@ export interface HomeView {
   assignment: TaskAssignment | null
   completedCount: number
   totalCount: number
+  todayTasks?: HomeTaskSummary[]
+}
+
+export interface HomeTaskSummary {
+  taskId: string
+  title: string
+  status: AssignmentStatus
+  startsAt: string
+  dueAt: string
+  redoDueAt?: string | null
 }
 
 export interface TaskDetailView {
   task: Task
   assignment: TaskAssignment
+  readingPageProgress?: Array<{ itemId: string; completedPageCount: number }>
+  automaticScore?: number | null
   submission?: Submission
-  submissionHistory?: Array<{ version: number; status: SubmissionStatus; submittedAt: string }>
+  submissionHistory?: Array<{ version: number; status: SubmissionStatus; submittedAt: string;
+    answers?: SubmissionAnswer[]; feedback?: ReviewFeedback }>
   feedback?: ReviewFeedback
 }

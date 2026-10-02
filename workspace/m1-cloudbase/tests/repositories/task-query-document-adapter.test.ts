@@ -76,6 +76,9 @@ describe('task query document repository', () => {
     await expect(repository.listPublishedResourceOptions(ORGANIZATION_ID)).resolves.toEqual([
       expect.objectContaining({ id: 'resource_demo', title: '虚构绘本', allowedClassIds: [CLASS_ID] }),
     ]);
+    await expect(repository.findPublishedResourceOption(ORGANIZATION_ID, 'resource_demo'))
+      .resolves.toMatchObject({ id: 'resource_demo', title: '虚构绘本', allowedClassIds: [CLASS_ID] });
+    await expect(repository.findPublishedResourceOption('org_other', 'resource_demo')).resolves.toBeNull();
     await expect(repository.findTask('org_other', TASK_ID)).resolves.toBeNull();
   });
 

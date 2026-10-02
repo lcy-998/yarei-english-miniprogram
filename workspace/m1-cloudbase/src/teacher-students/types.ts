@@ -1,6 +1,6 @@
 import type { AssignmentStatus } from '../task-core/types';
 
-export type TeacherStudentStatusFilter = 'all' | 'normal' | 'attention' | 'disabled';
+export type TeacherStudentStatusFilter = 'all' | 'active' | 'normal' | 'attention' | 'disabled';
 
 export interface TeacherStudentFilters {
   readonly classId?: string;

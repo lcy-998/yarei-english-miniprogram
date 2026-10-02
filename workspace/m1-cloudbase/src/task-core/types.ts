@@ -1,6 +1,6 @@
 import type { JsonObject, JsonValue } from '../shared/protocol';
 
-export type LearningResourceType = 'reading' | 'vocabulary' | 'exercise';
+export type LearningResourceType = 'reading' | 'vocabulary' | 'exercise' | 'recording';
 
 export interface LearningResourceRecord {
   readonly id: string;
@@ -34,7 +34,7 @@ export interface FrozenTaskItem {
   readonly id: string;
   readonly resourceId: string;
   readonly resourceVersion: number;
-  readonly snapshotSchemaVersion: 1;
+  readonly snapshotSchemaVersion: 1 | 2;
   readonly resourceSnapshot: Readonly<{
     title: string;
     type: LearningResourceType;
@@ -67,6 +67,9 @@ export interface TaskRecord {
   readonly teacherNote: string | null;
   readonly itemRefs: readonly TaskItemReference[];
   readonly items: readonly FrozenTaskItem[];
+  /** Server-owned lineage for drafts copied from a published content snapshot. */
+  readonly copiedFromTaskId?: string | null;
+  readonly copiedFromTemplateId?: string | null;
   readonly publishedAt: string | null;
   readonly deadlineExtendedAt: string | null;
   readonly visibility: 'visible' | 'recycled';
@@ -162,6 +165,9 @@ export interface ReviewFeedbackRecord {
   readonly teacherId: string;
   readonly decision: 'approved' | 'returned';
   readonly score: number | null;
+  readonly itemScores?: readonly Readonly<{ itemId: string; score: number }>[];
+  readonly originalAutomaticScore?: number | null;
+  readonly overrideReason?: string | null;
   readonly textComment: string | null;
   readonly returnReason: string | null;
   readonly publishedAt: string;
@@ -201,6 +207,7 @@ export interface ParentTaskResultView {
   readonly title: string;
   readonly studentId: string;
   readonly assignmentStatus: AssignmentStatus;
+  readonly automaticScore?: number | null;
   readonly submission: Readonly<{
     id: string;
     version: number;

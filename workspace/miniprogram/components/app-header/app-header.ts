@@ -3,6 +3,7 @@ Component({
     title: { type: String, value: '' },
     back: { type: Boolean, value: false },
     backUrl: { type: String, value: '' },
+    backIntercept: { type: Boolean, value: false },
     showBell: { type: Boolean, value: false },
     bellCount: { type: Number, value: 0 },
   },
@@ -16,10 +17,11 @@ Component({
   },
   methods: {
     onBack() {
+      if (this.properties.backIntercept) { this.triggerEvent('back'); return }
       if (getCurrentPages().length > 1) { wx.navigateBack(); return }
       if (this.properties.backUrl) { wx.reLaunch({ url: this.properties.backUrl }); return }
       wx.navigateBack()
     },
-    onBell() { wx.showToast({ title: '暂无新通知', icon: 'none' }) },
+    onBell() { wx.navigateTo({ url: '/pages/notifications/notifications' }) },
   },
 })

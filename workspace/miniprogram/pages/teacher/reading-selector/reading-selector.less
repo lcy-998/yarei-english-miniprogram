@@ -1,0 +1,55 @@
+@import "../textbook-pages.less";
+.reading-resource-row { display: flex; align-items: center; gap: 14px; }
+.reading-resource-cover, .reading-resource-icon { flex: none; width: 72px; height: 88px; border-radius: 12px; background: @yr-surface-blue; }
+.reading-resource-cover { object-fit: contain; }
+.reading-resource-icon { display: flex; align-items: center; justify-content: center; }
+.reading-resource-copy { min-width: 0; flex: 1; }
+.reading-categories { display: flex; gap: 6px; overflow-x: auto; margin-top: 12px; padding-bottom: 4px; }
+.reading-categories button { flex: none; margin: 0; min-height: 42px; padding: 0 11px; display: flex; align-items: center; justify-content: center; border: @yr-card-border; border-radius: 13px; background: #fff; color: @yr-text-secondary; font-size: 13px; font-weight: 800; line-height: 1.2; }
+.reading-categories button.active { border-color: @yr-brand-primary; background: #eaf3ff; color: @yr-brand-primary; box-shadow: inset 0 -3px 0 @yr-brand-primary; }
+.textbook-filter-row picker { min-width: 0; }
+.reading-filter-picker { box-sizing: border-box; min-height: 44px; margin-top: 9px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: @yr-card-border; border-radius: 12px; background: #f3f8ff; color: @yr-text-primary; font-size: 14px; font-weight: 800; }
+.reading-filter-picker text { flex: none; color: @yr-brand-primary; }
+.reading-preview { position: fixed; z-index: 40; inset: 0; display: flex; align-items: flex-end; background: rgba(4,22,61,.4); }
+.reading-preview-panel { box-sizing: border-box; width: 100%; max-height: 86vh; overflow-y: auto; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: #fff; }
+.range-row { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 12px; }
+.range-row picker { flex: none; display: block; width: 100%; max-width: 100%; min-width: 0; }
+.range-picker { box-sizing: border-box; width: 100%; min-height: 52px; padding: 0 14px; display: flex; align-items: center; gap: 10px; border: @yr-card-border; border-radius: 13px; background: @yr-surface-blue-75; color: @yr-text-primary; line-height: 1.2; }
+.range-picker-label { flex: none; color: @yr-text-secondary; font-size: 13px; font-weight: 800; }
+.range-picker-value { flex: 1; min-width: 0; overflow: hidden; color: @yr-text-primary; font-size: 15px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.range-picker-arrow { flex: none; width: 8px; height: 8px; margin-top: -4px; border-right: 2px solid @yr-brand-primary; border-bottom: 2px solid @yr-brand-primary; transform: rotate(45deg); }
+.chapter-list { display: block; width: 100%; margin-top: 12px; }
+.chapter-option { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; max-width: 100%; min-height: 52px; margin: 10px 0 0; padding: 0 14px; border: @yr-card-border; border-radius: 14px; background: @yr-surface-blue-75; color: @yr-text-primary; font-size: 16px; font-weight: 800; line-height: 1.3; text-align: left; }
+.chapter-option.active { border-color: @yr-brand-primary; background: @yr-brand-primary; color: #fff; box-shadow: 0 5px 12px rgba(23,100,216,.18); }
+.chapter-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-page-count { flex: none; font-size: 14px; font-weight: 800; }
+.reading-resource-row .textbook-card-title { font-size: 16px; }
+.reading-resource-row .textbook-card-meta { margin-top: 4px; font-size: 13px; font-weight: 700; }
+.reading-resource-row .textbook-chip { margin-top: 6px; }
+.reading-preview-panel .textbook-card { margin-top: 10px; }
+.reading-preview-panel .textbook-card-meta { font-size: 15px; font-weight: 700; }
+.reading-preview-panel .textbook-card-actions button { flex: 1; min-height: 42px; padding: 0 7px; font-size: 14px; }
+.reading-preview-actions { display: flex; flex-direction: column; align-items: stretch; gap: 14px; width: 100%; margin-top: 20px; }
+.reading-preview-actions button { box-sizing: border-box; display: flex; align-items: center; justify-content: center; align-self: stretch; width: 100%; max-width: none; min-height: 48px; margin: 0; font-size: 15px; font-weight: 850; line-height: 1.2; }
+
+.reading-card { overflow: hidden; border-left: 4px solid @yr-brand-primary; background: linear-gradient(110deg,#f3f8ff 0%,rgba(255,249,240,.97) 48%); }
+.reading-card--synchronized { border-left-color: @yr-success; background: linear-gradient(110deg,#edf9f1 0%,rgba(255,249,240,.97) 48%); }
+.reading-card--picture_book { border-left-color: @yr-urgent; background: linear-gradient(110deg,#fff3e8 0%,rgba(255,249,240,.97) 48%); }
+.reading-card--current_events { border-left-color: @yr-accent-purple; background: linear-gradient(110deg,#f2edff 0%,rgba(255,249,240,.97) 48%); }
+.reading-card--chapter_book { border-left-color: #158f88; background: linear-gradient(110deg,#eaf8f5 0%,rgba(255,249,240,.97) 48%); }
+.reading-resource-cover { box-sizing: border-box; border: 3px solid rgba(255,255,255,.94); background: #fff; box-shadow: 0 4px 10px rgba(7,30,73,.10); }
+.reading-resource-icon--synchronized, .reading-resource-icon--chapter_book { background: @yr-surface-green; }
+.reading-resource-icon--picture_book { background: #fff0e3; }
+.reading-resource-icon--current_events { background: @yr-surface-purple; }
+.reading-facts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.reading-facts text { padding: 3px 7px; border-radius: 10px; font-size: 12px; font-weight: 800; line-height: 1.3; }
+.reading-grade { background: @yr-surface-blue; color: @yr-brand-primary; }
+.reading-level { background: #fff0e3; color: @yr-urgent; }
+.reading-count { background: #eef2f7; color: @yr-text-secondary; }
+.reading-category-tag { margin-top: 8px; padding: 5px 9px; font-size: 12px; font-weight: 800; }
+.reading-category-tag--synchronized { background: @yr-surface-green; color: @yr-success; }
+.reading-category-tag--picture_book { background: #fff0e3; color: @yr-urgent; }
+.reading-category-tag--current_events { background: @yr-surface-purple; color: @yr-accent-purple; }
+.reading-category-tag--chapter_book { background: #e2f5f1; color: #08776f; }
+.reading-card .textbook-card-actions { justify-content: flex-end; }
+.reading-card .textbook-card-actions button { min-width: 130px; }

@@ -1,0 +1,69 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="textbook-page sync-page">
+    <app-header title="同步学教材" back="{{true}}" backUrl="/pages/teacher/materials-home/materials-home" backIntercept="{{true}}" bind:back="onNavigateBack"></app-header>
+    <view class="textbook-content sync-content">
+      <view class="textbook-card sync-filter-card">
+        <view class="sync-search-row">
+          <view class="sync-search-field"><view class="sync-search-icon" aria-hidden="true"></view><input placeholder="搜索课本、单元或课次" data-key="keyword" value="{{keyword}}" bindinput="input" confirm-type="search" bindconfirm="search"/></view>
+          <button class="sync-search-button" bindtap="search" loading="{{loading}}" disabled="{{loading}}">查找</button>
+        </view>
+        <view class="sync-filter-heading"><text class="sync-filter-caption">按课程条件筛选</text><button wx:if="{{keyword || grade || term || edition || unit || lesson}}" bindtap="clearFilters">重置条件</button></view>
+        <view class="sync-filter-grid">
+          <picker range="{{filterOptions.grade}}" data-key="grade" bindchange="chooseFilter"><view class="sync-filter-item"><text class="sync-filter-label">年级</text><view class="sync-filter-value"><text>{{grade || '全部年级'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view></view></picker>
+          <picker range="{{filterOptions.term}}" data-key="term" bindchange="chooseFilter"><view class="sync-filter-item"><text class="sync-filter-label">学期</text><view class="sync-filter-value"><text>{{term || '全部学期'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view></view></picker>
+          <picker range="{{filterOptions.edition}}" data-key="edition" bindchange="chooseFilter"><view class="sync-filter-item"><text class="sync-filter-label">版本</text><view class="sync-filter-value"><text>{{edition || '全部版本'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view></view></picker>
+          <picker range="{{filterOptions.unit}}" data-key="unit" bindchange="chooseFilter"><view class="sync-filter-item"><text class="sync-filter-label">单元</text><view class="sync-filter-value"><text>{{unit || '全部单元'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view></view></picker>
+          <picker range="{{filterOptions.lesson}}" data-key="lesson" bindchange="chooseFilter"><view class="sync-filter-item"><text class="sync-filter-label">课次</text><view class="sync-filter-value"><text>{{lesson || '全部课次'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view></view></picker>
+        </view>
+      </view>
+
+      <view class="sync-results-heading">
+        <text>备选教材</text>
+        <text wx:if="{{!loading}}">{{nextOffset === null ? '共' : '已加载'}} {{rows.length}} 本</text>
+      </view>
+      <state-panel wx:if="{{loading && !rows.length}}" state="loading" message="正在查找授权课本"></state-panel>
+      <state-panel wx:elif="{{error && !rows.length}}" state="error" message="{{error}}" bind:retry="search"></state-panel>
+      <view wx:else class="sync-results">
+        <text wx:if="{{error}}" class="textbook-error">{{error}}</text>
+        <view wx:for="{{rows}}" wx:key="id" class="textbook-card sync-book-card">
+          <view class="sync-book-row">
+            <view class="book-select {{selectedLookup[item.id] ? 'active' : ''}}" data-id="{{item.id}}" bindtap="select" hover-class="book-select--pressed" aria-role="button" aria-label="{{selectedLookup[item.id] ? '取消选择' : '选择课本'}}">{{selectedLookup[item.id] ? '✓' : ''}}</view>
+            <image wx:if="{{item.id === 'res_m2_sync_book_outline_demo'}}" class="sync-book-cover sync-book-cover-image" src="/assets/content/demo-sync-textbook-cover-thumb-v1.png" mode="aspectFit" aria-hidden="true"></image>
+            <view wx:else class="sync-book-cover"><g0-icon name="reading" size="{{40}}"></g0-icon></view>
+            <view class="sync-book-copy">
+              <text class="textbook-card-title">{{item.title}}</text>
+              <text class="textbook-card-meta">{{item.grade}}　{{item.term}}　{{item.edition}}</text>
+              <text class="sync-book-badge">已授权</text>
+            </view>
+          </view>
+          <view class="sync-book-summary">{{item.chapters.length}} 个单元　可预览目录</view>
+          <view class="textbook-card-actions">
+            <button data-id="{{item.id}}" bindtap="preview">预览目录</button>
+            <button data-id="{{item.id}}" bindtap="select">{{selectedLookup[item.id] ? '取消选择' : '选择课本'}}</button>
+          </view>
+        </view>
+        <view wx:if="{{!rows.length && nextOffset === null}}" class="textbook-card sync-empty">
+          <text class="sync-empty-title">{{keyword || grade || term || edition || unit || lesson ? '没有符合条件的课本' : '暂无可选课本'}}</text>
+          <text class="sync-empty-note">{{keyword || grade || term || edition || unit || lesson ? '可调整上方筛选条件后重新查找。' : '当前没有已上架且已授权的同步课本。'}}</text>
+        </view>
+        <button wx:if="{{nextOffset !== null}}" class="textbook-primary sync-more" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多课本</button>
+      </view>
+    </view>
+    <view class="textbook-footer sync-footer">
+      <view class="sync-selected-count">已选 <text>{{selectedIds.length}}</text> 本</view>
+      <button wx:if="{{selectedIds.length}}" class="sync-clear" bindtap="clearSelection">清空</button>
+      <button class="primary" loading="{{confirming}}" disabled="{{confirming || !selectedIds.length}}" bindtap="confirm">{{mode === 'config' ? '加入班级教材' : '确认引用'}}</button>
+    </view>
+    <view wx:if="{{preview}}" class="preview-shade" bindtap="closePreview">
+      <view class="preview-panel" catchtap="noop">
+        <text class="textbook-card-title">{{preview.title}}</text>
+        <text class="textbook-card-meta">{{preview.grade}}　{{preview.term}}　{{preview.edition}}</text>
+        <view wx:for="{{preview.chapters}}" wx:key="id" class="textbook-card">
+          <text class="textbook-card-title">{{item.title}}</text>
+          <text wx:for="{{item.lessons}}" wx:for-item="lesson" wx:key="id" class="textbook-card-meta">{{lesson.title}}</text>
+        </view>
+        <button class="textbook-primary" bindtap="closePreview">关闭预览</button>
+      </view>
+    </view>
+  </view>
+</g0-page-shell>

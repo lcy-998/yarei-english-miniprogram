@@ -14,6 +14,7 @@ const CLOUD_TO_PERMISSION: Readonly<Record<RolePermission, PermissionKey>> = {
   'user.read': 'user.view', 'user.manage': 'user.edit', 'authorization.manage': 'permission.manage',
   'audit.read': 'audit.view', 'student.read': 'user.view', 'student.manage': 'user.edit',
   'student.bind-code.issue': 'user.bind', 'content.read': 'dashboard.view', 'task.read': 'dashboard.view',
+  'student_work.restore': 'student_work.restore',
   'task.publish': 'dashboard.view', 'submission.review': 'dashboard.view', 'child.read': 'user.view',
   'child.bind': 'user.bind', 'child.unbind': 'user.bind',
 };

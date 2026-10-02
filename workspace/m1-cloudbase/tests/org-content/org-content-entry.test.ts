@@ -33,6 +33,17 @@ const teacherActor: TrustedActorContext = {
   authzVersion: 1,
 };
 
+const studentActor: TrustedActorContext = {
+  ...teacherActor,
+  requestId: 'req_actor_student',
+  sessionId: 'session_student',
+  actorUserId: 'user_student_xiaoyu',
+  actorRole: 'student',
+  platformSubjectDigest: 'digest_student',
+  permissions: [],
+  scopeIds: ['user_student_xiaoyu'],
+};
+
 const parentActor: TrustedActorContext = {
   ...teacherActor,
   requestId: 'req_actor_parent',
@@ -115,6 +126,13 @@ const vocabularyPack: VocabularyPackView = {
 
 function contentHandler(): ContentQueryHandler {
   return {
+    getMyClass: vi.fn(async () => ({ id: 'class_grade3_2', name: '三年级 2 班', organizationName: '启航实验学校', grade: '三年级', term: '第一学期', studentCount: 36, teacherNames: ['林老师'] })),
+    listSchoolQuestions: vi.fn(async () => ({ items: [{ id: 'question_1', title: '虚构动物题目', grade: '三年级', questionType: 'single_choice', stemSummary: '选择正确动物', contentVersion: 'demo-v1' }], nextOffset: null })),
+    listSchoolQuestionFacets: vi.fn(async () => [{ grade: '三年级', textbook: '演示同步教材', unit: 'Unit 3', questionType: 'single_choice' }]),
+    getSchoolQuestion: vi.fn(async () => ({ id: 'question_1', title: '虚构动物题目', grade: '三年级', questionType: 'single_choice', stemSummary: '选择正确动物', contentVersion: 'demo-v1', stem: '选择正确动物', options: ['猫', '狗'], correctAnswer: '猫', explanation: '虚构解析' })),
+    listTaskCatalogResources: vi.fn(async () => ({ items: [], nextOffset: null })),
+    listTaskCatalogFacets: vi.fn(async () => []),
+    getTaskCatalogResource: vi.fn(async () => ({ id: 'read_demo', type: 'reading', title: '虚构绘本', source: 'reading_book', grade: '三年级', contentVersion: 'demo-v1', requiredCount: 1 })),
     listReadingResources: vi.fn(async () => [readingListItem]),
     getReadingResource: vi.fn(async () => readingDetail),
     listVocabularyPacks: vi.fn(async () => [vocabularyPack]),
@@ -216,6 +234,50 @@ describe('M1 relationship-command 可注入函数入口', () => {
 });
 
 describe('M1 content-query 可注入函数入口', () => {
+  it('仅在授权阅读详情返回后将私有云页图换成短期 HTTPS 地址', async () => {
+    const cloudReading: ReadingResourceView = { ...readingDetail, chapters: [{
+      id: 'chapter_real_sample', title: 'What are you doing?', order: 1,
+      pages: [{ id: 'page_real_01', pageNumber: 1, order: 1,
+        imageAssetKey: 'cloud://demo/page.jpg', thumbnailAssetKey: 'cloud://demo/thumb.jpg',
+        width: 1200, height: 900, assetVersion: 'real-v1' }],
+    }] };
+    const getReadingResource = vi.fn(async () => cloudReading);
+    const getTempFileURL = vi.fn(async (input: Readonly<{
+      fileList: readonly Readonly<{ fileID: string; maxAge: number }>[];
+    }>) => ({ fileList: input.fileList.map(item => ({
+      fileID: item.fileID,
+      tempFileURL: `https://media.example.test/${item.fileID.endsWith('page.jpg') ? 'page' : 'thumb'}.jpg`,
+      code: 'SUCCESS',
+    })) }));
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getReadingResource }, readingMediaStorage: { getTempFileURL } });
+    const result = await main({ apiVersion: 'm1.v1', action: 'getReadingResource',
+      payload: { resourceId: 'read_zoo' } });
+    expect(result).toMatchObject({ ok: true, data: { chapters: [{ pages: [{
+      imageAssetKey: 'https://media.example.test/page.jpg',
+      thumbnailAssetKey: 'https://media.example.test/thumb.jpg',
+    }] }] } });
+    expect(getReadingResource).toHaveBeenCalledWith(studentActor, 'read_zoo');
+    expect(getTempFileURL).toHaveBeenCalledWith({ fileList: [
+      { fileID: 'cloud://demo/page.jpg', maxAge: 3600 },
+      { fileID: 'cloud://demo/thumb.jpg', maxAge: 3600 },
+    ] });
+  });
+
+  it('私有云页图无法签发时明确失败，不把 cloud:// 地址发给页面', async () => {
+    const handler = { ...contentHandler(), getReadingResource: vi.fn(async (): Promise<ReadingResourceView> => ({
+      ...readingDetail, chapters: [{ id: 'chapter_real_sample', title: 'Sample', order: 1,
+        pages: [{ id: 'page_real_01', pageNumber: 1, order: 1,
+          imageAssetKey: 'cloud://demo/page.jpg', thumbnailAssetKey: 'cloud://demo/thumb.jpg',
+          width: 1200, height: 900, assetVersion: 'real-v1' }] }],
+    })) };
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor), handler });
+    const result = await main({ apiVersion: 'm1.v1', action: 'getReadingResource',
+      payload: { resourceId: 'read_zoo' } });
+    expect(result).toMatchObject({ ok: false, error: { code: 'SERVICE_UNAVAILABLE' } });
+    expect(JSON.stringify(result)).not.toContain('cloud://');
+  });
+
   it('分发四个基础阅读/单词查询且查询禁止 operationId 和 expectedVersion', async () => {
     const handler = contentHandler();
     const main = createContentQueryFunction({ ...createBoundary('content-query', teacherActor), handler });
@@ -236,6 +298,41 @@ describe('M1 content-query 可注入函数入口', () => {
     })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { organizationId: expect.any(String) } } });
     expect(handler.getVocabularyPack).not.toHaveBeenCalled();
     expect(boundary.actorResolver.resolve).not.toHaveBeenCalled();
+  });
+
+  it('M2 本人班级 action 使用可信身份且拒绝客户端伪造学生 ID', async () => {
+    const handler = contentHandler();
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor), handler });
+    expect(await main({ apiVersion: 'm1.v1', action: 'getMyClass', payload: {} })).toMatchObject({ ok: true, data: { id: 'class_grade3_2' } });
+    expect(await main({ apiVersion: 'm1.v1', action: 'getMyClass', payload: { studentId: 'usr_other' } }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(handler.getMyClass).toHaveBeenCalledTimes(1);
+    expect(handler.getMyClass).toHaveBeenCalledWith(studentActor);
+  });
+
+  it('M2 学校题库严格校验筛选和分页，并在入口使用可信教师身份', async () => {
+    const handler = contentHandler();
+    const main = createContentQueryFunction({ ...createBoundary('content-query', teacherActor), handler });
+    expect(await main({ apiVersion: 'm1.v1', action: 'listSchoolQuestions', payload: {
+      filters: { grade: '三年级', targetClassIds: ['class_grade3_2'] }, page: { limit: 20, offset: 0 },
+    } })).toMatchObject({ ok: true, data: { items: [{ id: 'question_1' }], nextOffset: null } });
+    expect(handler.listSchoolQuestions).toHaveBeenCalledWith(teacherActor,
+      { grade: '三年级', targetClassIds: ['class_grade3_2'] }, { limit: 20, offset: 0 });
+    expect(await main({ apiVersion: 'm1.v1', action: 'listSchoolQuestionFacets', payload: { targetClassIds: ['class_grade3_2'] } }))
+      .toMatchObject({ ok: true, data: [{ grade: '三年级', textbook: '演示同步教材' }] });
+    expect(handler.listSchoolQuestionFacets).toHaveBeenCalledWith(teacherActor, ['class_grade3_2']);
+    expect(await main({ apiVersion: 'm1.v1', action: 'listTaskCatalogFacets', payload: {
+      type: 'reading', targetClassIds: ['class_grade3_2'],
+    } })).toMatchObject({ ok: true, data: [] });
+    expect(handler.listTaskCatalogFacets).toHaveBeenCalledWith(teacherActor, 'reading', ['class_grade3_2']);
+    expect(await main({ apiVersion: 'm1.v1', action: 'getSchoolQuestion', payload: { resourceId: 'question_1' } }))
+      .toMatchObject({ ok: true, data: { correctAnswer: '猫' } });
+    expect(await main({ apiVersion: 'm1.v1', action: 'listSchoolQuestions', payload: {
+      filters: { grade: '三年级', organizationId: 'org_forged' }, page: { limit: 20, offset: 0 },
+    } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(await main({ apiVersion: 'm1.v1', action: 'listSchoolQuestions', payload: {
+      filters: {}, page: { limit: 51, offset: 0 },
+    } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
   });
 });
 

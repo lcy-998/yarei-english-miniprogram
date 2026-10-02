@@ -70,6 +70,7 @@ export const ROLE_PERMISSIONS = [
   'child.read',
   'child.bind',
   'child.unbind',
+  'student_work.restore',
 ] as const;
 
 export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
@@ -249,7 +250,11 @@ export interface ReadingResourceEntity extends LearningResourceBase {
   readonly taskOnly?: boolean;
   readonly category: 'original' | 'synchronized' | 'picture_book' | 'current_events' | 'chapter_book';
   readonly grade: string;
+  readonly term?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
   readonly difficulty: string;
+  readonly theme?: string;
   readonly chapters: readonly ReadingChapterEntity[];
   readonly searchText?: string;
 }
@@ -257,12 +262,119 @@ export interface ReadingResourceEntity extends LearningResourceBase {
 export interface VocabularyResourceEntity extends LearningResourceBase {
   readonly type: 'vocabulary';
   readonly grade: string;
+  readonly term?: string;
   readonly textbook?: string;
   readonly unit: string;
   readonly words: readonly VocabularyWordEntity[];
 }
 
-export type LearningResourceEntity = ReadingResourceEntity | VocabularyResourceEntity;
+export const SCHOOL_QUESTION_TYPES = ['single_choice', 'multiple_choice', 'fill', 'subjective'] as const;
+export type SchoolQuestionType = (typeof SCHOOL_QUESTION_TYPES)[number];
+
+export interface ExerciseResourceEntity extends LearningResourceBase {
+  readonly type: 'exercise';
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly knowledgePoint?: string;
+  readonly difficulty?: string;
+  readonly questionType: SchoolQuestionType;
+  readonly stem: string;
+  readonly options: readonly string[];
+  readonly correctAnswer: JsonValue;
+  readonly explanation: string;
+}
+
+export type LearningResourceEntity = ReadingResourceEntity | VocabularyResourceEntity | ExerciseResourceEntity;
+
+export type TaskCatalogResourceType = 'reading' | 'vocabulary';
+
+export interface TaskCatalogFilters {
+  readonly type: TaskCatalogResourceType;
+  readonly category?: ReadingResourceEntity['category'];
+  readonly source?: TaskCatalogListItemView['source'];
+  readonly grade?: string;
+  readonly term?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+  readonly keyword?: string;
+  readonly targetClassIds?: readonly string[];
+}
+
+export interface TaskCatalogListItemView {
+  readonly id: string;
+  readonly type: TaskCatalogResourceType;
+  readonly title: string;
+  readonly source: 'reading_book' | 'synchronized_textbook' | 'word_pack';
+  readonly category?: ReadingResourceEntity['category'];
+  readonly grade: string;
+  readonly term?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+  readonly contentVersion: string;
+  readonly requiredCount: number;
+}
+
+export interface TaskCatalogFacet {
+  readonly source: TaskCatalogListItemView['source'];
+  readonly grade: string;
+  readonly term?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+}
+
+export interface TaskCatalogPageView {
+  readonly items: readonly TaskCatalogListItemView[];
+  readonly nextOffset: number | null;
+}
+
+export interface SchoolQuestionFilters {
+  readonly grade?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly knowledgePoint?: string;
+  readonly questionType?: SchoolQuestionType;
+  readonly difficulty?: string;
+  readonly keyword?: string;
+  readonly targetClassIds?: readonly string[];
+}
+
+export interface SchoolQuestionListItemView {
+  readonly id: string;
+  readonly title: string;
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly knowledgePoint?: string;
+  readonly questionType: SchoolQuestionType;
+  readonly difficulty?: string;
+  readonly stemSummary: string;
+  readonly contentVersion: string;
+}
+
+export interface SchoolQuestionPageView {
+  readonly items: readonly SchoolQuestionListItemView[];
+  readonly nextOffset: number | null;
+}
+
+export interface SchoolQuestionFacet {
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly knowledgePoint?: string;
+  readonly questionType: SchoolQuestionType;
+  readonly difficulty?: string;
+}
+
+export interface SchoolQuestionDetailView extends SchoolQuestionListItemView {
+  readonly stem: string;
+  readonly options: readonly string[];
+  readonly correctAnswer: JsonValue;
+  readonly explanation: string;
+}
 
 export interface OrganizationSafeView {
   readonly id: string;
@@ -354,7 +466,48 @@ export interface ReadingListItemView {
   readonly category: ReadingResourceEntity['category'];
   readonly grade: string;
   readonly difficulty: string;
+  readonly theme?: string;
   readonly contentVersion: string;
+}
+
+export interface StudentCatalogFilters {
+  readonly type: 'reading' | 'vocabulary';
+  readonly category?: ReadingResourceEntity['category'];
+  readonly grade?: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+  readonly theme?: string;
+  readonly keyword?: string;
+}
+
+export interface StudentCatalogItemView {
+  readonly id: string;
+  readonly type: StudentCatalogFilters['type'];
+  readonly title: string;
+  readonly category?: ReadingResourceEntity['category'];
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+  readonly theme?: string;
+  readonly contentVersion: string;
+  readonly itemCount: number;
+}
+
+export interface StudentCatalogPageView {
+  readonly items: readonly StudentCatalogItemView[];
+  readonly total: number;
+  readonly nextOffset: number | null;
+}
+
+export interface StudentCatalogFacetView {
+  readonly category?: ReadingResourceEntity['category'];
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit?: string;
+  readonly difficulty?: string;
+  readonly theme?: string;
 }
 
 export interface ReadingPageView {
@@ -389,6 +542,16 @@ export interface VocabularyPackView {
   readonly unit: string;
   readonly contentVersion: string;
   readonly words: readonly VocabularyWordEntity[];
+}
+
+export interface StudentClassView {
+  readonly id: string;
+  readonly name: string;
+  readonly organizationName: string;
+  readonly grade: string;
+  readonly term: string;
+  readonly studentCount: number;
+  readonly teacherNames: readonly string[];
 }
 
 export interface BindingCodeIssueView {

@@ -1,11 +1,12 @@
 <g0-page-shell nature="{{true}}" tone="nature"><view class="page">
-  <app-header title="单词练习" back="{{true}}" backUrl="/pages/index/index"></app-header>
+  <app-header title="单词练习" back="{{true}}" backUrl="{{teacherReviewMode ? '/pages/teacher/review-task/review-task' : '/pages/index/index'}}"></app-header>
   <state-panel wx:if="{{loading}}" state="loading"></state-panel>
   <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadPack"></state-panel>
   <view wx:elif="{{!pack}}" class="empty-card">暂无可用单词包</view>
   <block wx:else>
+    <view wx:if="{{teacherReviewMode}}" class="pack-card teacher-review-context"><text>教师只读查看 · 第 {{teacherSubmissionVersion}} 次提交</text><text>可逐词查看学生原作答，无法修改</text></view>
     <view class="pack-card">
-      <view class="pack-heading"><view><text class="pack-title">{{pack.title}}</text><text class="pack-meta">{{pack.grade}} · {{pack.textbook || '未标注教材'}} · {{pack.unit}}</text><text class="pack-progress">已练 {{completedCount}}/{{pack.words.length}}　首次正确率 {{correctRate}}%　错词 {{wrongWords.length}}</text></view><button wx:if="{{!taskPackId}}" class="pack-switch" bindtap="togglePackSelect">{{packSelectOpen ? '收起选择' : '选择词包'}}</button></view>
+      <view class="pack-heading"><view><text class="pack-title">{{pack.title}}</text><text wx:if="{{!teacherReviewMode}}" class="pack-meta">{{pack.grade}}　{{pack.textbook || '未标注教材'}}　{{pack.unit}}</text><text class="pack-progress">{{teacherReviewMode ? '本次提交已记录 ' + completedCount + '/' + pack.words.length + ' 词　首次正确率 ' + correctRate + '%' : '已练 ' + completedCount + '/' + pack.words.length + '　首次正确率 ' + correctRate + '%　错词 ' + wrongWords.length}}</text></view><button wx:if="{{!taskPackId && !teacherReviewMode}}" class="pack-switch" bindtap="togglePackSelect">{{packSelectOpen ? '收起选择' : '选择词包'}}</button></view>
       <view class="progress"><view style="width: {{completedCount * 100 / pack.words.length}}%"></view></view>
       <view wx:if="{{packSelectOpen}}" class="pack-selector">
         <input class="pack-search" value="{{packKeyword}}" bindinput="onPackSearch" placeholder="搜索词包、年级、教材或单元"/>
@@ -14,23 +15,27 @@
           <view class="pack-filter"><button data-key="textbook" bindtap="togglePackFilter">{{textbookFilter}} ▾</button><view wx:if="{{packFilterOpen === 'textbook'}}" class="pack-filter-menu"><view data-key="textbook" data-value="全部教材" bindtap="choosePackFilter">全部教材</view><view wx:for="{{packFilterOptions.textbooks}}" wx:key="*this" data-key="textbook" data-value="{{item}}" bindtap="choosePackFilter">{{item}}</view></view></view>
           <view class="pack-filter"><button data-key="unit" bindtap="togglePackFilter">{{unitFilter}} ▾</button><view wx:if="{{packFilterOpen === 'unit'}}" class="pack-filter-menu"><view data-key="unit" data-value="全部单元" bindtap="choosePackFilter">全部单元</view><view wx:for="{{packFilterOptions.units}}" wx:key="*this" data-key="unit" data-value="{{item}}" bindtap="choosePackFilter">{{item}}</view></view></view>
         </view>
-        <view class="pack-results-head"><text>找到 {{visiblePacks.length}} 个词包</text><button bindtap="clearPackFilters">清除筛选</button></view>
-        <scroll-view scroll-y="{{true}}" class="pack-options" style="height: {{visiblePacks.length > 3 ? 220 : visiblePacks.length * 70 + 20}}px"><button wx:for="{{visiblePacks}}" wx:key="id" class="{{item.id === selectedPackId ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="selectPack"><text>{{item.title}}</text><text>{{item.grade}} · {{item.textbook || '未标注教材'}} · {{item.unit}}</text></button><text wx:if="{{!visiblePacks.length}}" class="pack-empty">当前条件下暂无词包，可调整筛选。</text></scroll-view>
+        <view class="pack-results-head"><text>找到 {{packTotal}} 个词包</text><button bindtap="clearPackFilters">清除筛选</button></view>
+        <scroll-view scroll-y="{{true}}" class="pack-options" style="height: {{visiblePacks.length > 3 ? 220 : visiblePacks.length * 70 + 20}}px"><button wx:for="{{visiblePacks}}" wx:key="id" class="{{item.id === selectedPackId ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="selectPack"><text>{{item.title}}</text><text>{{item.grade}}　{{item.textbook || '未标注教材'}}　{{item.unit}}</text></button><text wx:if="{{!visiblePacks.length && !packCatalogLoading}}" class="pack-empty">当前条件下暂无词包，可调整筛选。</text><text wx:if="{{packCatalogError}}" class="pack-empty">{{packCatalogError}}</text><button wx:if="{{packNextOffset !== null}}" bindtap="loadMorePacks" loading="{{packCatalogLoading}}">加载更多</button></scroll-view>
       </view>
     </view>
     <view class="word-card">
-      <view class="mode-tabs"><button class="{{mode === 'study' ? 'active' : ''}}" data-mode="study" bindtap="selectMode">学习</button><button class="{{mode === 'practice' ? 'active' : ''}}" data-mode="practice" bindtap="selectMode">练习</button><button class="{{mode === 'wrong' ? 'active' : ''}}" data-mode="wrong" bindtap="selectMode">错词</button></view>
+      <view wx:if="{{!teacherReviewMode}}" class="mode-tabs"><button class="{{mode === 'study' ? 'active' : ''}}" data-mode="study" bindtap="selectMode">学习</button><button class="{{mode === 'practice' ? 'active' : ''}}" data-mode="practice" bindtap="selectMode">练习</button><button class="{{mode === 'wrong' ? 'active' : ''}}" data-mode="wrong" bindtap="selectMode">错词</button></view>
       <block wx:if="{{mode !== 'wrong'}}">
         <view class="word-visual"><view class="sun">☀</view></view>
-        <text class="word">{{mode === 'practice' && questionType === 'spelling' ? pack.words[wordIndex].meaning : syllableLabel}}</text><text class="meaning" wx:if="{{mode === 'study'}}">{{pack.words[wordIndex].meaning}}</text>
+        <text class="word">{{mode === 'practice' && questionType === 'spelling' ? (pack.words[wordIndex].meaning || (teacherReviewMode ? pack.words[wordIndex].word : '')) : syllableLabel}}</text><text class="meaning" wx:if="{{mode === 'study'}}">{{pack.words[wordIndex].meaning}}</text>
         <text wx:if="{{mode === 'study' || questionType === 'meaning'}}" class="example">{{pack.words[wordIndex].example}}</text>
         <block wx:if="{{mode === 'practice'}}">
           <text class="prompt">{{questionType === 'meaning' ? '请选择正确释义' : '请拼写这个单词'}}</text>
           <view wx:if="{{questionType === 'meaning'}}" class="choices"><button wx:for="{{choiceOptions}}" wx:key="*this" data-meaning="{{item}}" class="{{selectedMeaning === item ? 'selected' : ''}}" bindtap="chooseMeaning">{{item}}</button></view>
-          <input wx:else class="spelling-input" value="{{spellingAnswer}}" bindinput="onSpelling" placeholder="输入英文单词" disabled="{{answered}}" />
-          <text wx:if="{{answered && answerCorrect}}" class="result success">回答正确</text><text wx:elif="{{answered}}" class="result danger">正确答案：{{questionType === 'meaning' ? pack.words[wordIndex].meaning : pack.words[wordIndex].word}}</text>
+          <input wx:else class="spelling-input {{teacherReviewMode ? teacherCurrentEvidence.firstCorrect === true ? 'review-correct' : teacherCurrentEvidence.firstCorrect === false ? 'review-incorrect' : '' : ''}}" value="{{spellingAnswer}}" bindinput="onSpelling" placeholder="{{teacherReviewMode ? '本次提交未记录作答' : '输入英文单词'}}" disabled="{{teacherReviewMode || answered || answerSubmitting}}" />
+          <text wx:if="{{teacherReviewMode}}" class="result {{teacherCurrentEvidence.firstCorrect === true ? 'success' : teacherCurrentEvidence.firstCorrect === false ? 'danger' : ''}}">{{teacherCurrentEvidence.firstCorrect === true ? '首次作答正确' : teacherCurrentEvidence.firstCorrect === false ? '首次作答错误，正确答案：' + pack.words[wordIndex].word : '本次提交未记录首次作答'}}</text>
+          <text wx:elif="{{answered && answerCorrect}}" class="result success">回答正确</text><text wx:elif="{{answered}}" class="result danger">正确答案：{{questionType === 'meaning' ? pack.words[wordIndex].meaning : pack.words[wordIndex].word}}</text>
+          <text wx:if="{{answerError}}" class="result danger">{{answerError}}，答案已保留，可重试</text>
+          <view wx:if="{{teacherReviewMode && teacherCurrentEvidence.attempts.length > 1}}" class="teacher-word-attempts"><text wx:for="{{teacherCurrentEvidence.attempts}}" wx:key="attemptNumber" class="{{item.isCorrect ? 'success' : 'danger'}}">第 {{item.attemptNumber}} 次：{{item.studentInput}} · {{item.isCorrect ? '正确' : '错误'}}</text></view>
         </block>
-        <button class="primary" wx:if="{{!answered && mode === 'practice'}}" bindtap="submitAnswer">提交答案</button><button class="primary" wx:else bindtap="nextWord">下一个单词</button>
+        <view wx:if="{{teacherReviewMode}}" class="teacher-word-nav"><button disabled="{{wordIndex <= 0}}" bindtap="previousTeacherWord">上一个单词</button><text class="teacher-word-position">{{wordIndex + 1}} / {{pack.words.length}}</text><button disabled="{{wordIndex + 1 >= pack.words.length}}" bindtap="nextWord">下一个单词</button></view>
+        <block wx:else><button class="primary" wx:if="{{!answered && mode === 'practice'}}" bindtap="submitAnswer" loading="{{answerSubmitting}}" disabled="{{answerSubmitting}}">提交答案</button><button class="primary" wx:else bindtap="nextWord">下一个单词</button></block>
       </block>
       <view wx:else class="wrong-list"><text wx:if="{{!wrongWords.length}}">暂时没有错词，继续保持！</text><button wx:for="{{wrongWords}}" wx:key="id" data-id="{{item.id}}" bindtap="practiceWrong"><text>{{item.word}}</text><text>{{item.meaning}}</text><text>再次练习 ›</text></button></view>
     </view>

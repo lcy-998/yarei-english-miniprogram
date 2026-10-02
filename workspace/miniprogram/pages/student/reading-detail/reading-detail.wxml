@@ -1,20 +1,25 @@
 <g0-page-shell nature="{{true}}" tone="nature">
   <view class="m1-page reading-detail">
-    <app-header title="阅读详情" back="{{true}}" backUrl="{{returnUrl}}"></app-header>
+    <app-header title="阅读详情" back="{{true}}" backUrl="{{returnUrl}}" backIntercept="{{checkinMode || teacherReviewMode}}" bind:back="returnToCheckin"></app-header>
     <state-panel wx:if="{{loading}}" state="loading"></state-panel>
     <state-panel wx:elif="{{error && !reading}}" state="error" message="{{error}}" bind:retry="loadReading"></state-panel>
     <view wx:elif="{{reading}}" class="m1-content">
+      <view wx:if="{{teacherReviewMode}}" class="m1-card task-reading-context"><text>教师只读查看 · 第 {{reviewSubmissionVersion}} 次提交</text><text>可自由翻阅指定页，查看学生逐页记录</text></view>
       <view wx:if="{{taskMode}}" class="m1-card task-reading-context">
         <text>任务阅读</text>
         <text wx:if="{{taskRequiredPageCount > 0}}">阅读至第 {{taskRequiredPageCount}} 页，返回任务后自动更新进度</text>
         <text wx:else>完成本任务指定的阅读内容</text>
       </view>
+      <view wx:if="{{checkinMode}}" class="m1-card task-reading-context">
+        <text>今日打卡阅读</text>
+        <text>请从第一页读到最后一页，页面保存后返回打卡任务核对结果</text>
+      </view>
       <view class="m1-card detail-head">
-        <view><text class="book-name">{{reading.book.title}}</text><text class="page-meta">第 {{displayChapterNumber}} 章　{{displayPageNumber}} / {{reading.pageCount}}</text></view>
-        <button class="detail-favorite {{reading.book.favorite ? 'active' : ''}}" bindtap="toggleFavorite">{{reading.book.favorite ? '已收藏' : '收藏'}}</button>
+        <view><text class="book-name">{{reading.book.title}}</text><text class="page-meta">{{teacherReviewMode ? '第 ' + displayPageNumber + ' 页 · 指定范围 ' + (reviewPageIndex + 1) + ' / ' + reading.pageCount : '第 ' + displayChapterNumber + ' 章　' + displayPageNumber + ' / ' + reading.pageCount}}</text></view>
+        <button wx:if="{{!teacherReviewMode}}" class="detail-favorite {{reading.book.favorite ? 'active' : ''}}" bindtap="toggleFavorite">{{reading.book.favorite ? '已收藏' : '收藏'}}</button>
       </view>
       <view class="m1-card progress-card">
-        <view><text>已保存的阅读进度</text><text>{{reading.hasSavedProgress ? reading.progressPercent : 0}}%</text></view>
+        <view><text>{{teacherReviewMode ? '本次提交已记录访问' : '已保存的阅读进度'}}</text><text>{{reading.hasSavedProgress ? reading.progressPercent : 0}}%</text></view>
         <view class="m1-progress"><view style="width: {{reading.hasSavedProgress ? reading.progressPercent : 0}}%"></view></view>
       </view>
       <view class="page-frame" bindtap="previewPage">
@@ -24,13 +29,14 @@
         <view wx:if="{{imageError}}" class="page-error"><text>高清页图加载失败，已保留缩略图</text><view class="page-error-actions"><button catchtap="retryImage">重试加载</button><button wx:if="{{pendingPageNumber > 0}}" catchtap="returnToSavedPage">返回已保存页</button></view></view>
         <view class="zoom-hint">点击页图放大查看</view>
       </view>
-      <view wx:if="{{saveError}}" class="reading-save-error"><text>{{saveError}}</text><button bindtap="saveVisiblePage">重试保存</button></view>
+      <view wx:if="{{saveError && !teacherReviewMode}}" class="reading-save-error"><text>{{saveError}}</text><button bindtap="saveVisiblePage">重试保存</button></view>
       <view class="page-actions">
-        <g0-button variant="secondary" disabled="{{displayPageNumber <= 1 || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" bind:action="previousPage">上一页</g0-button>
-        <g0-button disabled="{{displayPageNumber >= reading.pageCount || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" loading="{{saving}}" bind:action="nextPage">下一页</g0-button>
+        <g0-button variant="secondary" disabled="{{teacherReviewMode ? reviewPageIndex <= 0 : displayPageNumber <= 1 || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" bind:action="previousPage">上一页</g0-button>
+        <g0-button disabled="{{teacherReviewMode ? reviewPageIndex + 1 >= reading.pageCount : displayPageNumber >= reading.pageCount || saving || imageLoading || imageError || pendingPageNumber > 0 || saveError}}" loading="{{saving}}" bind:action="nextPage">下一页</g0-button>
       </view>
-      <text wx:if="{{!imageLoading && !imageError && !saving && !saveError}}" class="autosave">阅读位置已保存</text>
+      <text wx:if="{{teacherReviewMode}}" class="autosave">{{reviewPageVisited[reviewPageIndex] ? '本次提交已记录访问该页' : '本次提交未记录访问该页'}}</text>
+      <text wx:elif="{{!imageLoading && !imageError && !saving && !saveError}}" class="autosave">阅读位置已保存</text>
     </view>
   </view>
 </g0-page-shell>
-<view wx:if="{{zoomed}}" class="reading-fullscreen" bindtap="previewPage" aria-role="button" aria-label="关闭页图放大"><image class="reading-fullscreen-image" src="{{imageError ? displayThumbnailUrl : displayImageUrl}}" mode="aspectFit"></image><text>轻触任意位置退出全屏</text></view>
+<view wx:if="{{zoomed}}" class="reading-fullscreen" bindtap="previewPage" aria-role="button" aria-label="关闭页图放大"><image class="reading-fullscreen-image" src="{{imageError || !displayImageUrl ? displayThumbnailUrl : displayImageUrl}}" mode="aspectFit"></image><text>轻触任意位置退出全屏</text></view>

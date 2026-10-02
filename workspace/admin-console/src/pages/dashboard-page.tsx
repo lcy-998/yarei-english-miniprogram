@@ -8,7 +8,7 @@ export function DashboardPage({ snapshot, onNavigate }: { snapshot: AdminSnapsho
     { icon: 'school', label: '学校数量', value: snapshot.schools.length, tone: 'blue', page: 'organization' as PageKey },
     { icon: 'classes', label: '班级数量', value: snapshot.classes.filter((item) => item.status === 'active').length, tone: 'green', page: 'organization' as PageKey },
     { icon: 'user', label: '用户数量', value: activeUsers, tone: 'orange', page: 'users' as PageKey },
-    { icon: 'activity', label: '任务与活动', value: 3, tone: 'purple' },
+    { icon: 'activity', label: '任务与活动', value: '查看', tone: 'purple', page: 'task-activities' as PageKey },
   ];
   return <div className="dashboard">
     <section className="metric-grid">{metrics.map((metric) => <button key={metric.label} className="metric-card" onClick={() => metric.page && onNavigate(metric.page)} disabled={!metric.page}>

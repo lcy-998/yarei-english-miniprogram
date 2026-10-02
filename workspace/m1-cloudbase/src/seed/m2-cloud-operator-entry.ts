@@ -1,0 +1,11 @@
+export { createCloudBaseDocumentDatabase } from '../repositories/cloudbase-document-database';
+export { proposeM2CurrentDependencyBaseline } from './m2-current-dependency-baseline';
+export { createM2AuditedCloudOperator } from './m2-offline-operator';
+export { createM2BusinessReadIsolation } from './m2-business-read-isolation';
+export { createOrgContentDocumentRepository } from '../repositories/org-content-document-adapter';
+export { grantM2DemoAdminRestorePermission } from './m2-demo-admin-grant';
+export { ActivityService } from '../activity/activity-service';
+export { DocumentActivityRepository } from '../activity/document-repository';
+export { createM2CapacityFixtureOperator } from './m2-capacity-fixture';
+export { createM2ActivityCapacityFixtureOperator } from './m2-activity-capacity-fixture';
+export { NotificationMaintenance } from '../notification/maintenance';

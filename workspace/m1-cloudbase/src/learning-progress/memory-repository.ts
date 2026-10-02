@@ -4,12 +4,14 @@ import type {
   LearningProgressOperationRecord,
   LearningResourceAccessRecord,
   ReadingProgressRecord,
+  ReadingPageEventRecord,
   VocabularyProgressRecord,
 } from './types';
 
 export interface LearningProgressFixture {
   readonly resources: readonly LearningResourceAccessRecord[];
   readonly readingProgress?: readonly ReadingProgressRecord[];
+  readonly readingPageEvents?: readonly ReadingPageEventRecord[];
   readonly vocabularyProgress?: readonly VocabularyProgressRecord[];
   readonly operations?: readonly LearningProgressOperationRecord[];
   readonly audits?: readonly LearningProgressAuditRecord[];
@@ -31,6 +33,7 @@ const cloneOperation = (value: LearningProgressOperationRecord): LearningProgres
 export class InMemoryLearningProgressRepository implements LearningProgressRepository, LearningProgressTransaction {
   private resources: LearningResourceAccessRecord[];
   private reading: ReadingProgressRecord[];
+  private readingPageEvents: ReadingPageEventRecord[];
   private vocabulary: VocabularyProgressRecord[];
   private operations: LearningProgressOperationRecord[];
   private audits: LearningProgressAuditRecord[];
@@ -39,6 +42,7 @@ export class InMemoryLearningProgressRepository implements LearningProgressRepos
   public constructor(fixture: LearningProgressFixture) {
     this.resources = fixture.resources.map(cloneResource);
     this.reading = (fixture.readingProgress ?? []).map(cloneReading);
+    this.readingPageEvents = (fixture.readingPageEvents ?? []).map(item => ({ ...item }));
     this.vocabulary = (fixture.vocabularyProgress ?? []).map(cloneVocabulary);
     this.operations = (fixture.operations ?? []).map(cloneOperation);
     this.audits = (fixture.audits ?? []).map((item) => ({ ...item }));
@@ -54,6 +58,7 @@ export class InMemoryLearningProgressRepository implements LearningProgressRepos
       return await work(this);
     } catch (error: unknown) {
       this.reading = snapshot.readingProgress.map(cloneReading);
+      this.readingPageEvents = snapshot.readingPageEvents.map(item => ({ ...item }));
       this.vocabulary = snapshot.vocabularyProgress.map(cloneVocabulary);
       this.operations = snapshot.operations.map(cloneOperation);
       this.audits = snapshot.audits.map((item) => ({ ...item }));
@@ -73,6 +78,11 @@ export class InMemoryLearningProgressRepository implements LearningProgressRepos
     return value === undefined ? null : cloneReading(value);
   }
 
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return this.readingPageEvents.filter(item => item.organizationId === organizationId && item.studentId === studentId
+      && item.resourceId === resourceId).map(item => ({ ...item }));
+  }
+
   public async findVocabularyProgress(organizationId: string, studentId: string, packId: string): Promise<VocabularyProgressRecord | null> {
     const value = this.vocabulary.find((item) => item.organizationId === organizationId && item.studentId === studentId && item.packId === packId);
     return value === undefined ? null : cloneVocabulary(value);
@@ -85,6 +95,11 @@ export class InMemoryLearningProgressRepository implements LearningProgressRepos
 
   public async saveReadingProgress(record: ReadingProgressRecord): Promise<void> {
     this.reading = replace(this.reading, cloneReading(record));
+  }
+
+  public async appendReadingPageEvent(record: ReadingPageEventRecord): Promise<void> {
+    if (this.readingPageEvents.some(item => item.id === record.id)) throw new Error('reading page event already exists');
+    this.readingPageEvents.push({ ...record });
   }
 
   public async saveVocabularyProgress(record: VocabularyProgressRecord): Promise<void> {
@@ -102,12 +117,14 @@ export class InMemoryLearningProgressRepository implements LearningProgressRepos
 
   public debugSnapshot(): Readonly<{
     readingProgress: readonly ReadingProgressRecord[];
+    readingPageEvents: readonly ReadingPageEventRecord[];
     vocabularyProgress: readonly VocabularyProgressRecord[];
     operations: readonly LearningProgressOperationRecord[];
     audits: readonly LearningProgressAuditRecord[];
   }> {
     return {
       readingProgress: this.reading.map(cloneReading),
+      readingPageEvents: this.readingPageEvents.map(item => ({ ...item })),
       vocabularyProgress: this.vocabulary.map(cloneVocabulary),
       operations: this.operations.map(cloneOperation),
       audits: this.audits.map((item) => ({ ...item })),

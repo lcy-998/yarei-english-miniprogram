@@ -69,6 +69,8 @@ describe('M1 task-core 可注入函数入口', () => {
     const boundary = createBoundary('task-command');
     const handler = {
       saveTaskDraft: vi.fn(async () => ok({ action: 'saved' })),
+      copyTaskSnapshot: vi.fn(async () => ok({ action: 'copied' })),
+      instantiateTemplate: vi.fn(async () => ok({ action: 'instantiated' })),
       publishTask: vi.fn(async () => ok({ action: 'published' })),
       updatePublishedTask: vi.fn(async () => ok({ action: 'updated' })),
       withdrawTask: vi.fn(async () => ok({ action: 'withdrawn' })),
@@ -99,6 +101,28 @@ describe('M1 task-core 可注入函数入口', () => {
       expectedVersion: 1, operationId: 'operation_publish_task_0001',
     })).toMatchObject({ ok: true, data: { action: 'published' } });
     expect(handler.publishTask).toHaveBeenCalledWith(actor, 'task_demo', 1, 'operation_publish_task_0001');
+    expect(await main({
+      apiVersion: 'm1.v1', action: 'copyTaskSnapshot', payload: { sourceTaskId: 'task_demo' },
+      expectedVersion: 2, operationId: 'operation_copy_task_0001',
+    })).toMatchObject({ ok: true, data: { action: 'copied' } });
+    expect(handler.copyTaskSnapshot).toHaveBeenCalledWith(actor, 'task_demo', 2, 'operation_copy_task_0001');
+    expect(await main({
+      apiVersion: 'm1.v1', action: 'copyTaskSnapshot',
+      payload: { sourceTaskId: 'task_demo', items: [{ resourceSnapshot: { title: '伪造内容' } }] },
+      expectedVersion: 2, operationId: 'operation_copy_forged_0001',
+    })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(handler.copyTaskSnapshot).toHaveBeenCalledTimes(1);
+    expect(await main({ apiVersion: 'm1.v1', action: 'instantiateTemplate',
+      payload: { templateId: 'template_demo' }, expectedVersion: 3,
+      operationId: 'operation_instantiate_template_0001' }))
+      .toMatchObject({ ok: true, data: { action: 'instantiated' } });
+    expect(handler.instantiateTemplate).toHaveBeenCalledWith(actor, 'template_demo', 3,
+      'operation_instantiate_template_0001');
+    expect(await main({ apiVersion: 'm1.v1', action: 'instantiateTemplate',
+      payload: { templateId: 'template_demo', items: [{ resourceSnapshot: { title: '伪造内容' } }] },
+      expectedVersion: 3, operationId: 'operation_instantiate_forged_0001' }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(handler.instantiateTemplate).toHaveBeenCalledTimes(1);
     expect(await main({
       apiVersion: 'm1.v1', action: 'updatePublishedTask',
       payload: { taskId: 'task_demo', dueAt: '2026-09-18T00:00:00.000Z', description: '更新说明' },
@@ -179,6 +203,27 @@ describe('M1 task-core 可注入函数入口', () => {
       4,
       'operation_review_0001',
     );
+    expect(await review({
+      apiVersion: 'm1.v1', action: 'publishReview',
+      payload: { submissionId: 'submission_demo', decision: 'approved', score: 75,
+        overrideReason: '复核原始作答后调整', expectedSubmissionVersion: 1 },
+      expectedVersion: 4, operationId: 'operation_review_override_0001',
+    })).toMatchObject({ ok: true });
+    expect(reviewHandler.publishReview).toHaveBeenLastCalledWith(actor, expect.objectContaining({
+      overrideReason: '复核原始作答后调整',
+    }), 4, 'operation_review_override_0001');
+    expect(await review({ apiVersion: 'm1.v1', action: 'publishReview',
+      payload: { submissionId: 'submission_demo', decision: 'approved', expectedSubmissionVersion: 1,
+        itemScores: [{ itemId: 'item_record', score: 80 }] },
+      expectedVersion: 4, operationId: 'operation_review_item_scores_0001' })).toMatchObject({ ok: true });
+    expect(reviewHandler.publishReview).toHaveBeenLastCalledWith(actor, expect.objectContaining({
+      itemScores: [{ itemId: 'item_record', score: 80 }],
+    }), 4, 'operation_review_item_scores_0001');
+    expect(await review({ apiVersion: 'm1.v1', action: 'publishReview',
+      payload: { submissionId: 'submission_demo', decision: 'approved', expectedSubmissionVersion: 1,
+        itemScores: [{ itemId: 'item_record', score: 80, actorUserId: 'forged' }] },
+      expectedVersion: 4, operationId: 'operation_review_item_scores_forged' }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await review({
       apiVersion: 'm1.v1', action: 'publishBatchComment',
       payload: { previewToken: 'preview_token_demo', previewVersion: 5, textComment: '统一点评' },

@@ -51,7 +51,11 @@ export class TeacherStudentQueryService {
     const scoped = filters.classId === undefined
       ? authorized
       : authorized.filter((item) => item.classEntity.id === filters.classId);
-    const assignments = await this.dependencies.taskRepository.listAssignments(actor.organizationId);
+    const [assignments, users] = await Promise.all([
+      this.dependencies.taskRepository.listAssignments(actor.organizationId),
+      this.dependencies.organizationRepository.listUsers(actor.organizationId),
+    ]);
+    const usersById = new Map(users.map(user => [user.id, user]));
     const keyword = filters.keyword?.toLocaleLowerCase();
     const items: TeacherStudentListItem[] = [];
 
@@ -62,9 +66,11 @@ export class TeacherStudentQueryService {
       );
       for (const membership of memberships) {
         if (membership.status === 'transferred') continue;
-        const student = await this.dependencies.organizationRepository.findUser(actor.organizationId, membership.studentId);
-        if (student === null || !student.roles.includes('student')) continue;
+        if (membership.status === 'inactive' && filters.status !== 'all' && filters.status !== 'disabled') continue;
+        const student = usersById.get(membership.studentId);
+        if (student === undefined || !student.roles.includes('student')) continue;
         if (membership.status === 'inactive' && student.status !== 'disabled') continue;
+        if (filters.status === 'active' && student.status !== 'active') continue;
         if (keyword !== undefined
           && !student.displayName.toLocaleLowerCase().includes(keyword)
           && !student.studentNumber?.toLocaleLowerCase().includes(keyword)) continue;
@@ -247,6 +253,7 @@ function classOption(classEntity: ClassEntity): TeacherStudentClassOption {
 
 function matchesStatus(item: TeacherStudentListItem, status: TeacherStudentFilters['status']): boolean {
   if (status === 'all') return true;
+  if (status === 'active') return item.accountStatus === 'active';
   if (status === 'attention') return item.accountStatus === 'active' && item.needsAttention;
   if (status === 'normal') return item.accountStatus === 'active' && !item.needsAttention;
   return item.accountStatus === 'disabled';

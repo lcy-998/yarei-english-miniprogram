@@ -1,0 +1,30 @@
+.notice-page { min-height: 100vh; padding: 0 20px 48px; box-sizing: border-box; color: #071e49; }
+.notice-head { min-height: 64px; margin: 8px 2px 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.notice-title { font-size: 30px; font-weight: 900; letter-spacing: .5px; }
+.all-read { flex: 0 0 96px; width: 96px; height: 44px; min-width: 0; min-height: 44px; box-sizing: border-box; margin: 0; padding: 0 4px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: #1764d8; font-size: 17px; font-weight: 900; line-height: 1; white-space: nowrap; }
+.all-read::after { border: 0; }
+.all-read.is-disabled { background: transparent; color: #7a8aa4; opacity: .66; }
+.all-read.is-pressed { background: rgba(23,100,216,.08); }
+.notice-surface { padding: 18px 14px 22px; border-radius: 24px; background: rgba(255,249,240,.97); box-shadow: 0 7px 20px rgba(7,30,73,.13); }
+.filter-row { display: flex; gap: 6px; margin-bottom: 14px; }
+.filter { flex: 1; min-width: 0; min-height: 42px; display: grid; place-items: center; border-radius: 21px; background: #e8f2fc; color: #071e49; font-size: 14px; font-weight: 800; }
+.filter.active { background: #1764d8; color: #fff; box-shadow: 0 5px 11px rgba(23,100,216,.20); }
+.date-filter { height: 44px; display: flex; align-items: center; gap: 12px; margin-bottom: 15px; padding: 0 13px; border: 1px solid #cbdff7; border-radius: 14px; background: rgba(255,255,255,.82); color: #071e49; font-size: 15px; font-weight: 800; }
+.calendar-mark { position: relative; width: 18px; height: 18px; box-sizing: border-box; border: 2px solid #1764d8; border-radius: 4px; }
+.calendar-mark::before { content: ""; position: absolute; top: 4px; left: 0; right: 0; border-top: 2px solid #1764d8; }
+.calendar-mark::after { content: ""; position: absolute; top: -5px; left: 4px; width: 3px; height: 6px; border-radius: 2px; background: #1764d8; box-shadow: 8px 0 0 #1764d8; }
+.down-mark { width: 8px; height: 8px; margin-left: auto; border-right: 2px solid #1764d8; border-bottom: 2px solid #1764d8; transform: translateY(-2px) rotate(45deg); }
+.notice-row { display: flex; align-items: center; gap: 9px; min-height: 83px; margin-top: 10px; padding: 10px; box-sizing: border-box; border: 1px solid rgba(23,100,216,.07); border-radius: 18px; background: #fff; box-shadow: 0 4px 12px rgba(7,30,73,.05); }
+.notice-row.pressed { background: #edf5ff; }
+.unread { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: #1764d8; }.unread.read { background: transparent; }
+.notice-copy { flex: 1; min-width: 0; }.row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 5px; }
+.row-title { min-width: 0; max-height: 2.8em; overflow: hidden; white-space: normal; word-break: break-all; color: #071e49; font-size: 14px; font-weight: 900; line-height: 1.4; }
+.row-time { flex: none; color: #596987; font-size: 10px; }.row-summary { display: block; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #596987; font-size: 12px; }
+.arrow { flex: 0 0 27px; width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: #e7f2ff; }.arrow view { width: 7px; height: 7px; margin-left: -3px; border-top: 3px solid #1764d8; border-right: 3px solid #1764d8; border-radius: 1px; transform: rotate(45deg); }
+.empty { padding: 48px 0; color: #596987; font-size: 14px; text-align: center; }
+.empty-refresh { display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 136px; min-height: 42px; margin: 16px auto 0; padding: 0 12px; border-radius: 21px;
+  background: #e8f2fc; color: #1764d8; font-size: 14px; font-weight: 800; line-height: 1.2; }
+.empty-refresh::after { border: 0; }
+.empty-refresh text { display: block; line-height: 1.2; }
+.more { margin: 18px auto 0; border-radius: 14px; background: #e8f2fc; color: #1764d8; font-size: 14px; font-weight: 800; }.retry { padding: 13px; color: #c7422d; font-size: 13px; text-align: center; }

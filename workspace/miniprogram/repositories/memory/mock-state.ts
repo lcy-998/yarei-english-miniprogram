@@ -60,6 +60,7 @@ const demoFeedback: ReviewFeedback[] = demoAssignments
   }))
 
 export const initialState: AppState = {
+  exerciseSnapshots: [],
   users: [
     ...demoStudents,
     { id: 'usr_teacher_lin', displayName: '林老师', role: 'teacher', classId: 'cls_grade3_2' },

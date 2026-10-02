@@ -6,6 +6,7 @@
       <view class="teacher-brand"><image src="/assets/g0/brand-logo.png" mode="aspectFit"></image><view><text>雅睿英语</text><text>教师工作台</text></view></view>
       <view class="m1-content">
         <view class="list-heading"><text class="m1-title">学员列表</text><view class="class-filter-wrap"><button class="class-filter" bindtap="chooseClass">{{selectedClass}}<text class="filter-arrow {{classFilterOpen ? 'is-open' : ''}}"></text></button><view wx:if="{{classFilterOpen}}" class="class-menu"><view wx:for="{{classOptions}}" wx:key="id" class="class-option {{selectedClassId === item.id ? 'selected' : ''}}" data-class-id="{{item.id}}" bindtap="selectClass">{{item.name}}</view></view></view></view>
+        <button class="stats-entry" bindtap="openStats">查看学员统计 ›</button>
         <view class="control-panel">
           <view class="m1-toolbar"><view class="search-wrap"><view class="search-symbol"></view><input value="{{keyword}}" placeholder="搜索姓名或学号" bindinput="onSearch"/></view><picker range="{{statusOptions}}" range-key="label" value="{{statusIndex}}" bindchange="onStatusChange"><view class="status-filter">{{statusOptions[statusIndex].label}}<text class="filter-arrow"></text></view></picker></view>
           <view class="list-tools"><button class="import" bindtap="importStudents"><view class="tool-icon">↑</view><text>批量导入</text></button><button class="export" bindtap="exportStudents"><view class="tool-icon">≡</view><text>复制 CSV</text></button><button class="primary" bindtap="addStudent"><view class="tool-icon">＋</view><text>新建学员</text></button></view>

@@ -20,5 +20,13 @@ describe('student task reading entry', () => {
     openReading.call(context, event)
     expect(getCurrentBookId()).toBe('res_reading_zoo_cloud_v2')
     expect(navigateTo).toHaveBeenCalledWith({ url: '/pages/student/reading-detail/reading-detail?bookId=res_reading_zoo_cloud_v2&taskId=task_demo&requiredPageCount=2' })
+    const rangeContext = { data: { detail: { task: { id: 'task_demo', items: [{
+      id: 'item_reading', resourceId: 'res_reading_zoo_cloud_v2',
+      completionRuleData: { kind: 'reading_pages', requiredPageCount: 2 }, readingPageNumbers: [2, 3],
+    }] } } } }
+    openReading.call(rangeContext, event)
+    expect(navigateTo).toHaveBeenLastCalledWith({
+      url: '/pages/student/reading-detail/reading-detail?bookId=res_reading_zoo_cloud_v2&taskId=task_demo&requiredPageCount=2&startPageNumber=2',
+    })
   })
 })

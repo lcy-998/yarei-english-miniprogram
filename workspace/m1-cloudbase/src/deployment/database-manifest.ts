@@ -117,7 +117,7 @@ export const M1_DATABASE_MANIFEST: readonly CollectionDefinition[] = [
     index('idx_assignments_org_class_task_status', ['organizationId', 'classId', 'taskId', 'status']),
   ]),
   collection('submissions', [
-    index('uq_submissions_org_assignment_version', ['organizationId', 'assignmentId', 'version'], true),
+    index('uq_submissions_org_assignment_submission_version', ['organizationId', 'assignmentId', 'submissionVersion'], true),
     index('idx_submissions_org_student_status_updated', ['organizationId', 'studentId', 'status', 'updatedAt']),
     index('idx_submissions_org_task_status_submitted', ['organizationId', 'taskId', 'status', 'submittedAt']),
   ]),

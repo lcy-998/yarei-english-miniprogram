@@ -1,0 +1,44 @@
+<g0-page-shell tone="parent">
+  <view class="report-page">
+    <app-header title="学习报告"></app-header>
+    <view class="report-content">
+      <view class="child-card" bindtap="openChildren" aria-role="button" aria-label="切换孩子">
+        <view class="child-avatar">{{childAvatarText}}</view>
+        <view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-class">{{childClassName}}</text></view>
+        <view class="child-switch">{{children.length ? '切换孩子' : '绑定孩子'}}<view class="chevron" aria-hidden="true"></view></view>
+      </view>
+
+      <view class="period-tabs">
+        <view wx:for="{{periodNames}}" wx:key="*this" class="period-tab {{periodIndex === index ? 'period-tab--active' : ''}}" data-index="{{index}}" bindtap="onPeriodTap" aria-role="button">{{item}}</view>
+      </view>
+      <view wx:if="{{periodIndex === 2}}" class="date-row">
+        <picker mode="date" value="{{startsOn}}" bindchange="onStartChange"><view>{{startsOn}}</view></picker>
+        <text>至</text>
+        <picker mode="date" value="{{endsOn}}" bindchange="onEndChange"><view>{{endsOn}}</view></picker>
+      </view>
+
+      <state-panel wx:if="{{loading}}" state="loading" message="正在整理孩子的学习记录"></state-panel>
+      <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadReport"></state-panel>
+      <view wx:elif="{{report}}">
+        <view class="metric-panel">
+          <view class="metric metric--success" bindtap="jumpDetails" aria-role="button"><g0-icon name="check" tone="success" size="{{32}}"></g0-icon><text class="metric-label">任务完成率</text><text class="metric-value">{{report.summary.completionRate === null ? '未记录' : report.summary.completionRate + '%'}}</text><text class="metric-note">{{report.summary.completedCount}}/{{report.summary.assignedCount}} 项</text></view>
+          <view class="metric metric--blue" bindtap="jumpDetails" aria-role="button"><g0-icon name="task" size="{{32}}"></g0-icon><text class="metric-label">提交次数</text><text class="metric-value">{{report.summary.taskSubmissionCount}}</text><text class="metric-note">含重交版本</text></view>
+          <view class="metric metric--purple" bindtap="jumpDetails" aria-role="button"><g0-icon name="review" tone="ai" size="{{32}}"></g0-icon><text class="metric-label">平均成绩</text><text class="metric-value">{{report.summary.averageScore === null ? '未记录' : report.summary.averageScore}}</text><text class="metric-note">{{report.summary.averageScore === null ? '暂无分数' : '已记录分数'}}</text></view>
+          <view class="metric metric--orange" bindtap="jumpDetails" aria-role="button"><g0-icon name="calendar" tone="warning" size="{{32}}"></g0-icon><text class="metric-label">逾期任务</text><text class="metric-value">{{report.summary.overdueCount}}</text><text class="metric-note">按任务记录</text></view>
+        </view>
+
+        <view class="trend-card">
+          <view class="section-head"><text>{{periodIndex === 0 ? '近 7 天' : '所选时段末 7 天'}}任务完成趋势</text><text class="section-aside">按截止日</text></view>
+          <view class="trend-note">每日到期任务中已完成的数量</view>
+          <view class="trend-bars"><view wx:for="{{trend}}" wx:key="date" class="trend-item"><view class="bar-track"><view wx:if="{{item.completed}}" class="bar" style="height: {{item.percent}}%"></view></view><text class="bar-date">{{item.date}}</text><text class="bar-value">{{item.completed}}</text></view></view>
+        </view>
+
+        <view class="other-card"><text class="other-title">其他学习指标</text><view class="other-grid"><view><text>学习时长</text><text>未记录</text></view><view><text>练习正确率</text><text>未记录</text></view><view><text>配音提交</text><text>{{report.summary.dubbingCount === null ? '未记录' : report.summary.dubbingCount + ' 次'}}</text></view><view><text>跟读记录</text><text>未记录</text></view></view></view>
+
+        <view id="report-details" class="details-card"><view class="section-head"><text>学习明细</text></view><text class="detail-note">按任务截止日期筛选；点开任务可核对提交与点评。</text><view wx:for="{{rows}}" wx:key="key" class="detail-row" data-task-id="{{item.taskId}}" bindtap="openTask" aria-role="button"><view class="detail-icon">任</view><view class="detail-copy"><text class="detail-title">{{item.taskTitle}}</text><text class="detail-meta">{{item.dueOn}} 截止　{{item.statusLabel}}　{{item.submissionCount}} 次提交</text></view><view class="detail-score">{{item.scoreLabel}}</view><view class="detail-arrow" aria-hidden="true"></view></view><view wx:if="{{!rows.length}}" class="empty-card">当前日期下暂无学习记录。</view></view>
+      </view>
+      <view wx:elif="{{!children.length}}" class="empty-card standalone">请先绑定孩子，再查看学习报告。</view>
+    </view>
+    <g0-tab-bar role="parent" active="report"></g0-tab-bar>
+  </view>
+</g0-page-shell>

@@ -1,0 +1,28 @@
+.textbook-demo-note { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; background: #eef5ff; color: #305c9e; font-size: 13px; }
+.textbook-admin-panel { margin-bottom: 18px; }
+.textbook-admin-panel .panel-heading { display: flex; align-items: center; justify-content: space-between; }
+.textbook-admin-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin-top: 16px; }
+.textbook-admin-grid > div { padding: 16px; border-radius: 14px; background: #f5f8fc; }
+.textbook-admin-grid h3 { margin: 0 0 12px; font-size: 15px; }
+.textbook-admin-grid label, .textbook-admin-modal label { display: flex; align-items: center; gap: 8px; margin: 9px 0; font-size: 14px; }
+.textbook-admin-grid p, .textbook-admin-modal p { color: #66758f; font-size: 13px; line-height: 1.6; }
+.textbook-admin-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.textbook-admin-meta { margin: 12px 0 0; color: #6d7a8d; font-size: 12px; }
+.textbook-admin-filters { display: flex; gap: 10px; margin: 15px 0; }
+.textbook-admin-filters input, .textbook-admin-filters select { min-height: 40px; padding: 8px 12px; border: 1px solid #d7e0ef; border-radius: 9px; background: #fff; }
+.textbook-admin-filters input { min-width: 240px; }
+.textbook-admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.textbook-admin-table th, .textbook-admin-table td { padding: 12px 10px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; }
+.textbook-admin-table th { background: #f5f8fc; color: #596987; font-weight: 700; }
+.textbook-admin-table td strong, .textbook-admin-table td small { display: block; }
+.textbook-admin-table td small { margin-top: 4px; color: #7d8a9d; }
+.textbook-admin-table td button { display: inline-block; margin: 0 8px 5px 0; border: 0; background: none; color: #1764d8; cursor: pointer; font-size: 12px; }
+.textbook-admin-table td button:disabled { color: #9eabbc; cursor: default; }
+.textbook-admin-table td .danger-link { color: #a53230; }
+.textbook-admin-status { display: inline-block; padding: 3px 8px; border-radius: 9px; background: #eaf4ff; color: #1764d8; font-size: 12px; font-weight: 700; }
+.textbook-admin-status.status-offline { background: #f7e9e9; color: #a53230; }
+.textbook-admin-status.status-published { background: #e7f7ed; color: #1f8e58; }
+.textbook-admin-modal { min-width: min(480px,80vw); }
+.textbook-admin-chapter { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-bottom: 1px solid #e7edf4; }
+.textbook-admin-chapter span { color: #596987; font-size: 13px; }
+@media (max-width: 900px) { .textbook-admin-grid { grid-template-columns: 1fr; } .textbook-admin-filters { flex-wrap: wrap; } }

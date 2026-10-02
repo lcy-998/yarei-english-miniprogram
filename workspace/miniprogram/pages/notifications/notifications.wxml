@@ -1,0 +1,20 @@
+<g0-page-shell nature="{{true}}" tone="nature"><view class="notice-page">
+  <app-header title="" back="{{true}}"></app-header>
+  <view class="notice-head"><text class="notice-title">通知中心</text><button wx:if="{{unreadCount > 0}}" class="all-read {{busy ? 'is-disabled' : ''}}" hover-class="is-pressed" bindtap="markAll" disabled="{{busy}}">全部已读</button></view>
+  <view class="notice-surface">
+    <view class="filter-row"><view wx:for="{{filters}}" wx:key="value" class="filter {{filter === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseFilter">{{item.label}}</view></view>
+    <picker range="{{dayOptions}}" range-key="label" bindchange="chooseDays"><view class="date-filter"><view class="calendar-mark" aria-hidden="true"></view><text>近{{days}}天</text><view class="down-mark" aria-hidden="true"></view></view></picker>
+    <state-panel wx:if="{{loading}}" state="loading" message="正在读取通知"></state-panel>
+    <state-panel wx:elif="{{error && !rows.length}}" state="error" message="{{error}}" bind:retry="loadNotices"></state-panel>
+    <view wx:elif="{{!rows.length}}" class="empty"><text>{{filter === 'checkin' ? '暂无打卡通知' : '暂无通知'}}</text><button class="empty-refresh" bindtap="refreshNotices"><text>刷新通知</text></button></view>
+    <block wx:else>
+      <view wx:for="{{rows}}" wx:key="id" class="notice-row" data-id="{{item.id}}" bindtap="openNotice" hover-class="pressed" aria-role="button">
+        <view class="unread {{item.readAt ? 'read' : ''}}"></view>
+        <g0-icon name="{{item.kind === 'task_reviewed' || item.kind === 'task_returned' ? 'review' : item.kind === 'checkin_reminder' || item.kind === 'activity_published' ? 'calendar' : 'task'}}" tone="{{item.kind === 'task_reviewed' || item.kind === 'task_returned' ? 'ai' : item.kind === 'checkin_reminder' || item.kind === 'activity_published' ? 'yellow' : 'primary'}}" size="{{46}}"></g0-icon>
+        <view class="notice-copy"><view class="row-top"><text class="row-title">{{item.displayTitle}}</text><text class="row-time">{{item.timeLabel}}</text></view><text wx:if="{{item.displaySubtitle}}" class="row-summary">{{item.displaySubtitle}}</text></view><view class="arrow" aria-hidden="true"><view></view></view>
+      </view>
+      <view wx:if="{{error}}" class="retry" bindtap="loadMore">{{error}}　点击重试</view>
+      <button wx:if="{{hasMore}}" class="more" bindtap="loadMore" disabled="{{loadingMore}}">{{loadingMore ? '加载中…' : '加载更多'}}</button>
+    </block>
+  </view>
+</view></g0-page-shell>

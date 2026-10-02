@@ -1,5 +1,5 @@
 import { Task, TaskStatus } from '../../../domain/types'
-import { getTeacherTasks, previewTeacherTask, recycleTeacherTask } from '../../../services/app-service'
+import { copyTeacherTaskSnapshot, getTeacherTaskForEdit, getTeacherTasks, previewTeacherTask, recycleTeacherTask } from '../../../services/app-service'
 import { getSession, setCurrentTaskId, setTeacherTaskCopy } from '../../../session/session'
 import { createPageOperationId } from '../../../shared/write-intent'
 
@@ -20,6 +20,7 @@ function displayDate(value: string): string {
 Component({
   data: {
     loading: true, error: '', rows: [] as TaskReviewRow[], allRows: [] as TaskReviewRow[], keyword: '',
+    copyInProgress: false, copySourceKey: '', copyOperationId: '',
     typeFilter: '全部类型', statusFilter: '全部状态', dateFilter: '近 30 天', filterOpen: '', suppressClose: false,
     typeOptions: ['全部类型', '课堂任务'], statusOptions: STATUS_OPTIONS, dateOptions: DATE_OPTIONS,
   },
@@ -56,7 +57,17 @@ Component({
     closeMenus() { if (this.data.suppressClose) { this.setData({ suppressClose: false }); return } this.setData({ filterOpen: '', rows: this.data.rows.map(row => ({ ...row, menuOpen: false })) }) },
     toggleFilter(event: WechatMiniprogram.TouchEvent) { const key = event.currentTarget.dataset.key as string; this.setData({ filterOpen: this.data.filterOpen === key ? '' : key, suppressClose: true }) },
     chooseFilter(event: WechatMiniprogram.TouchEvent) { const key = event.currentTarget.dataset.key as 'type' | 'status' | 'date'; const value = event.currentTarget.dataset.value as string; const next = key === 'type' ? { typeFilter: value } : key === 'status' ? { statusFilter: value } : { dateFilter: value }; this.setData({ ...next, filterOpen: '', suppressClose: true }, () => this.applyFilters()) },
-    openReview(event: WechatMiniprogram.TouchEvent) { setCurrentTaskId(event.currentTarget.dataset.id as string); wx.navigateTo({ url: '/pages/teacher/completion/completion' }) },
+    openReview(event: WechatMiniprogram.TouchEvent) {
+      const id = event.currentTarget.dataset.id as string
+      const row = this.data.allRows.find(item => item.id === id)
+      if (!row) return
+      if (row.status === 'draft') {
+        wx.navigateTo({ url: `/pages/teacher/publish-task/publish-task?editTaskId=${encodeURIComponent(id)}` })
+        return
+      }
+      setCurrentTaskId(id)
+      wx.navigateTo({ url: '/pages/teacher/completion/completion' })
+    },
     toggleMenu(event: WechatMiniprogram.TouchEvent) { const id = event.currentTarget.dataset.id as string; this.setData({ suppressClose: true, rows: this.data.rows.map(row => ({ ...row, menuOpen: row.id === id ? !row.menuOpen : false })) }) },
     async moreAction(event: WechatMiniprogram.TouchEvent) {
       const action = event.currentTarget.dataset.action as string
@@ -64,15 +75,45 @@ Component({
       const session = getSession()
       if (!row || !session) return
       if (action === 'review') { setCurrentTaskId(row.id); wx.navigateTo({ url: '/pages/teacher/completion/completion' }); return }
-      if (action === 'preview' || action === 'copy') {
+      if (action === 'copy') {
+        if (this.data.copyInProgress) return
+        this.setData({ copyInProgress: true })
+        try {
+          const source = await getTeacherTaskForEdit(session.user.id, row.id)
+          if (!source.ok) { wx.showToast({ title: source.error.message, icon: 'none' }); return }
+          if (source.data.status === 'draft') { wx.showToast({ title: '草稿请直接编辑', icon: 'none' }); return }
+          if (!source.data.itemRefs.length || source.data.itemRefs.length !== source.data.items.length) {
+            wx.showToast({ title: '原任务内容快照不完整，无法再次布置', icon: 'none' }); return
+          }
+          const copySourceKey = `${source.data.taskId}:${source.data.version}`
+          const copyOperationId = this.data.copySourceKey === copySourceKey && this.data.copyOperationId
+            ? this.data.copyOperationId : createPageOperationId('copy_task')
+          this.setData({ copySourceKey, copyOperationId })
+          const copied = await copyTeacherTaskSnapshot(session.user.id, source.data.taskId,
+            source.data.version, copyOperationId)
+          if (!copied.ok) {
+            if (copied.error.code === 'CONFLICT' || copied.error.code === 'VALIDATION_ERROR') {
+              this.setData({ copySourceKey: '', copyOperationId: '' })
+            }
+            wx.showToast({ title: copied.error.message, icon: 'none' }); return
+          }
+          this.setData({ copySourceKey: '', copyOperationId: '' })
+          if (copied.data) {
+            wx.navigateTo({ url: `/pages/teacher/publish-task/publish-task?editTaskId=${encodeURIComponent(copied.data.taskId)}` })
+            return
+          }
+          setTeacherTaskCopy({ title: source.data.title, description: source.data.description ?? '',
+            itemRefs: source.data.itemRefs, items: source.data.items })
+          wx.navigateTo({ url: '/pages/teacher/publish-task/publish-task' })
+        } catch (_error: unknown) {
+          wx.showToast({ title: '复制暂未完成，请重试', icon: 'none' })
+        } finally { this.setData({ copyInProgress: false }) }
+        return
+      }
+      if (action === 'preview') {
         const result = await previewTeacherTask(session.user.id, row.id, row.version)
         if (!result.ok) { wx.showToast({ title: result.error.message, icon: 'none' }); return }
         const preview = result.data
-        if (action === 'copy') {
-          setTeacherTaskCopy({ title: preview.title, description: preview.description ?? '', items: preview.items.map(item => ({ resourceId: item.resourceId, type: item.type })) })
-          wx.navigateTo({ url: '/pages/teacher/publish-task/publish-task' })
-          return
-        }
         wx.showModal({ title: '学生视角预览', content: `${preview.title}\n${preview.description ?? '无额外要求'}\n内容：${preview.items.map(item => item.title).join('、') || '暂无内容'}\n截止：${displayDate(preview.dueAt)}`, showCancel: false })
         return
       }

@@ -1,0 +1,6 @@
+{
+  "deployable": false,
+  "scope": "student-works/staging",
+  "stagingClientWriteCondition": "auth != null && /^student-works\\/staging\\/[a-f0-9]+\\/[A-Za-z0-9_-]+\\.mp3$/.test(resource.path) && (resource.openid == auth.openid || resource.openid == auth.uid) && resource.size <= 20971520",
+  "privateClientReadWrite": false
+}

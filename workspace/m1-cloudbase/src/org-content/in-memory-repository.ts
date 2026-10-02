@@ -4,6 +4,11 @@ import type {
   ClassEntity,
   ClassMembershipEntity,
   LearningResourceEntity,
+  ExerciseResourceEntity,
+  SchoolQuestionFilters,
+  TaskCatalogFilters,
+  ReadingResourceEntity,
+  VocabularyResourceEntity,
   OrganizationAuditEntity,
   OrganizationEntity,
   ParentStudentLinkEntity,
@@ -260,6 +265,38 @@ export class InMemoryOrgContentRepository implements OrgContentRepository, OrgCo
 
   public async listLearningResources(organizationId: string, type: LearningResourceEntity['type']): Promise<readonly LearningResourceEntity[]> {
     return clone(this.resources.filter((item) => item.organizationId === organizationId && item.type === type));
+  }
+
+  public async listExerciseResourcePage(
+    organizationId: string,
+    filters: Omit<SchoolQuestionFilters, 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ExerciseResourceEntity | null)[]; hasMore: boolean }>> {
+    const matches = this.resources.filter((item): item is ExerciseResourceEntity => item.organizationId === organizationId
+      && item.type === 'exercise' && item.status === 'published')
+      .filter((item) => Object.entries(filters).every(([key, value]) => value === undefined || item[key as keyof ExerciseResourceEntity] === value))
+      .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+    return {
+      items: clone(matches.slice(page.offset, page.offset + page.limit)),
+      hasMore: matches.length > page.offset + page.limit,
+    };
+  }
+
+  public async listTaskCatalogResourcePage(
+    organizationId: string,
+    type: TaskCatalogFilters['type'],
+    filters: Omit<TaskCatalogFilters, 'type' | 'source' | 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ReadingResourceEntity | VocabularyResourceEntity | null)[]; hasMore: boolean }>> {
+    const matches = this.resources.filter((item): item is ReadingResourceEntity | VocabularyResourceEntity =>
+      item.organizationId === organizationId && item.type === type && item.status === 'published')
+      .filter((item) => Object.entries(filters).every(([key, value]) => value === undefined
+        || item[key as keyof (ReadingResourceEntity | VocabularyResourceEntity)] === value))
+      .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+    return {
+      items: clone(matches.slice(page.offset, page.offset + page.limit)),
+      hasMore: matches.length > page.offset + page.limit,
+    };
   }
 
   public async findLearningResource(organizationId: string, resourceId: string): Promise<LearningResourceEntity | null> {

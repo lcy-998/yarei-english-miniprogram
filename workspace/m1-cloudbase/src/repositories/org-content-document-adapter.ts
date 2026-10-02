@@ -3,6 +3,7 @@ import type { OrgContentIdempotencyBoundary } from '../org-content/idempotency';
 import type { OrgContentRepository, OrgContentTransaction } from '../org-content/repository';
 import {
   OrgContentError,
+  SCHOOL_QUESTION_TYPES,
   ROLE_PERMISSIONS,
   ROLE_SCOPE_TYPES,
   TEACHER_CLASS_PERMISSIONS,
@@ -10,6 +11,7 @@ import {
   type BindingCodeEntity,
   type ClassEntity,
   type ClassMembershipEntity,
+  type ExerciseResourceEntity,
   type LearningResourceEntity,
   type OrganizationAuditEntity,
   type OrganizationEntity,
@@ -19,6 +21,10 @@ import {
   type RelationshipAuditEntity,
   type ResourceVisibility,
   type RoleAssignmentEntity,
+  type SchoolQuestionFilters,
+  type TaskCatalogFilters,
+  type ReadingResourceEntity,
+  type VocabularyResourceEntity,
   type TeacherClassGrantEntity,
   type UserEntity,
   type VocabularyWordEntity,
@@ -101,14 +107,21 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
   }
 
   public async listUsers(organizationId: string): Promise<readonly UserEntity[]> {
-    const documents = await this.database.find(ORG_CONTENT_COLLECTIONS.users, {
-      organizationId,
-      deletedAt: null,
-    });
-    return compact(await Promise.all(documents.map(async (document) => this.decodeUserWithRoles(
-      document,
-      organizationId,
-    ))));
+    const [documents, assignments] = await Promise.all([
+      this.database.find(ORG_CONTENT_COLLECTIONS.users, { organizationId, deletedAt: null }),
+      this.listRoleAssignments(organizationId),
+    ]);
+    const rolesByUser = new Map<string, Set<UserEntity['roles'][number]>>();
+    for (const assignment of assignments) {
+      if (assignment.status !== 'active') continue;
+      const roles = rolesByUser.get(assignment.userId) ?? new Set<UserEntity['roles'][number]>();
+      roles.add(assignment.role);
+      rolesByUser.set(assignment.userId, roles);
+    }
+    return compact(documents.map(document => {
+      const base = decodeUser(document, organizationId);
+      return base === null ? null : { ...base, roles: [...(rolesByUser.get(base.id) ?? [])] };
+    }));
   }
 
   public async listUsersForClass(organizationId: string, classId: string): Promise<readonly UserEntity[]> {
@@ -319,6 +332,41 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
     });
     return documents.map((document) => decodeLearningResource(document, organizationId))
       .filter((item): item is LearningResourceEntity => item !== null && item.type === type);
+  }
+
+  public async listExerciseResourcePage(
+    organizationId: string,
+    filters: Omit<SchoolQuestionFilters, 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ExerciseResourceEntity | null)[]; hasMore: boolean }>> {
+    const criteria: Record<string, JsonValue> = { organizationId, type: 'exercise', status: 'published', deletedAt: null };
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined) criteria[key] = value;
+    const result = await this.database.findPage(ORG_CONTENT_COLLECTIONS.resources, criteria, page);
+    return {
+      items: result.items.map((document) => {
+        const resource = decodeLearningResource(document, organizationId);
+        return resource?.type === 'exercise' ? resource : null;
+      }),
+      hasMore: result.hasMore,
+    };
+  }
+
+  public async listTaskCatalogResourcePage(
+    organizationId: string,
+    type: TaskCatalogFilters['type'],
+    filters: Omit<TaskCatalogFilters, 'type' | 'source' | 'keyword' | 'targetClassIds'>,
+    page: Readonly<{ limit: number; offset: number }>,
+  ): Promise<Readonly<{ items: readonly (ReadingResourceEntity | VocabularyResourceEntity | null)[]; hasMore: boolean }>> {
+    const criteria: Record<string, JsonValue> = { organizationId, type, status: 'published', deletedAt: null };
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined) criteria[key] = value;
+    const result = await this.database.findPage(ORG_CONTENT_COLLECTIONS.resources, criteria, page);
+    return {
+      items: result.items.map((document) => {
+        const resource = decodeLearningResource(document, organizationId);
+        return resource?.type === type ? resource : null;
+      }),
+      hasMore: result.hasMore,
+    };
   }
 
   public async findLearningResource(
@@ -1442,10 +1490,15 @@ function decodeLearningResource(
       'original', 'synchronized', 'picture_book', 'current_events', 'chapter_book',
     ] as const) ?? (legacyChapters === null ? null : 'picture_book');
     const grade = readStringFrom(document, payload, 'grade') ?? (legacyChapters === null ? null : '未分级');
+    const term = readOptionalStringFrom(document, payload, 'term');
+    const textbook = readOptionalStringFrom(document, payload, 'textbook');
+    const unit = readOptionalStringFrom(document, payload, 'unit');
     const difficulty = readStringFrom(document, payload, 'difficulty') ?? (legacyChapters === null ? null : '基础');
+    const theme = readOptionalStringFrom(document, payload, 'theme');
     const chapters = decodeChapters(field(document, payload, 'chapters')) ?? legacyChapters;
     const searchText = readOptionalStringFrom(document, payload, 'searchText');
-    if (category === null || grade === null || difficulty === null || chapters === null || searchText === false) return null;
+    if (category === null || grade === null || term === false || textbook === false || unit === false
+      || difficulty === null || theme === false || chapters === null || searchText === false) return null;
     return {
       id: document._id,
       organizationId,
@@ -1457,7 +1510,11 @@ function decodeLearningResource(
       copyrightStatus,
       category,
       grade,
+      ...(term === undefined ? {} : { term }),
+      ...(textbook === undefined ? {} : { textbook }),
+      ...(unit === undefined ? {} : { unit }),
       difficulty,
+      ...(theme === undefined ? {} : { theme }),
       chapters,
       ...(legacyChapters === null ? {} : { taskOnly: true }),
       ...(searchText === undefined ? {} : { searchText }),
@@ -1466,9 +1523,11 @@ function decodeLearningResource(
 
   if (document.type === 'vocabulary') {
     const grade = readStringFrom(document, payload, 'grade');
+    const term = readOptionalStringFrom(document, payload, 'term');
+    const textbook = readOptionalStringFrom(document, payload, 'textbook');
     const unit = readStringFrom(document, payload, 'unit');
     const words = decodeWords(field(document, payload, 'words'));
-    if (grade === null || unit === null || words === null) return null;
+    if (grade === null || term === false || textbook === false || unit === null || words === null) return null;
     return {
       id: document._id,
       organizationId,
@@ -1479,8 +1538,41 @@ function decodeLearningResource(
       visibility,
       copyrightStatus,
       grade,
+      ...(term === undefined ? {} : { term }),
+      ...(textbook === undefined ? {} : { textbook }),
       unit,
       words,
+    };
+  }
+
+  if (document.type === 'exercise') {
+    if (!isJsonObject(document.payload)) return null;
+    if (typeof document.contentVersion !== 'number' || !Number.isSafeInteger(document.contentVersion)
+      || document.contentVersion < 1) return null;
+    const grade = readStringFrom(document, payload, 'grade');
+    const textbook = readOptionalStringFrom(document, payload, 'textbook');
+    const unit = readOptionalStringFrom(document, payload, 'unit');
+    const knowledgePoint = readOptionalStringFrom(document, payload, 'knowledgePoint');
+    const difficulty = readOptionalStringFrom(document, payload, 'difficulty');
+    const questionType = readEnum(field(document, payload, 'questionType'), SCHOOL_QUESTION_TYPES);
+    const stem = readStringFrom(document, payload, 'stem');
+    const options = readStringArray(payload, 'options');
+    const explanation = readStringFrom(document, payload, 'explanation');
+    const correctAnswer = field(document, payload, 'correctAnswer');
+    if (grade === null || textbook === false || unit === false || knowledgePoint === false || difficulty === false
+      || questionType === null || stem === null || options === null || explanation === null || correctAnswer === undefined
+      || !Array.isArray(payload.questionIds) || payload.questionIds.length !== 1 || payload.questionIds[0] !== document._id
+      || payload.questionType !== questionType
+      || payload.stem !== stem || JSON.stringify(payload.options) !== JSON.stringify(options)
+      || JSON.stringify(payload.correctAnswer) !== JSON.stringify(correctAnswer)
+      || payload.explanation !== explanation) return null;
+    return {
+      id: document._id, organizationId, type: 'exercise', title, contentVersion, status: 'published', visibility,
+      copyrightStatus, grade, questionType, stem, options, explanation, correctAnswer,
+      ...(textbook === undefined ? {} : { textbook }),
+      ...(unit === undefined ? {} : { unit }),
+      ...(knowledgePoint === undefined ? {} : { knowledgePoint }),
+      ...(difficulty === undefined ? {} : { difficulty }),
     };
   }
 

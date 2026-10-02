@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TrustedActorContext } from '../../src/auth/trusted-actor';
 import { ContentQueryService } from '../../src/org-content/content-service';
 import type { ReadingResourceEntity, RoleAssignmentEntity } from '../../src/org-content/types';
@@ -31,6 +31,16 @@ const teacherActor: TrustedActorContext = {
 };
 
 describe('org-content document repository', () => {
+  it('joins active roles for a user list in one scoped role query', async () => {
+    const database = seededDatabase();
+    const find = vi.spyOn(database, 'find');
+    const repository = createOrgContentDocumentRepository(database);
+    const users = await repository.listUsers(ORGANIZATION_ID);
+    expect(users.find(user => user.id === STUDENT_ID)?.roles).toEqual(['student']);
+    expect(users.some(user => user.id === 'student_other_tenant')).toBe(false);
+    expect(find.mock.calls.filter(([collection]) => collection === ORG_CONTENT_COLLECTIONS.roles)).toHaveLength(1);
+  });
+
   it('enforces tenant, soft-delete and active/published status boundaries on every scoped query', async () => {
     const repository = createOrgContentDocumentRepository(seededDatabase());
 
@@ -65,6 +75,11 @@ describe('org-content document repository', () => {
 
   it('supports content-query and never exposes private OCR/body/search fields in its safe view', async () => {
     const service = new ContentQueryService(createOrgContentDocumentRepository(seededDatabase()));
+
+    await expect(service.getMyClass(studentActor)).resolves.toEqual({
+      id: CLASS_ID, name: '虚构三年级 2 班', organizationName: '虚构学校', grade: '3', term: '上学期',
+      studentCount: 1, teacherNames: [],
+    });
 
     await expect(service.listReadingResources(studentActor)).resolves.toEqual([
       expect.objectContaining({ id: 'reading_published', title: '虚构绘本' }),

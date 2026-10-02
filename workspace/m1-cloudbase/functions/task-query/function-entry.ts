@@ -17,7 +17,7 @@ export function createTaskQueryFunction(dependencies: TaskQueryFunctionDependenc
       switch (input.action) {
         case 'getTeacherWorkbench': return dependencies.handler.getTeacherWorkbench(actor, input.date, input.classId);
         case 'listTeacherTasks': return dependencies.handler.listTeacherTasks(actor, input.filters, input.page);
-        case 'getDraftOptions': return dependencies.handler.getDraftOptions(actor);
+        case 'getDraftOptions': return dependencies.handler.getDraftOptions(actor, input.catalogMode);
         case 'previewTask': return dependencies.handler.previewTask(actor, input.preview);
         case 'getTaskForEdit': return dependencies.handler.getTaskForEdit(actor, input.taskId);
         case 'getCompletion': return dependencies.handler.getCompletion(actor, input.taskId, input.filter, input.page);

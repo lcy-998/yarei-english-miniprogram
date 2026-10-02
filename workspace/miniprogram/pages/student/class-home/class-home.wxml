@@ -1,0 +1,33 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page class-home">
+    <app-header title="我的班级"></app-header>
+    <view class="class-content">
+      <state-panel wx:if="{{loading && !classInfo}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error && !classInfo}}" state="error" message="{{error}}" bind:retry="loadClass"></state-panel>
+      <view wx:if="{{classInfo}}">
+        <view class="class-hero m1-card">
+          <text class="class-eyebrow">我的班级</text>
+          <text class="class-name">{{classInfo.name}}</text>
+          <text class="school-name">{{classInfo.organizationName}}</text>
+          <view class="class-facts">
+            <view class="fact-card"><view class="fact-icon students-icon" aria-hidden="true"><view class="person-head"></view><view class="person-body"></view></view><view class="fact-copy"><text class="fact-label">班级同学</text><text class="fact-value">{{classInfo.studentCount}} 名</text></view></view>
+            <view class="fact-card"><view class="fact-icon teacher-icon" aria-hidden="true"><view class="person-head"></view><view class="person-body"></view></view><view class="fact-copy"><text class="fact-label">班级教师</text><text class="fact-value">{{teacherLabel}}</text></view></view>
+          </view>
+          <text wx:if="{{error}}" class="m1-inline-error">{{error}}　请下拉或点击重试</text>
+        </view>
+        <view class="class-section material-section m1-card">
+          <view class="section-heading"><view class="section-icon book-icon" aria-hidden="true"><view class="book-page"></view></view><text class="m1-section-title">班级教材</text></view>
+          <view class="material-empty"><text class="section-main">暂无已发布的班级教材</text><text class="section-sub">教材配置发布后会显示在这里</text></view>
+        </view>
+        <view class="class-section activity-section m1-card"><view class="section-heading"><view class="section-icon calendar-icon" aria-hidden="true"><text>✓</text></view><text class="m1-section-title">打卡活动</text></view>
+          <text wx:if="{{activitiesLoading}}" class="section-sub">正在加载活动…</text>
+          <text wx:if="{{activityError}}" class="section-sub">{{activityError}}　请稍后重试</text>
+          <view wx:for="{{activities}}" wx:key="id" class="activity-card"><text class="section-main">{{item.title}}</text><text class="section-sub">{{item.schedule.startsOn}} 至 {{item.schedule.endsOn}}</text><text class="activity-meta">休息日 {{item.schedule.restDates.length}} 天</text><button class="board-link" data-id="{{item.id}}" bindtap="openActivity">查看打卡任务 <text aria-hidden="true">›</text></button><button class="board-link board-link--secondary" data-id="{{item.id}}" bindtap="openLeaderboard">查看班级榜单 <text aria-hidden="true">›</text></button></view>
+          <text wx:if="{{!activities.length && !activitiesLoading && !activityError}}" class="section-sub">当前暂无可查看的打卡活动</text>
+        </view>
+      </view>
+      <button wx:if="{{classInfo && error}}" class="class-retry" bindtap="loadClass">重新加载班级资料</button>
+    </view>
+    <g0-tab-bar role="student" active="class"></g0-tab-bar>
+  </view>
+</g0-page-shell>

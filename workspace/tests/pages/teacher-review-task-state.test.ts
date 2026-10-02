@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { currentReviewTaskFirst, filterReviewRowsByClass, parseReviewScoreInput, reviewClassOptions, reviewTaskOptions, selectReviewRows, selectedReviewTaskId } from '../../miniprogram/pages/teacher/review-task/review-task-state'
+import { currentReviewTaskFirst, filterReviewRowsByClass, parseReviewScoreInput, reviewClassOptions, reviewQueueOverview, reviewTaskOptions, selectReviewRows, selectedReviewTaskId } from '../../miniprogram/pages/teacher/review-task/review-task-state'
 import type { ReviewAssignmentView } from '../../miniprogram/services/app-service'
 
 const rows: ReviewAssignmentView[] = [
@@ -15,6 +15,8 @@ describe('教师逐人检查与只读详情入口', () => {
 
   it('快速点评入口仍只展示待点评队列', () => {
     expect(selectReviewRows(rows, '')).toMatchObject({ rows: [{ assignmentId: 'a_pending' }], readOnlyMode: false })
+    expect(reviewQueueOverview(rows)).toEqual({ assignedCount: 3, pendingCount: 1,
+      reviewedCount: 1, withoutPendingCount: 1 })
   })
 })
 

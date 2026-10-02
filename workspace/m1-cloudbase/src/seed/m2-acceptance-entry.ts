@@ -1,0 +1,17 @@
+export { createCloudBaseDocumentDatabase } from '../repositories/cloudbase-document-database';
+export { createIdentityDocumentRepository } from '../repositories/identity-session-document-adapter';
+export { createTaskCoreDocumentRepository } from '../repositories/task-core-document-adapter';
+export { createTaskQueryDocumentRepository } from '../repositories/task-query-document-adapter';
+export { createOrgContentDocumentRepository } from '../repositories/org-content-document-adapter';
+export { TaskCoreService } from '../task-core/task-core-service';
+export { StudentTaskQueryService, TeacherTaskQueryService, ReviewQueryService } from '../task-query/service';
+export { ActivityService } from '../activity/activity-service';
+export { DocumentActivityRepository } from '../activity/document-repository';
+export { TextbookAdminService } from '../textbook/admin-service';
+export { StudentWorkService } from '../student-work/service';
+export { DocumentStudentWorkRepository } from '../student-work/document-repository';
+export { CloudBaseRecordingSeal } from '../student-work/cloudbase-recording-seal';
+export { CloudBaseWorkPlayback } from '../student-work/cloudbase-playback';
+export { StudentWorkAdminService } from '../student-work/admin-service';
+export { PhonicsService } from '../phonics/service';
+export { DocumentPhonicsRepository } from '../phonics/document-repository';

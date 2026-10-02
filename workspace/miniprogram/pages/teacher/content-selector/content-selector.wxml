@@ -1,0 +1,61 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="m1-page catalog-page">
+    <app-header title="选择任务内容" back="{{true}}" backUrl="/pages/teacher/publish-task/publish-task" backIntercept="{{true}}" bind:back="onNavigateBack"></app-header>
+    <view class="catalog-content">
+      <scroll-view scroll-x="{{true}}" class="type-strip">
+        <view wx:for="{{types}}" wx:key="value" class="type-tab {{activeType === item.value ? 'active' : ''}}" data-type="{{item.value}}" bindtap="chooseType" aria-role="button" aria-label="{{item.label}}{{item.locked ? '，M3 开放' : ''}}">
+          <g0-icon name="{{item.icon}}" tone="{{item.tone}}" size="{{44}}"></g0-icon>
+          <text>{{item.label}}</text><text wx:if="{{item.locked}}" class="type-stage">M3</text>
+        </view>
+      </scroll-view>
+      <view class="search-card m1-card">
+        <text class="source-label">{{activeType === 'reading' ? '阅读书籍' : activeType === 'vocabulary' ? '词包' : activeType === 'exercise' ? '学校习题库' : '教学素材'}}</text>
+        <view wx:if="{{activeType === 'reading' || activeType === 'vocabulary' || activeType === 'exercise' || activeType === 'recording'}}" class="search-line">
+          <input value="{{keyword}}" placeholder="搜索当前类型的资源" bindinput="onKeyword" confirm-type="search" bindconfirm="search"/>
+          <view class="search-action {{loading ? 'disabled' : ''}}" bindtap="search" hover-class="pressed" aria-role="button" aria-label="查找资源">查找</view>
+        </view>
+        <view wx:if="{{activeType === 'reading'}}" class="reading-category-section">
+          <text class="reading-category-title">按阅读分类</text>
+          <view class="reading-category-strip">
+            <view wx:for="{{readingCategories}}" wx:key="value" class="reading-category-chip {{readingCategory === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseReadingCategory" hover-class="pressed" aria-role="button" aria-label="{{item.label}}">{{item.label}}</view>
+          </view>
+        </view>
+        <view wx:if="{{activeType === 'reading' || activeType === 'vocabulary'}}" class="catalog-filter-grid">
+          <picker range="{{facetOptions.sources}}" range-key="label" data-key="source" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{source === 'reading_book' ? '阅读书籍' : source === 'synchronized_textbook' ? '同步学教材' : source === 'word_pack' ? '词包' : '全部来源'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.grades}}" range-key="label" data-key="grade" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{grade || '全部年级'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.terms}}" range-key="label" data-key="term" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{term || '全部学期'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.textbooks}}" range-key="label" data-key="textbook" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{textbook === '__unlabeled_textbook__' ? '未标注教材' : textbook || '全部教材'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.units}}" range-key="label" data-key="unit" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{unit || '全部单元'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.difficulties}}" range-key="label" data-key="difficulty" bindchange="chooseFacet"><view class="catalog-filter-picker"><text class="catalog-filter-text">{{difficulty || '全部难度'}}</text><view class="catalog-filter-chevron" aria-hidden="true"></view></view></picker>
+        </view>
+        <button wx:if="{{activeType === 'exercise'}}" class="advanced-button" bindtap="openQuestionLibrary">按年级、教材、单元、知识点筛选 ›</button>
+      </view>
+      <state-panel wx:if="{{loading && !rows.length}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error && !rows.length}}" state="error" message="{{error}}" bind:retry="retry"></state-panel>
+      <view wx:else>
+        <text wx:if="{{error}}" class="catalog-error">{{error}}</text>
+        <view wx:for="{{rows}}" wx:key="id" class="catalog-card m1-card">
+          <view class="catalog-card-main">
+            <view class="select-button {{item.selected ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="toggleRow" aria-role="button" aria-label="{{item.selected ? '移除内容' : '添加内容'}}">{{item.selected ? '✓' : '+'}}</view>
+            <image wx:if="{{item.id === 'res_reading_zoo_demo' || item.id === 'book_zoo'}}" class="catalog-cover" src="/assets/content/demo-zoo-cover-thumb-v1.png" mode="aspectFit" aria-hidden="true"></image>
+            <image wx:elif="{{item.id === 'res_m2_sync_book_outline_demo'}}" class="catalog-cover" src="/assets/content/demo-sync-textbook-cover-thumb-v1.png" mode="aspectFit" aria-hidden="true"></image>
+            <view wx:elif="{{item.type === 'reading'}}" class="catalog-cover catalog-cover--icon"><g0-icon name="reading" size="{{36}}"></g0-icon></view>
+            <view class="catalog-copy"><text class="catalog-source">{{item.source}}</text><text class="catalog-title">{{item.title}}</text><text class="catalog-detail">{{item.detail}}</text></view>
+          </view>
+          <view class="catalog-card-actions"><view class="preview-button" data-id="{{item.id}}" bindtap="previewRow" aria-role="button" aria-label="预览{{item.title}}">预览内容</view></view>
+        </view>
+        <view wx:if="{{!rows.length && !error && nextOffset === null}}" class="empty-card m1-card">{{emptyMessage}}</view>
+        <view wx:if="{{!rows.length && !error && nextOffset !== null}}" class="empty-card m1-card">本批暂未找到匹配内容，目录中还有资源可继续查找。</view>
+        <button wx:if="{{nextOffset !== null}}" class="more-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">{{rows.length ? '加载更多' : '继续查找'}}</button>
+      </view>
+    </view>
+    <view class="selected-panel">
+      <view class="selected-head"><text>已选 {{selected.length}} 项</text><text>跨类型与筛选保留</text></view>
+      <scroll-view scroll-y="{{true}}" class="selected-list {{selected.length === 1 ? 'one-item' : ''}} {{selected.length > 1 ? 'has-items' : ''}}">
+        <view wx:for="{{selected}}" wx:key="id" class="selected-chip {{item.invalid ? 'invalid' : ''}}"><text class="selected-title">{{item.title}}</text><button data-id="{{item.id}}" bindtap="removeSelected" aria-label="移除{{item.title}}">×</button></view>
+        <text wx:if="{{!selected.length}}" class="selected-empty">请选择至少一项内容</text>
+      </scroll-view>
+      <button class="confirm-button" loading="{{confirming}}" disabled="{{confirming || !selected.length}}" bindtap="confirmSelection">确认并返回布置任务</button>
+    </view>
+  </view>
+</g0-page-shell>

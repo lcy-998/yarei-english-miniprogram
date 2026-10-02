@@ -16,8 +16,10 @@ const unavailable = createUnconfiguredFunction(
 
 export const main = createDefaultCloudBaseContentQueryFunction(
   unavailable,
-  (_capabilities, infrastructure) => createContentQueryFunction({
+  (capabilities, infrastructure) => createContentQueryFunction({
     ...infrastructure,
     handler: infrastructure.handler,
+    ...(capabilities.playbackStorage === undefined
+      ? {} : { readingMediaStorage: capabilities.playbackStorage }),
   }),
 );

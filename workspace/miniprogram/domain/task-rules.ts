@@ -41,8 +41,9 @@ export function getTodayAssignments(tasks: Task[], assignments: TaskAssignment[]
     .filter(item => item.studentId === studentId)
     .flatMap(item => {
       const task = taskById.get(item.taskId)
-      if (!task || task.status === 'draft') return []
-      const urgent = item.status === 'overdue' || item.status === 'redo_required' || Boolean(item.redoDueAt)
+      if (!task || task.status === 'draft' || task.status === 'withdrawn') return []
+      const urgent = item.status === 'overdue' || item.status === 'redo_required'
+        || (item.status !== 'completed' && item.status !== 'awaiting_review' && Boolean(item.redoDueAt))
       return urgent || localTaskDate(task.startsAt) === localDate || localTaskDate(task.dueAt) === localDate ? [{ task, assignment: item }] : []
     })
     .sort((a, b) => {

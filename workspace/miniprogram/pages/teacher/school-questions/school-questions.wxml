@@ -1,0 +1,35 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="m1-page question-page">
+    <app-header title="学校习题库" back="{{true}}" backUrl="/pages/teacher/materials-home/materials-home" backIntercept="{{true}}" bind:back="onNavigateBack"></app-header>
+    <view class="question-content">
+      <view class="readonly-banner">学校题库只读，仅可预览和引用</view>
+      <view class="question-filters m1-card">
+        <input class="question-search" placeholder="搜索题目或知识点" value="{{keyword}}" data-key="keyword" bindinput="onFilterInput"/>
+        <view class="filter-grid">
+          <picker range="{{facetOptions.grades}}" data-key="grade" bindchange="chooseFacet"><view class="facet-picker"><text class="facet-label">{{grade || '全部年级'}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.textbooks}}" data-key="textbook" bindchange="chooseFacet"><view class="facet-picker"><text class="facet-label">{{textbook || '全部教材'}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.units}}" data-key="unit" bindchange="chooseFacet"><view class="facet-picker"><text class="facet-label">{{unit || '全部单元'}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.knowledgePoints}}" data-key="knowledgePoint" bindchange="chooseFacet"><view class="facet-picker"><text class="facet-label">{{knowledgePoint || '全部知识点'}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{typeChoices}}" range-key="label" value="{{questionTypeIndex}}" bindchange="chooseQuestionTypePicker"><view class="facet-picker"><text class="facet-label">{{questionTypeLabel}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+          <picker range="{{facetOptions.difficulties}}" data-key="difficulty" bindchange="chooseFacet"><view class="facet-picker"><text class="facet-label">{{difficulty || '全部难度'}}</text><view class="facet-chevron" aria-hidden="true"></view></view></picker>
+        </view>
+        <button class="filter-submit" bindtap="loadQuestions" disabled="{{loading}}">按条件查找</button>
+      </view>
+      <state-panel wx:if="{{loading && !rawQuestions.length}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error && !rawQuestions.length}}" state="error" message="{{error}}" bind:retry="reload"></state-panel>
+      <view wx:else>
+        <text wx:if="{{error}}" class="question-error">{{error}}</text>
+        <view wx:for="{{questions}}" wx:key="id" class="question-card m1-card">
+          <button class="question-check {{item.selected ? 'selected' : ''}}" aria-label="{{item.selected ? '取消选择' : '选择题目'}}" data-id="{{item.id}}" bindtap="toggleQuestion">{{item.selected ? '✓' : ''}}</button>
+          <view class="question-copy"><view class="question-tags"><text>{{item.typeLabel}}</text><text>{{item.grade}}</text><text wx:if="{{item.unit}}">{{item.unit}}</text><text wx:if="{{item.difficulty}}">{{item.difficulty}}</text></view><text class="question-stem">{{item.stemSummary}}</text><text wx:if="{{item.knowledgePoint}}" class="question-point">{{item.knowledgePoint}}</text></view>
+          <button class="preview-button" data-id="{{item.id}}" bindtap="previewQuestion">预览</button>
+        </view>
+        <view wx:if="{{!questions.length && !error && nextOffset === null}}" class="question-empty m1-card">当前条件下暂无授权题目，可调整筛选后重试。</view>
+        <view wx:if="{{!questions.length && !error && nextOffset !== null}}" class="question-empty m1-card">本批暂未找到匹配题目，目录中还有题目可继续查找。</view>
+        <button wx:if="{{nextOffset !== null}}" class="more-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">{{questions.length ? '加载更多' : '继续查找'}}</button>
+      </view>
+    </view>
+    <view class="question-footer"><text>已选 <text class="selected-count">{{selected.length}}</text> 题</text><button class="clear-button" bindtap="clearSelected">清空</button><button class="confirm-button" loading="{{confirming}}" disabled="{{confirming || !selected.length}}" bindtap="confirmCitation">确认引用</button></view>
+    <view wx:if="{{preview || previewError}}" class="preview-overlay" bindtap="closePreview"><view class="preview-sheet" catchtap="noop"><view class="preview-head"><text>题目预览</text><button bindtap="closePreview">关闭</button></view><text wx:if="{{previewError}}" class="question-error">{{previewError}}</text><view wx:if="{{preview}}"><text class="preview-stem">{{preview.stem}}</text><text wx:for="{{preview.options}}" wx:key="*this" class="preview-option">{{item}}</text><view class="answer-box">正确答案　{{answerLabel}}</view><view class="explanation-box">解析　{{preview.explanation}}</view><text class="preview-meta">{{preview.grade}}　{{preview.unit}}　{{preview.knowledgePoint}}　{{preview.difficulty}}</text><button class="preview-select" data-id="{{preview.id}}" bindtap="toggleQuestion">选择或移除本题</button></view></view></view>
+  </view>
+</g0-page-shell>

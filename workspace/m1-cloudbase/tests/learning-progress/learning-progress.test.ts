@@ -17,6 +17,7 @@ const teacher: TrustedActorContext = { ...student, actorUserId: 'teacher_lin', a
 const resources: LearningResourceAccessRecord[] = [
   {
     id: 'read_zoo', organizationId: 'org_demo', type: 'reading', status: 'published',
+    contentVersion: 'demo-v1',
     allowedStudentIds: ['student_xiaoyu'],
     pages: [
       { id: 'page_1', chapterId: 'chapter_1', pageNumber: 1 },
@@ -61,6 +62,9 @@ describe('M1 learning progress persistence', () => {
     });
     expect(saved).toMatchObject({ resourceId: 'read_zoo', chapterId: 'chapter_1', pageId: 'page_2', pageNumber: 2, favorite: true, version: 1 });
     expect(await service.getReadingProgress(student, 'read_zoo')).toEqual(saved);
+    expect(await repository.listReadingPageEvents('org_demo', 'student_xiaoyu', 'read_zoo')).toEqual([expect.objectContaining({
+      pageId: 'page_2', pageNumber: 2, progressVersion: 1, contentVersion: 'demo-v1', visitedAt: NOW,
+    })]);
     await expect(service.getReadingProgress(teacher, 'read_zoo')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(repository.debugSnapshot().audits).toEqual([
       expect.objectContaining({ action: 'reading_progress.saved', actorUserId: 'student_xiaoyu', result: 'succeeded' }),
@@ -76,6 +80,7 @@ describe('M1 learning progress persistence', () => {
     const first = await service.saveReadingProgress(student, input);
     expect(await service.saveReadingProgress(student, input)).toEqual(first);
     expect(repository.debugSnapshot().readingProgress).toHaveLength(1);
+    expect(repository.debugSnapshot().readingPageEvents).toHaveLength(1);
     expect(repository.debugSnapshot().audits.filter(item => item.result === 'succeeded')).toHaveLength(1);
 
     await expect(service.saveReadingProgress(student, { ...input, operationId: 'operation_reading_0003', favorite: true }))
@@ -83,6 +88,7 @@ describe('M1 learning progress persistence', () => {
     await expect(service.saveReadingProgress(student, { ...input, pageId: 'page_2' }))
       .rejects.toMatchObject({ code: 'CONFLICT' });
     expect(repository.debugSnapshot().audits.filter(item => item.result === 'denied')).toHaveLength(2);
+    expect(repository.debugSnapshot().readingPageEvents).toHaveLength(1);
   });
 
   it('serializes concurrent first writes so only one CAS update commits', async () => {
@@ -101,6 +107,7 @@ describe('M1 learning progress persistence', () => {
     expect(results.filter(item => item.status === 'rejected')).toHaveLength(1);
     expect(repository.debugSnapshot().readingProgress).toHaveLength(1);
     expect(repository.debugSnapshot().readingProgress[0]?.version).toBe(1);
+    expect(repository.debugSnapshot().readingPageEvents).toHaveLength(1);
   });
 
   it('stores vocabulary completion, calculated accuracy and validated wrong words', async () => {

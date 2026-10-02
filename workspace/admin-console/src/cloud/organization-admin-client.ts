@@ -2,10 +2,17 @@ import type {
   AdminAuditErrorCode,
   AdminAuditLogFilter,
   AdminAuditLogView,
+  AdminQuestionDetail,
+  AdminQuestionFilters,
+  AdminQuestionSummary,
+  AdminQuestionVisibility,
   AdminClassView,
   AdminCloudResult,
   AdminDashboardFilter,
   AdminDashboardOverviewView,
+  DeletedWorkDraftPage,
+  DeletedWorkDraftSummary,
+  RestoredWorkDraftView,
   AdminPageRequest,
   AdminPageView,
   AdminRoleAssignmentView,
@@ -21,11 +28,22 @@ import type {
 import type { AdminCloudTransport } from './admin-cloud-transport';
 
 export interface OrganizationAdminClient {
+  listAdminQuestions(input: Readonly<{ filters?: AdminQuestionFilters; page: AdminPageRequest }>): Promise<AdminCloudResult<AdminPageView<AdminQuestionSummary>>>;
+  getAdminQuestion(id: string): Promise<AdminCloudResult<AdminQuestionDetail>>;
+  setQuestionVisibility(input: Readonly<{ id: string; visibility: AdminQuestionVisibility; reason: string;
+    expectedVersion: number; operationId: string }>): Promise<AdminCloudResult<AdminQuestionDetail>>;
+  batchSetQuestionVisibility(input: Readonly<{ items: readonly Readonly<{ id: string; expectedVersion: number }>[];
+    visibility: AdminQuestionVisibility; reason: string; operationId: string }>): Promise<AdminCloudResult<readonly AdminQuestionDetail[]>>;
+  batchSetQuestionStatus(input: Readonly<{ items: readonly Readonly<{ id: string; expectedVersion: number }>[];
+    status: 'published' | 'offline'; reason: string; operationId: string }>): Promise<AdminCloudResult<readonly AdminQuestionDetail[]>>;
   listClasses(): Promise<AdminCloudResult<readonly AdminClassView[]>>;
   getDashboardOverview(filter?: AdminDashboardFilter): Promise<AdminCloudResult<AdminDashboardOverviewView>>;
   listRoleAssignments(input: Readonly<{ filter?: AdminRoleAssignmentFilter; page: AdminPageRequest }>): Promise<AdminCloudResult<AdminPageView<AdminRoleAssignmentView>>>;
   listAuditLogs(input: Readonly<{ filter?: AdminAuditLogFilter; page: AdminPageRequest }>): Promise<AdminCloudResult<AdminPageView<AdminAuditLogView>>>;
   listUsers(filter?: Readonly<{ classId?: string; role?: UserRole; status?: 'active' | 'disabled'; keyword?: string }>): Promise<AdminCloudResult<readonly AdminUserView[]>>;
+  listDeletedWorkDrafts(input: Readonly<{ studentId: string; page: AdminPageRequest }>): Promise<AdminCloudResult<DeletedWorkDraftPage>>;
+  restoreWorkDraft(input: Readonly<{ studentId: string; workId: string; reason: string;
+    expectedVersion: number; operationId: string }>): Promise<AdminCloudResult<RestoredWorkDraftView>>;
   createClass(input: ClassWriteInput & Readonly<{ expectedVersion: 1; operationId: string }>): Promise<AdminCloudResult<AdminClassView>>;
   updateClass(input: ClassWriteInput & Readonly<{ classId: string; expectedVersion: number; operationId: string }>): Promise<AdminCloudResult<AdminClassView>>;
   disableClass(input: Readonly<{ classId: string; reason: string; expectedVersion: number; operationId: string }>): Promise<AdminCloudResult<AdminClassView>>;
@@ -44,6 +62,18 @@ interface TeacherGrantInput { readonly teacherId: string; readonly classId: stri
 
 export function createOrganizationAdminClient(transport: AdminCloudTransport): OrganizationAdminClient {
   return {
+    listAdminQuestions: input => invokeAndParse(transport,
+      { action: 'listAdminQuestions', payload: { filters: input.filters ?? {}, page: input.page } },
+      value => parsePage(value, parseQuestionSummary, input.page)),
+    getAdminQuestion: id => invokeAndParse(transport, { action: 'getAdminQuestion', payload: { id } }, parseQuestionDetail),
+    setQuestionVisibility: input => invokeAndParse(transport,
+      writeCall('setQuestionVisibility', input, ['id', 'visibility', 'reason']), parseQuestionDetail),
+    batchSetQuestionVisibility: input => invokeAndParse(transport,
+      { action: 'batchSetQuestionVisibility', payload: { items: input.items, visibility: input.visibility, reason: input.reason },
+        expectedVersion: 1, operationId: input.operationId }, value => parseList(value, parseQuestionDetail)),
+    batchSetQuestionStatus: input => invokeAndParse(transport,
+      { action: 'batchSetQuestionStatus', payload: { items: input.items, status: input.status, reason: input.reason },
+        expectedVersion: 1, operationId: input.operationId }, value => parseList(value, parseQuestionDetail)),
     listClasses: () => invokeAndParse(transport, { action: 'listClasses', payload: {} }, parseClassList),
     getDashboardOverview: (filter = {}) => invokeAndParse(transport, { action: 'getDashboardOverview', payload: filter }, parseDashboardOverview),
     listRoleAssignments: (input) => invokeAndParse(
@@ -57,6 +87,12 @@ export function createOrganizationAdminClient(transport: AdminCloudTransport): O
       (value) => parsePage(value, parseAuditLog, input.page),
     ),
     listUsers: (filter = {}) => invokeAndParse(transport, { action: 'listUsers', payload: filter }, parseUserList),
+    listDeletedWorkDrafts: input => invokeAndParse(transport,
+      { action: 'listDeletedWorkDrafts', payload: { studentId: input.studentId, page: input.page } },
+      value => parseDeletedWorkDraftPage(value, input.studentId, input.page)),
+    restoreWorkDraft: input => invokeAndParse(transport,
+      writeCall('restoreWorkDraft', input, ['studentId', 'workId', 'reason']),
+      value => parseRestoredWorkDraft(value, input.studentId, input.workId)),
     createClass: (input) => invokeAndParse(transport, writeCall('createClass', input, ['name', 'grade', 'term', 'reason']), parseClass),
     updateClass: (input) => invokeAndParse(transport, writeCall('updateClass', input, ['classId', 'name', 'grade', 'term', 'reason']), parseClass),
     disableClass: (input) => invokeAndParse(transport, writeCall('disableClass', input, ['classId', 'reason']), parseClass),
@@ -107,6 +143,86 @@ function parseUser(value: unknown): AdminUserView | null {
   const classIds = optionalStringArray(value.classIds);
   if (roles === null || classIds === null || (bindingCount !== undefined && (typeof bindingCount !== 'number' || !Number.isSafeInteger(bindingCount) || bindingCount < 0))) return null;
   return { id, displayName, displayNameMasked, roles, status, version, ...(mobileMasked === undefined ? {} : { mobileMasked }), ...(studentNumber === undefined ? {} : { studentNumber }), ...(classIds === undefined ? {} : { classIds }), ...(bindingCount === undefined ? {} : { bindingCount }) };
+}
+
+function parseDeletedWorkDraftPage(value: unknown, studentId: string, page: AdminPageRequest): DeletedWorkDraftPage | null {
+  if (!exactRecord(value, ['items', 'nextOffset']) || !Array.isArray(value.items)
+    || value.items.length > page.limit) return null;
+  const items: DeletedWorkDraftSummary[] = [];
+  for (const item of value.items) {
+    const parsed = parseDeletedWorkDraft(item, studentId);
+    if (parsed === null) return null;
+    items.push(parsed);
+  }
+  if (value.nextOffset !== null && (!Number.isSafeInteger(value.nextOffset)
+    || value.nextOffset !== page.offset + page.limit || items.length !== page.limit)) return null;
+  return { items, nextOffset: value.nextOffset as number | null };
+}
+
+function parseDeletedWorkDraft(value: unknown, studentId: string): DeletedWorkDraftSummary | null {
+  if (!exactRecord(value, ['id', 'studentId', 'materialId', 'version', 'deletedAt', 'recoverableUntil',
+    'stagingCleanupStatus', 'restorable', 'blockedReason'], ['materialTitle'])) return null;
+  if (!isString(value.id) || value.studentId !== studentId || !isString(value.materialId)
+    || !isVersion(value.version) || typeof value.deletedAt !== 'string' || !isIsoDateTime(value.deletedAt)
+    || typeof value.recoverableUntil !== 'string' || !isIsoDateTime(value.recoverableUntil)
+    || !['none', 'deleting', 'deleted', 'unknown'].includes(String(value.stagingCleanupStatus))
+    || typeof value.restorable !== 'boolean'
+    || value.blockedReason !== null && !['expired', 'cleanup_locked', 'staging_deleted', 'invalid_record'].includes(String(value.blockedReason))
+    || value.restorable !== (value.blockedReason === null)
+    || value.materialTitle !== undefined && value.materialTitle !== null && typeof value.materialTitle !== 'string') return null;
+  return { id: value.id, studentId, materialId: value.materialId, version: value.version,
+    deletedAt: value.deletedAt, recoverableUntil: value.recoverableUntil,
+    stagingCleanupStatus: value.stagingCleanupStatus as DeletedWorkDraftSummary['stagingCleanupStatus'],
+    restorable: value.restorable, blockedReason: value.blockedReason as DeletedWorkDraftSummary['blockedReason'],
+    ...(value.materialTitle === undefined ? {} : { materialTitle: value.materialTitle as string | null }) };
+}
+
+function parseRestoredWorkDraft(value: unknown, studentId: string, workId: string): RestoredWorkDraftView | null {
+  if (!exactRecord(value, ['id', 'studentId', 'materialId', 'version', 'restoredAt', 'restoredByUserId'])
+    || value.id !== workId || value.studentId !== studentId || !isString(value.materialId)
+    || !isVersion(value.version) || typeof value.restoredAt !== 'string'
+    || !isIsoDateTime(value.restoredAt) || !isString(value.restoredByUserId)) return null;
+  return { id: workId, studentId, materialId: value.materialId, version: value.version,
+    restoredAt: value.restoredAt, restoredByUserId: value.restoredByUserId };
+}
+
+function parseQuestionVisibility(value: unknown): AdminQuestionVisibility | null {
+  if (exactRecord(value, ['type']) && value.type === 'organization') return { type: 'organization' };
+  if (exactRecord(value, ['type', 'classIds']) && value.type === 'classes') {
+    const classIds = optionalStringArray(value.classIds);
+    return classIds && classIds.length > 0 ? { type: 'classes', classIds } : null;
+  }
+  return null;
+}
+
+function parseQuestionSummary(value: unknown): AdminQuestionSummary | null {
+  if (!exactRecord(value, ['id', 'title', 'stemSummary', 'grade', 'unit', 'difficulty', 'knowledgePoint', 'questionType',
+    'status', 'visibility', 'updatedAt', 'version'])) return null;
+  const visibility = parseQuestionVisibility(value.visibility);
+  if (!isString(value.id) || !isString(value.title) || typeof value.stemSummary !== 'string'
+    || !isString(value.grade) || value.unit !== null && typeof value.unit !== 'string'
+    || value.difficulty !== null && typeof value.difficulty !== 'string'
+    || value.knowledgePoint !== null && typeof value.knowledgePoint !== 'string'
+    || !['single_choice', 'multiple_choice', 'fill', 'subjective'].includes(String(value.questionType))
+    || !['draft', 'published', 'offline'].includes(String(value.status)) || !visibility
+    || value.updatedAt !== null && (typeof value.updatedAt !== 'string' || !isIsoDateTime(value.updatedAt))
+    || !isVersion(value.version)) return null;
+  return { id: value.id, title: value.title, stemSummary: value.stemSummary, grade: value.grade,
+    unit: value.unit as string | null, difficulty: value.difficulty as string | null,
+    knowledgePoint: value.knowledgePoint as string | null,
+    questionType: value.questionType as AdminQuestionSummary['questionType'],
+    status: value.status as AdminQuestionSummary['status'], visibility,
+    updatedAt: value.updatedAt as string | null, version: value.version };
+}
+
+function parseQuestionDetail(value: unknown): AdminQuestionDetail | null {
+  if (!exactRecord(value, ['id', 'title', 'stemSummary', 'grade', 'unit', 'difficulty', 'knowledgePoint', 'questionType',
+    'status', 'visibility', 'updatedAt', 'version', 'stem', 'options', 'correctAnswer', 'explanation'])) return null;
+  const { stem, options, correctAnswer, explanation, ...summaryValue } = value;
+  const summary = parseQuestionSummary(summaryValue);
+  if (!summary || !isString(stem) || !Array.isArray(options) || !options.every(item => typeof item === 'string')
+    || correctAnswer === undefined || typeof explanation !== 'string') return null;
+  return { ...summary, stem, options, correctAnswer, explanation };
 }
 
 function parseRoleAssignment(value: unknown): AdminRoleAssignmentView | null {
@@ -209,7 +325,7 @@ function parseTeacherGrant(value: unknown): AdminTeacherClassGrantView | null {
   return { id, organizationId, teacherId, classId, permissions, status, grantedBy, grantedAt, version, ...(revokedAt === undefined ? {} : { revokedAt }) };
 }
 
-const ROLE_PERMISSIONS: readonly RolePermission[] = ['organization.read', 'organization.manage', 'class.read', 'class.manage', 'user.read', 'user.manage', 'authorization.manage', 'audit.read', 'student.read', 'student.manage', 'student.bind-code.issue', 'content.read', 'task.read', 'task.publish', 'submission.review', 'child.read', 'child.bind', 'child.unbind'];
+const ROLE_PERMISSIONS: readonly RolePermission[] = ['organization.read', 'organization.manage', 'class.read', 'class.manage', 'user.read', 'user.manage', 'authorization.manage', 'audit.read', 'student.read', 'student.manage', 'student.bind-code.issue', 'student_work.restore', 'content.read', 'task.read', 'task.publish', 'submission.review', 'child.read', 'child.bind', 'child.unbind'];
 const TEACHER_PERMISSIONS: readonly TeacherClassPermission[] = ['class.read', 'student.read', 'student.manage', 'student.bind-code.issue', 'content.read', 'task.read', 'task.publish', 'submission.review'];
 
 function parseList<T>(value: unknown, parse: (item: unknown) => T | null): readonly T[] | null {

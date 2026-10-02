@@ -1,5 +1,8 @@
 {
   "*": {
-    "invoke": "auth != null"
+    "invoke": "auth != null && auth.loginType != 'ANONYMOUS'"
+  },
+  "maintenance-timer": {
+    "invoke": false
   }
 }

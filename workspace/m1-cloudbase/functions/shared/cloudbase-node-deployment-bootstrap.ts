@@ -10,6 +10,9 @@ import type { BatchReviewPreviewCodec } from '../../src/task-core/batch-review-p
 import type { CursorCodec } from '../../src/task-query/types';
 import type { TrustedBusinessSessionTokenCodec } from '../../src/runtime/cloudbase-runtime-adapter';
 import type { CloudBaseServerSdkPort } from './cloudbase-composition';
+import type { CloudBaseWorkStoragePort } from '../../src/student-work/cloudbase-recording-seal';
+import type { CloudBasePlaybackSdkPort } from '../../src/student-work/cloudbase-playback';
+import { createM2BusinessReadIsolation } from '../../src/seed/m2-business-read-isolation';
 import {
   type CloudBaseFunctionRuntimeCapabilities,
   type CloudBaseRuntimeProvider,
@@ -33,6 +36,9 @@ export interface CloudBaseNodeAuthPort {
 export interface CloudBaseNodeApplicationPort {
   auth(): CloudBaseNodeAuthPort;
   database(): CloudBaseNativeDatabasePort;
+  downloadFile?: CloudBaseWorkStoragePort['downloadFile'];
+  uploadFile?: CloudBaseWorkStoragePort['uploadFile'];
+  getTempFileURL?: CloudBasePlaybackSdkPort['getTempFileURL'];
 }
 
 /**
@@ -87,7 +93,7 @@ export function createCloudBaseNodeDeploymentProvider(
     getWXContext: () => ({ UID: readUid(requireAuth(app.auth()).getUserInfo()) }),
     database: () => nativeDatabase,
   };
-  const documents = createCloudBaseDocumentDatabase(nativeDatabase, options.database);
+  const documents = createM2BusinessReadIsolation(createCloudBaseDocumentDatabase(nativeDatabase, options.database));
   const base = createIdentitySessionRuntimeCapabilities({
     sdk,
     documents,
@@ -101,6 +107,11 @@ export function createCloudBaseNodeDeploymentProvider(
   });
   const capabilities: CloudBaseFunctionRuntimeCapabilities = Object.freeze({
     ...base,
+    ...(typeof app.downloadFile === 'function' && typeof app.uploadFile === 'function'
+      ? { recordingStorage: { downloadFile: (input: Parameters<CloudBaseWorkStoragePort['downloadFile']>[0]) => app.downloadFile!(input),
+        uploadFile: (input: Parameters<CloudBaseWorkStoragePort['uploadFile']>[0]) => app.uploadFile!(input) }, environmentId: currentEnvironment } : {}),
+    ...(typeof app.getTempFileURL === 'function'
+      ? { playbackStorage: { getTempFileURL: (input: Parameters<CloudBasePlaybackSdkPort['getTempFileURL']>[0]) => app.getTempFileURL!(input) } } : {}),
     queryCursorCodec: options.cryptography.queryCursorCodec,
     batchReviewPreviewCodec: options.cryptography.batchReviewPreviewCodec,
     bindingCodes: options.cryptography.bindingCodes,

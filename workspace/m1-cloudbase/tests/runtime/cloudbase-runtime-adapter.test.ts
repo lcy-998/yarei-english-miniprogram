@@ -88,6 +88,19 @@ describe('CloudBase runtime adapter', () => {
     await expect(anonymousRuntime.getBusinessSessionId({ businessSessionToken: null })).resolves.toBeNull();
   });
 
+  it('A-05/A-07 queries and commands accept only admin-console audience tokens', async () => {
+    for (const functionName of ['admin-task-activity-query', 'admin-task-activity-command',
+      'textbook-admin-query', 'textbook-admin-command'] as const) {
+      const runtime = createCloudBaseRuntimeAdapter({ functionName, sdk: sdkContext({ UID: 'admin_demo' }),
+        businessSession: { getBusinessSessionId: (token, audience) =>
+          token === 'admin-token-demo' && audience === 'admin-console' ? 'ses_admin_demo' : null } });
+      await expect(runtime.getBusinessSessionId({ businessSessionToken: 'admin-token-demo' }))
+        .resolves.toBe('ses_admin_demo');
+      await expect(runtime.getBusinessSessionId({ businessSessionToken: 'mini-token-demo' }))
+        .resolves.toBeNull();
+    }
+  });
+
   it('assembles trusted runtime, actor resolver and document port without an envId or SDK import', async () => {
     const nativeDatabase = new NativeDatabaseDouble();
     const identities = new InMemoryIdentityRepository({

@@ -36,6 +36,8 @@ export interface ReadingBookView {
   grade: string
   difficulty: string
   theme: string
+  textbook?: string
+  unit?: string
   progressPercent: number
   favorite: boolean
   pageCount: number

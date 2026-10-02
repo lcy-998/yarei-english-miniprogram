@@ -1,0 +1,64 @@
+@import "../../../styles/m1-pages.less";
+
+.activity-page { padding-bottom: 96px; }
+.activity-content { position: relative; z-index: 2; padding: 12px 12px 36px; }
+.activity-hero { display: flex; flex-direction: column; padding: 15px 18px; border-radius: 20px; background: linear-gradient(125deg,#e7f4ff,rgba(255,255,255,.97)); }
+.hero-kicker { color: @yr-brand-primary; font-size: 12px; font-weight: 850; }
+.hero-title { margin-top: 5px; color: @yr-text-primary; font-size: 20px; font-weight: 900; }
+.hero-note { margin-top: 6px; color: @yr-text-secondary; font-size: 12px; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; margin: 16px 1px 11px; color: @yr-text-primary; font-size: 18px; font-weight: 900; }
+.section-heading button { margin: 0; padding: 0 13px; border-radius: 17px; background: @yr-gradient-primary; color: #fff; font-size: 12px; font-weight: 800; line-height: 35px; }
+.activity-card, .form-card, .empty-card { margin-top: 11px; padding: 17px; border: @yr-card-border; border-radius: 19px; background: rgba(255,255,255,.97); box-shadow: 0 5px 15px rgba(7,30,73,.07); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 9px; }
+.card-title { flex: 1; min-width: 0; color: @yr-text-primary; font-size: 17px; font-weight: 850; line-height: 1.4; }
+.activity-mark { flex: none; width: 39px; height: 39px; display: flex; align-items: center; justify-content: center; border-radius: 11px; background: linear-gradient(135deg,#62d77c,@yr-success); color: #fff; font-size: 24px; font-weight: 900; box-shadow: 0 3px 9px rgba(31,169,104,.2); }
+.status-tag { flex: none; padding: 4px 8px; border-radius: 12px; background: @yr-surface-green; color: @yr-success; font-size: 11px; font-weight: 800; }
+.card-meta { display: block; margin-top: 7px; color: @yr-text-secondary; font-size: 12px; }
+.evidence-note { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding: 11px; border-radius: 12px; background: #eef5ff; color: @yr-text-secondary; font-size: 11px; }
+.card-actions, .form-actions { display: flex; gap: 9px; margin-top: 13px; }
+.card-actions button, .form-actions button { flex: 1; min-width: 0; min-height: 43px; margin: 0; border: 1px solid @yr-border-subtle; border-radius: 13px; background: #fff; color: @yr-brand-primary; font-size: 12px; font-weight: 800; }
+.card-actions button.primary, .form-actions button.primary { background: @yr-gradient-primary; color: #fff; }
+.empty-card, .empty-inline { color: @yr-text-secondary; font-size: 13px; text-align: center; }
+.field-label { display: block; margin: 14px 0 7px; color: @yr-text-primary; font-size: 13px; font-weight: 800; }
+.form-card input, .form-card textarea, .picker-value { box-sizing: border-box; width: 100%; min-height: 42px; padding: 10px 11px; border-radius: 13px; background: @yr-surface-blue; color: @yr-text-primary; font-size: 14px; }
+.form-card textarea { min-height: 78px; }
+.date-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.date-grid > view { min-width: 0; }
+.cycle-row { display: flex; gap: 7px; }
+.cycle-row button { flex: 1; min-width: 0; margin: 0; padding: 0; border-radius: 14px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; line-height: 34px; }
+.weekday-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; }
+.weekday-chip { box-sizing: border-box; flex: 0 0 22%; min-width: 0; min-height: 44px; padding: 0 3px; display: flex; align-items: center; justify-content: center; border: @yr-card-border; border-radius: 12px; background: @yr-surface-blue-75; color: @yr-text-primary; font-size: 14px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.weekday-chip.selected { border-color: @yr-brand-primary; background: @yr-brand-primary; color: #fff; box-shadow: 0 4px 10px rgba(23,100,216,.18); }
+.weekday-chip.weekday-pressed { opacity: .78; }
+.weekday-chip.unavailable { opacity: .45; }
+.weekday-note { display: block; margin-top: 9px; color: @yr-text-secondary; font-size: 13px; font-weight: 700; }
+.legacy-rest-note { display: block; margin-top: 9px; padding: 10px 11px; border-radius: 11px; background: @yr-surface-warning; color: @yr-urgent; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.condition-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.condition-head > view { flex: 1; min-width: 0; }
+.condition-head button { flex: none; margin: 0; padding: 0 10px; border-radius: 13px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; line-height: 33px; }
+.field-title { display: block; color: @yr-text-primary; font-size: 15px; font-weight: 850; }
+.field-note { display: block; margin-top: 4px; color: @yr-text-secondary; font-size: 11px; }
+.condition-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 4px; border-bottom: 1px solid @yr-border-subtle; }
+.condition-copy { flex: 1; min-width: 0; }
+.condition-copy text:first-child { display: block; color: @yr-text-primary; font-size: 13px; font-weight: 800; }
+.condition-copy text:last-child { display: block; margin-top: 3px; color: @yr-text-secondary; font-size: 11px; }
+.threshold-input { flex: none; width: 76px !important; text-align: center; }
+.remove-condition { flex: none; margin: 0; padding: 0 5px; background: transparent; color: @yr-text-secondary; font-size: 19px; line-height: 32px; }
+.disabled-condition { display: block; margin-top: 11px; color: @yr-text-secondary; font-size: 11px; }
+.activity-error { display: block; margin: 12px 3px; color: @yr-danger; font-size: 13px; }
+.override-current { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; padding: 11px; border-radius: 14px; background: @yr-surface-green; color: @yr-text-primary; font-size: 12px; }
+.hero-note, .card-meta, .field-note, .disabled-condition, .override-current { font-size: 13px; font-weight: 700; line-height: 1.45; }
+.status-tag, .evidence-note, .condition-copy text:last-child { font-size: 12px; font-weight: 700; }
+.field-label, .condition-copy text:first-child { font-size: 14px; }
+.card-actions button, .form-actions button, .condition-head button { display: flex; align-items: center; justify-content: center; min-height: 44px; font-size: 13px; line-height: 1.2; }
+.picker-value { min-height: 44px; box-sizing: border-box; display: flex; align-items: center; font-size: 14px; font-weight: 700; }
+.override-form .form-card { padding: 20px; border-radius: 22px; background: rgba(255,249,240,.98); }
+.override-form .field-label { margin: 18px 0 8px; }
+.override-picker { display: block; width: 100%; }
+.override-picker-value { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border: 1px solid @yr-border-subtle; border-radius: 15px; background: @yr-surface-blue; color: @yr-text-secondary; font-size: 15px; font-weight: 800; line-height: 1.35; }
+.override-picker-value.is-selected { color: @yr-text-primary; }
+.override-picker-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.override-picker-chevron { flex: none; width: 9px; height: 9px; margin: -5px 3px 0 0; border-right: 2px solid @yr-brand-primary; border-bottom: 2px solid @yr-brand-primary; border-radius: 1px; transform: rotate(45deg); }
+.override-form .form-card textarea { height: 108px; min-height: 108px; padding: 12px 14px; border: 1px solid @yr-border-subtle; line-height: 1.5; }
+.override-form .form-actions { margin-top: 18px; }
+.override-form .form-actions button { min-height: 48px; font-size: 14px; }

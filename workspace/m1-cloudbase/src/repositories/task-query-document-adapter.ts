@@ -19,8 +19,11 @@ import {
   assignmentDocumentId,
   deterministicSubmissionId,
   feedbackDocumentId,
+  readTaskVocabularyAttempts,
   submissionByIdDocumentId,
 } from './task-core-document-adapter';
+import type { VocabularyAttemptRecord } from '../vocabulary-evidence/types';
+import type { ReadingPageEventRecord } from '../learning-progress/types';
 
 export function createTaskQueryDocumentRepository(
   database: DocumentDatabasePort,
@@ -179,6 +182,18 @@ class TaskQueryDocumentRepository implements TaskQueryRepository {
     });
   }
 
+  public async listVocabularyAttempts(organizationId: string, studentId: string, packId: string,
+    taskId: string, itemId: string, round: number, contentVersion: string): Promise<readonly VocabularyAttemptRecord[]> {
+    return this.read((reader) => readTaskVocabularyAttempts(reader, organizationId, studentId, packId,
+      taskId, itemId, round, contentVersion));
+  }
+
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return this.read(async reader => (await reader.find(TASK_CORE_COLLECTIONS.readingPageEvents, {
+      organizationId, studentId, resourceId, deletedAt: null,
+    })).map(document => decodeDocument<ReadingPageEventRecord>(document)));
+  }
+
   public async listPublishedResourceOptions(
     organizationId: string,
   ): Promise<readonly QueryResourceOptionRecord[]> {
@@ -186,14 +201,26 @@ class TaskQueryDocumentRepository implements TaskQueryRepository {
       organizationId,
       status: 'published',
       deletedAt: null,
-    })).map((document) => ({
-      id: readDomainId(document),
-      organizationId,
-      title: readString(document, 'title'),
-      type: readResourceType(document),
-      status: 'published' as const,
-      allowedClassIds: readAllowedClassIds(document),
-    })));
+    })).flatMap((document) => {
+      const type = readResourceType(document);
+      return type === null ? [] : [{
+        id: readDomainId(document), organizationId, title: readString(document, 'title'),
+        type, status: 'published' as const, allowedClassIds: readAllowedClassIds(document),
+      }];
+    }));
+  }
+
+  public async findPublishedResourceOption(organizationId: string, resourceId: string): Promise<QueryResourceOptionRecord | null> {
+    return this.read(async (reader) => {
+      const document = await reader.get(TASK_CORE_COLLECTIONS.resources, resourceId);
+      if (!isVisible(document, organizationId) || document.status !== 'published') return null;
+      const type = readResourceType(document);
+      if (type === null) return null;
+      return {
+        id: readDomainId(document), organizationId, title: readString(document, 'title'),
+        type, status: 'published', allowedClassIds: readAllowedClassIds(document),
+      };
+    });
   }
 
   private async read<T>(work: (reader: DocumentDatabaseReaderPort) => Promise<T>): Promise<T> {
@@ -259,12 +286,10 @@ function readAllowedClassIds(document: VersionedDocument): readonly string[] {
   throw new TaskCorePersistenceError('INTERNAL_ERROR');
 }
 
-function readResourceType(document: VersionedDocument): QueryResourceOptionRecord['type'] {
+function readResourceType(document: VersionedDocument): QueryResourceOptionRecord['type'] | null {
   const type = document.type;
-  if (type !== 'reading' && type !== 'vocabulary' && type !== 'exercise') {
-    throw new TaskCorePersistenceError('INTERNAL_ERROR');
-  }
-  return type;
+  return type === 'reading' || type === 'vocabulary' || type === 'exercise' || type === 'recording'
+    ? type : null;
 }
 
 function cloneJson(value: JsonValue): JsonValue {

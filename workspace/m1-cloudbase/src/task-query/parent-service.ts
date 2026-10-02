@@ -5,6 +5,7 @@ import type { IdentityRepository } from '../runtime/ports';
 import { failure, success, type RequestIdGenerator, type ResultClock } from '../shared/result';
 import type { ServiceResult } from '../shared/protocol';
 import type { ParentTaskResultView, ReviewFeedbackRecord, SubmissionRecord, TaskAssignmentRecord, TaskRecord } from '../task-core/types';
+import { automaticTaskScore } from '../task-core/task-score';
 import type { TaskQueryRepository } from './repository';
 import { InMemoryOpaqueCursorCodec } from './service';
 import type {
@@ -132,6 +133,7 @@ export class ParentTaskQueryService {
       title: task.title,
       studentId: childId,
       assignmentStatus: assignment.status,
+      automaticScore: submission === null ? null : automaticTaskScore(task, submission),
       submission: submission === null || submission.submittedAt === null ? null : {
         id: submission.id, version: submission.submissionVersion, answers: submission.answers, submittedAt: submission.submittedAt,
       },

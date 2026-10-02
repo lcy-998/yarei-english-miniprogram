@@ -18,8 +18,12 @@ import {
   type UserSafeView,
 } from '../../src/org-content/types';
 import type { ServiceResult } from '../../src/shared/protocol';
-import { createMeta, success } from '../../src/shared/result';
+import { createMeta, failure, success } from '../../src/shared/result';
 import { createOrgContentFailureMapper } from '../shared/org-content-failure';
+import { QuestionAdminError, type QuestionAdminDetail, type QuestionAdminPage } from '../../src/question-admin/types';
+import type { QuestionAdminService } from '../../src/question-admin/service';
+import { StudentWorkAdminError, type DeletedWorkDraftPage, type RestoredWorkDraftView,
+  type StudentWorkAdminService } from '../../src/student-work/admin-service';
 import { createTrustedFunction, type TrustedFunctionDependencies } from '../shared/trusted-function';
 
 export type OrganizationAdminOutput =
@@ -31,7 +35,12 @@ export type OrganizationAdminOutput =
   | TeacherClassGrantEntity
   | AdminDashboardOverviewView
   | AdminPageView<RoleAssignmentSafeView>
-  | AdminPageView<OperationLogSafeView>;
+  | AdminPageView<OperationLogSafeView>
+  | QuestionAdminDetail
+  | readonly QuestionAdminDetail[]
+  | QuestionAdminPage
+  | DeletedWorkDraftPage
+  | RestoredWorkDraftView;
 
 export interface OrganizationAdminHandler {
   getDashboardOverview(actor: TrustedActorContext, range: Readonly<{ from?: string; to?: string }>): Promise<AdminDashboardOverviewView>;
@@ -68,17 +77,49 @@ export interface OrganizationAdminHandler {
 
 export interface OrganizationAdminFunctionDependencies extends TrustedFunctionDependencies {
   readonly handler: OrganizationAdminHandler;
+  readonly questions: QuestionAdminService;
+  readonly studentWorks: StudentWorkAdminService;
 }
 
 export function createOrganizationAdminFunction(dependencies: OrganizationAdminFunctionDependencies) {
   return createTrustedFunction(
     'organization-admin',
     ORGANIZATION_ADMIN_ACTIONS,
-    { ...dependencies, mapFailure: createOrgContentFailureMapper(dependencies.mapFailure) },
+    { ...dependencies, mapFailure: (phase, error) => error instanceof StudentWorkAdminError ? error.code
+      : error instanceof QuestionAdminError ? error.code
+      : createOrgContentFailureMapper(dependencies.mapFailure)(phase, error) },
     validateOrganizationAdminRequest,
     async (input, actor): Promise<ServiceResult<OrganizationAdminOutput>> => {
       if (actor.actorRole !== 'admin') throw new OrgContentError('FORBIDDEN');
       switch (input.action) {
+        case 'listDeletedWorkDrafts':
+          return success(await dependencies.studentWorks.listDeletedDrafts(actor, input.studentId, input.page),
+            createMeta(dependencies.clock, dependencies.requestIds));
+        case 'restoreWorkDraft': {
+          try {
+            return success(await dependencies.studentWorks.restoreDraft(actor, input),
+              createMeta(dependencies.clock, dependencies.requestIds));
+          } catch (error: unknown) {
+            if (error instanceof StudentWorkAdminError && error.fieldMessage) {
+              return failure(error.code, createMeta(dependencies.clock, dependencies.requestIds),
+                { workId: error.fieldMessage });
+            }
+            throw error;
+          }
+        }
+        case 'listAdminQuestions':
+          return success(await dependencies.questions.list(actor, input.filters, input.page), createMeta(dependencies.clock, dependencies.requestIds));
+        case 'getAdminQuestion':
+          return success(await dependencies.questions.get(actor, input.id), createMeta(dependencies.clock, dependencies.requestIds));
+        case 'setQuestionVisibility':
+          return success(await dependencies.questions.setVisibility(actor, input.id, input.visibility,
+            input.expectedVersion, input.reason, input.operationId), createMeta(dependencies.clock, dependencies.requestIds));
+        case 'batchSetQuestionVisibility':
+          return success(await dependencies.questions.batchSetVisibility(actor, input.items, input.visibility,
+            input.reason, input.operationId), createMeta(dependencies.clock, dependencies.requestIds));
+        case 'batchSetQuestionStatus':
+          return success(await dependencies.questions.batchSetStatus(actor, input.items, input.status,
+            input.reason, input.operationId), createMeta(dependencies.clock, dependencies.requestIds));
         case 'getDashboardOverview':
           return success(
             await dependencies.handler.getDashboardOverview(actor, {

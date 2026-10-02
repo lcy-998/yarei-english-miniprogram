@@ -20,6 +20,7 @@ import type {
   TaskAssignmentRecord,
   TaskRecord,
 } from '../../src/task-core/types';
+import type { TaskTemplate } from '../../src/task-template/types';
 
 const ORGANIZATION_ID = 'organization_demo';
 const TEACHER_ID = 'teacher_demo';
@@ -30,6 +31,41 @@ const ASSIGNMENT_ID = `assignment_${TASK_ID}_${STUDENT_ID}`;
 const SUBMISSION_ID = deterministicSubmissionId(ASSIGNMENT_ID, 1);
 
 describe('TaskCore document database adapter contract', () => {
+  it('reads and version updates a scoped template in the task creation transaction', async () => {
+    const template: TaskTemplate = { id: 'template_demo', organizationId: ORGANIZATION_ID,
+      ownerTeacherId: TEACHER_ID, scope: 'personal', title: '虚构模板', description: '',
+      itemRefs: [{ id: 'item_1', resourceId: 'resource_1', order: 1,
+        completionRule: { kind: 'reading_pages', requiredPageCount: 1, pageIds: ['page_1'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 } }],
+      items: [{ id: 'item_1', resourceId: 'resource_1', resourceVersion: 1, snapshotSchemaVersion: 1,
+        resourceSnapshot: { title: '虚构绘本', type: 'reading', payload: { chapters: [{ id: 'chapter_1',
+          pages: [{ id: 'page_1', imageAssetKey: 'demo/page-1' }] }] } },
+        completionRule: { kind: 'reading_pages', requiredPageCount: 1, pageIds: ['page_1'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      status: 'active', useCount: 0, version: 1,
+      createdAt: '2026-09-16T00:00:00.000Z', updatedAt: '2026-09-16T00:00:00.000Z' };
+    const database = new FakeDocumentDatabase({
+      [TASK_CORE_COLLECTIONS.templates]: [createDocument(template.id, ORGANIZATION_ID, 1, template)],
+    });
+    const repository = createTaskCoreDocumentRepository(database);
+    expect(await repository.findTemplate(ORGANIZATION_ID, template.id)).toMatchObject({ useCount: 0, version: 1 });
+    await repository.runTransaction(scope(), async (transaction) => {
+      expect(await transaction.findTemplate(ORGANIZATION_ID, template.id)).toBeNull();
+    });
+    await repository.runTransaction(scope({ templateIds: [template.id] }), async (transaction) => {
+      const current = await transaction.findTemplate(ORGANIZATION_ID, template.id);
+      expect(current).toMatchObject({ useCount: 0, version: 1 });
+      await transaction.saveTemplate({ ...current!, useCount: 1, version: 2,
+        updatedAt: '2026-09-16T01:00:00.000Z' });
+    });
+    expect(await repository.findTemplate(ORGANIZATION_ID, template.id)).toMatchObject({ useCount: 1, version: 2 });
+    await expect(repository.runTransaction(scope({ templateIds: [template.id] }), async (transaction) => {
+      const current = await transaction.findTemplate(ORGANIZATION_ID, template.id);
+      await transaction.saveTemplate({ ...current!, useCount: 2, version: 3 });
+      throw new Error('abort template draft');
+    })).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(await repository.findTemplate(ORGANIZATION_ID, template.id)).toMatchObject({ useCount: 1, version: 2 });
+  });
   it('decodes current content resources with document ids and class visibility before task snapshotting', async () => {
     const resourceId = 'res_reading_zoo_cloud_v2';
     const database = new FakeDocumentDatabase({
@@ -59,6 +95,27 @@ describe('TaskCore document database adapter contract', () => {
       expect(await transaction.findReadingProgress(ORGANIZATION_ID, STUDENT_ID, 'resource_reading')).toMatchObject({ pageNumber: 2 });
       expect(await transaction.findVocabularyProgress(ORGANIZATION_ID, STUDENT_ID, 'pack_demo')).toMatchObject({ completedCount: 3, correctCount: 2 });
       expect(await transaction.findVocabularyProgress(ORGANIZATION_ID, 'another_student', 'pack_demo')).toBeNull();
+    });
+  });
+
+  it('reads only matching task-round spelling attempts inside the submission transaction', async () => {
+    const attempt = { id: 'attempt_task_1', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID,
+      packId: 'pack_demo', taskId: TASK_ID, itemId: 'item_words', round: 1, contentVersion: '2',
+      wordId: 'word_tiger', studentInput: 'tiger', isCorrect: true, firstAttempt: true,
+      attemptNumber: 1, attemptedAt: '2026-09-16T01:00:00.000Z' };
+    const database = new FakeDocumentDatabase({
+      [TASK_CORE_COLLECTIONS.vocabularyAttempts]: [
+        createDocument(attempt.id, ORGANIZATION_ID, 1, attempt),
+        createDocument('attempt_other_round', ORGANIZATION_ID, 1, { ...attempt, id: 'attempt_other_round', round: 2 }),
+        createDocument('attempt_other_student', ORGANIZATION_ID, 1, { ...attempt, id: 'attempt_other_student', studentId: 'another_student' }),
+      ],
+    });
+    const repository = createTaskCoreDocumentRepository(database);
+    await repository.runTransaction(scope(), async (transaction) => {
+      expect(await transaction.listVocabularyAttempts(ORGANIZATION_ID, STUDENT_ID, 'pack_demo', TASK_ID,
+        'item_words', 1, '2')).toEqual([attempt]);
+      expect(await transaction.listVocabularyAttempts(ORGANIZATION_ID, STUDENT_ID, 'pack_demo', TASK_ID,
+        'item_words', 3, '2')).toEqual([]);
     });
   });
 
@@ -435,6 +492,7 @@ function resultPayload(): NonNullable<IdempotencyRecord['result']> {
 
 function scope(overrides: Partial<Readonly<{
   resourceIds: readonly string[];
+  templateIds: readonly string[];
   membershipIds: readonly string[];
   teacherGrantIds: readonly string[];
   assignmentIds: readonly string[];
@@ -444,6 +502,7 @@ function scope(overrides: Partial<Readonly<{
   return {
     organizationId: ORGANIZATION_ID,
     resourceIds: overrides.resourceIds ?? [],
+    templateIds: overrides.templateIds ?? [],
     membershipIds: overrides.membershipIds ?? [],
     teacherGrantIds: overrides.teacherGrantIds ?? [],
     assignmentIds: overrides.assignmentIds ?? [],

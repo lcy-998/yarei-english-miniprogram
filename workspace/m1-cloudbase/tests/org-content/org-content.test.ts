@@ -397,3 +397,25 @@ describe('基础阅读和单词授权查询', () => {
       .rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
+
+describe('M2 学生本人班级查询', () => {
+  it('只返回当前有效班级与教师脱敏名称，不返回手机号或其他班级', async () => {
+    const service = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture()));
+    const view = await service.getMyClass(actor(STUDENT_ID, 'student', [], [STUDENT_ID]));
+    expect(view).toEqual({ id: CLASS_ID, name: '三年级 2 班', organizationName: '启航实验学校', grade: '三年级', term: '上学期', studentCount: 1, teacherNames: ['林老师'] });
+    expect(JSON.stringify(view)).not.toContain('139****0002');
+    expect(JSON.stringify(view)).not.toContain(OTHER_CLASS_ID);
+  });
+
+  it('无班级、重复有效班级或非学生身份均失败', async () => {
+    const student = actor(STUDENT_ID, 'student', [], [STUDENT_ID]);
+    const noClass = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({ memberships: [] })));
+    await expect(noClass.getMyClass(student)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const duplicate = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({ memberships: [
+      { id: 'mem_one', organizationId: ORG_ID, classId: CLASS_ID, studentId: STUDENT_ID, status: 'active', version: 1 },
+      { id: 'mem_two', organizationId: ORG_ID, classId: OTHER_CLASS_ID, studentId: STUDENT_ID, status: 'active', version: 1 },
+    ] })));
+    await expect(duplicate.getMyClass(student)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(duplicate.getMyClass(actor(PARENT_ID, 'parent', ['child.read'], [PARENT_ID]))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});

@@ -1,0 +1,47 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="textbook-page">
+    <app-header title="班级教材" back="{{true}}" backUrl="/pages/teacher/materials-home/materials-home"></app-header>
+    <view class="textbook-content">
+      <view class="textbook-card class-filters">
+        <input class="class-search" placeholder="搜索班级" value="{{keyword}}" bindinput="onKeyword"/>
+        <view class="textbook-filter-row">
+          <picker range="{{gradeOptions}}" range-key="label" bindchange="chooseGrade">
+            <view class="class-filter-value"><text>{{selectedGradeLabel}}</text><view class="textbook-chevron" aria-hidden="true"></view></view>
+          </picker>
+          <picker range="{{['全部状态','已配置','未配置']}}" bindchange="chooseConfigured">
+            <view class="class-filter-value"><text>{{configured === 'yes' ? '已配置' : configured === 'no' ? '未配置' : '全部状态'}}</text><view class="textbook-chevron" aria-hidden="true"></view></view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="class-summary">
+        <view>负责班级<text>{{classes.length}}</text></view>
+        <view wx:if="{{showConfiguredBookCount}}">已配置<text>{{classes.length - unconfiguredCount}}</text></view>
+        <view wx:if="{{showConfiguredBookCount}}">待配置<text>{{unconfiguredCount}}</text></view>
+      </view>
+
+      <state-panel wx:if="{{loading}}" state="loading" message="正在加载班级教材"></state-panel>
+      <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+      <view wx:else>
+        <view wx:for="{{rows}}" wx:key="id" class="textbook-card class-book-card {{index % 2 === 0 ? 'tone-blue' : 'tone-warm'}}">
+          <view class="class-card-head">
+            <view class="class-avatar">班</view>
+            <view class="class-card-copy">
+              <text class="textbook-card-title">{{item.name}}</text>
+              <text wx:if="{{showGrade}}" class="textbook-card-meta">{{item.gradeLabel}}　{{item.termLabel}}</text>
+              <text wx:if="{{showStudentCount}}" class="textbook-card-meta">{{item.studentCount}} 名学员</text>
+            </view>
+            <text wx:if="{{showConfiguredBookCount}}" class="class-status {{item.config && item.config.publishedTextbooks.length ? 'configured' : ''}}">{{item.config && item.config.publishedTextbooks.length ? '已配置' : '未配置'}}</text>
+          </view>
+          <view wx:if="{{showConfiguredBookCount}}" class="class-book-summary {{item.config && item.config.publishedTextbooks.length ? 'book-configured' : 'book-unconfigured'}}">{{item.config && item.config.publishedTextbooks.length ? '已配置 ' + item.config.publishedTextbooks.length + ' 本课本' : '尚未配置课本'}}</view>
+          <text wx:if="{{showProgress}}" class="textbook-card-meta class-progress">当前进度：未记录</text>
+          <text wx:if="{{showUpdatedAt && item.config}}" class="textbook-card-meta class-updated">最近更新：{{item.config.updatedAt}}</text>
+          <view class="textbook-card-actions"><button class="{{item.config && item.config.publishedTextbooks.length ? 'view-book' : 'configure-book'}}" data-id="{{item.id}}" bindtap="openClass">{{item.config && item.config.publishedTextbooks.length ? '查看课本' : '配置教材'}}</button></view>
+        </view>
+        <view wx:if="{{!classes.length}}" class="textbook-card textbook-empty">暂无负责班级，请联系学校管理员授权。</view>
+        <view wx:elif="{{!rows.length}}" class="textbook-card textbook-empty">当前筛选下没有班级，可调整条件。</view>
+      </view>
+    </view>
+    <g0-tab-bar role="teacher" active="materials"></g0-tab-bar>
+  </view>
+</g0-page-shell>

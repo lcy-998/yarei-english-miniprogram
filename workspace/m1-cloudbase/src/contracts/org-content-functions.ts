@@ -10,6 +10,8 @@ import {
   type TeacherClassPermission,
   type UserRole,
 } from '../org-content/types';
+import { SCHOOL_QUESTION_TYPES, type SchoolQuestionFilters, type StudentCatalogFilters, type TaskCatalogFilters } from '../org-content/types';
+import type { QuestionAdminFilters, QuestionBatchItem, QuestionVisibility } from '../question-admin/types';
 
 export type ContractValidation<T> =
   | { readonly ok: true; readonly value: T }
@@ -30,6 +32,15 @@ export type RelationshipCommandInput =
     }>;
 
 export const CONTENT_QUERY_ACTIONS = [
+  'getMyClass',
+  'listSchoolQuestions',
+  'listSchoolQuestionFacets',
+  'getSchoolQuestion',
+  'listTaskCatalogResources',
+  'listTaskCatalogFacets',
+  'getTaskCatalogResource',
+  'listStudentCatalog',
+  'listStudentCatalogFacets',
   'listReadingResources',
   'getReadingResource',
   'listVocabularyPacks',
@@ -38,7 +49,15 @@ export const CONTENT_QUERY_ACTIONS = [
 export type ContentQueryAction = (typeof CONTENT_QUERY_ACTIONS)[number];
 
 export type ContentQueryInput =
-  | Readonly<{ action: 'listReadingResources' | 'listVocabularyPacks' }>
+  | Readonly<{ action: 'getMyClass' | 'listReadingResources' | 'listVocabularyPacks' }>
+  | Readonly<{ action: 'listSchoolQuestions'; filters: SchoolQuestionFilters; page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'listSchoolQuestionFacets'; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'getSchoolQuestion'; resourceId: string; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'listTaskCatalogResources'; filters: TaskCatalogFilters; page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'listTaskCatalogFacets'; type: TaskCatalogFilters['type']; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'getTaskCatalogResource'; resourceId: string; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'listStudentCatalog'; filters: StudentCatalogFilters; page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'listStudentCatalogFacets'; type: StudentCatalogFilters['type']; category?: StudentCatalogFilters['category'] }>
   | Readonly<{ action: 'getReadingResource' | 'getVocabularyPack'; resourceId: string }>;
 
 export const ORGANIZATION_ADMIN_ACTIONS = [
@@ -57,10 +76,29 @@ export const ORGANIZATION_ADMIN_ACTIONS = [
   'revokeRole',
   'grantTeacherClass',
   'revokeTeacherClass',
+  'listAdminQuestions',
+  'getAdminQuestion',
+  'setQuestionVisibility',
+  'batchSetQuestionVisibility',
+  'batchSetQuestionStatus',
+  'listDeletedWorkDrafts',
+  'restoreWorkDraft',
 ] as const;
 export type OrganizationAdminAction = (typeof ORGANIZATION_ADMIN_ACTIONS)[number];
 
 export type OrganizationAdminInput =
+  | Readonly<{ action: 'listDeletedWorkDrafts'; studentId: string;
+      page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'restoreWorkDraft'; studentId: string; workId: string; reason: string;
+      expectedVersion: number; operationId: string }>
+  | Readonly<{ action: 'listAdminQuestions'; filters: QuestionAdminFilters; page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'getAdminQuestion'; id: string }>
+  | Readonly<{ action: 'setQuestionVisibility'; id: string; visibility: QuestionVisibility; reason: string;
+      expectedVersion: number; operationId: string }>
+  | Readonly<{ action: 'batchSetQuestionVisibility'; items: readonly QuestionBatchItem[];
+      visibility: QuestionVisibility; reason: string; expectedVersion: 1; operationId: string }>
+  | Readonly<{ action: 'batchSetQuestionStatus'; items: readonly QuestionBatchItem[];
+      status: 'published' | 'offline'; reason: string; expectedVersion: 1; operationId: string }>
   | Readonly<{ action: 'listClasses' }>
   | Readonly<{ action: 'getDashboardOverview'; from?: string; to?: string }>
   | Readonly<{
@@ -170,10 +208,168 @@ export function validateContentQueryRequest(
 ): ContractValidation<ContentQueryInput> {
   const envelopeError = rejectQueryWriteFields<ContentQueryInput>(request);
   if (envelopeError !== null) return envelopeError;
-  if (request.action === 'listReadingResources' || request.action === 'listVocabularyPacks') {
+  if (request.action === 'getMyClass' || request.action === 'listReadingResources' || request.action === 'listVocabularyPacks') {
     const exact = parseExactObject(request.payload, []);
     if (!exact.ok) return exact;
     return { ok: true, value: { action: request.action } };
+  }
+  if (request.action === 'listStudentCatalog') {
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filters = parseExactObjectValue(exact.value.filters, ['type'],
+      ['category', 'grade', 'textbook', 'unit', 'difficulty', 'theme', 'keyword'], 'filters');
+    if (!filters.ok) return filters;
+    if (filters.value.type !== 'reading' && filters.value.type !== 'vocabulary') return invalid('filters.type', '目录类型无效。');
+    const type = filters.value.type;
+    const category = optionalEnum(filters.value.category, 'filters.category',
+      ['original', 'synchronized', 'picture_book', 'current_events', 'chapter_book'] as const);
+    const grade = optionalBoundedString(filters.value.grade, 'filters.grade', 100);
+    const textbook = optionalBoundedString(filters.value.textbook, 'filters.textbook', 100);
+    const unit = optionalBoundedString(filters.value.unit, 'filters.unit', 100);
+    const difficulty = optionalBoundedString(filters.value.difficulty, 'filters.difficulty', 100);
+    const theme = optionalBoundedString(filters.value.theme, 'filters.theme', 100);
+    const keyword = optionalBoundedString(filters.value.keyword, 'filters.keyword', 100);
+    for (const result of [category, grade, textbook, unit, difficulty, theme, keyword]) if (!result.ok) return result;
+    if (!category.ok || !grade.ok || !textbook.ok || !unit.ok || !difficulty.ok || !theme.ok || !keyword.ok) {
+      return invalid('filters', '筛选条件无效。');
+    }
+    if ((type === 'vocabulary' && (category.value || difficulty.value || theme.value))
+      || (type === 'reading' && unit.value)) return invalid('filters', '筛选条件与目录类型不匹配。');
+    const page = parseQuestionPage(exact.value.page);
+    if (!page.ok) return page;
+    return { ok: true, value: { action: request.action,
+      filters: { type, ...compactOptional({ category: category.value, grade: grade.value,
+        textbook: textbook.value, unit: unit.value, difficulty: difficulty.value,
+        theme: theme.value, keyword: keyword.value }) }, page: page.value } };
+  }
+  if (request.action === 'listStudentCatalogFacets') {
+    const exact = parseExactObject(request.payload, ['type'], ['category']);
+    if (!exact.ok) return exact;
+    if (exact.value.type !== 'reading' && exact.value.type !== 'vocabulary') return invalid('type', '目录类型无效。');
+    const category = optionalEnum(exact.value.category, 'category',
+      ['original', 'synchronized', 'picture_book', 'current_events', 'chapter_book'] as const);
+    if (!category.ok) return category;
+    if (exact.value.type === 'vocabulary' && category.value) return invalid('category', '词包不支持阅读分类。');
+    return { ok: true, value: { action: request.action, type: exact.value.type,
+      ...(category.value === undefined ? {} : { category: category.value }) } };
+  }
+  if (request.action === 'listSchoolQuestions') {
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filters = parseExactObjectValue(exact.value.filters, [], [
+      'grade', 'textbook', 'unit', 'knowledgePoint', 'questionType', 'difficulty', 'keyword', 'targetClassIds',
+    ], 'filters');
+    if (!filters.ok) return filters;
+    const grade = optionalBoundedString(filters.value.grade, 'filters.grade', 100);
+    const textbook = optionalBoundedString(filters.value.textbook, 'filters.textbook', 100);
+    const unit = optionalBoundedString(filters.value.unit, 'filters.unit', 100);
+    const knowledgePoint = optionalBoundedString(filters.value.knowledgePoint, 'filters.knowledgePoint', 100);
+    const questionType = optionalEnum(filters.value.questionType, 'filters.questionType', SCHOOL_QUESTION_TYPES);
+    const difficulty = optionalBoundedString(filters.value.difficulty, 'filters.difficulty', 100);
+    const keyword = optionalBoundedString(filters.value.keyword, 'filters.keyword', 100);
+    if (!grade.ok) return grade;
+    if (!textbook.ok) return textbook;
+    if (!unit.ok) return unit;
+    if (!knowledgePoint.ok) return knowledgePoint;
+    if (!questionType.ok) return questionType;
+    if (!difficulty.ok) return difficulty;
+    if (!keyword.ok) return keyword;
+    const targetClassIds = filters.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(filters.value.targetClassIds, 'filters.targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    const page = parseQuestionPage(exact.value.page);
+    if (!page.ok) return page;
+    return { ok: true, value: {
+      action: request.action,
+      filters: compactOptional({ grade: grade.value, textbook: textbook.value, unit: unit.value,
+        knowledgePoint: knowledgePoint.value, questionType: questionType.value, difficulty: difficulty.value,
+        keyword: keyword.value, targetClassIds: targetClassIds.value }),
+      page: page.value,
+    } };
+  }
+  if (request.action === 'listTaskCatalogResources') {
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filters = parseExactObjectValue(exact.value.filters, ['type'], [
+      'source', 'category', 'grade', 'term', 'textbook', 'unit', 'difficulty', 'keyword', 'targetClassIds',
+    ], 'filters');
+    if (!filters.ok) return filters;
+    if (filters.value.type !== 'reading' && filters.value.type !== 'vocabulary') {
+      return invalid('filters.type', '目录类型仅支持阅读和单词。');
+    }
+    const grade = optionalBoundedString(filters.value.grade, 'filters.grade', 100);
+    const source = optionalEnum(filters.value.source, 'filters.source', ['reading_book', 'synchronized_textbook', 'word_pack'] as const);
+    const category = optionalEnum(filters.value.category, 'filters.category', ['original', 'synchronized', 'picture_book', 'current_events', 'chapter_book'] as const);
+    const term = optionalBoundedString(filters.value.term, 'filters.term', 100);
+    const textbook = optionalBoundedString(filters.value.textbook, 'filters.textbook', 100);
+    const unit = optionalBoundedString(filters.value.unit, 'filters.unit', 100);
+    const difficulty = optionalBoundedString(filters.value.difficulty, 'filters.difficulty', 100);
+    const keyword = optionalBoundedString(filters.value.keyword, 'filters.keyword', 100);
+    if (!grade.ok) return grade;
+    if (!source.ok) return source;
+    if (!category.ok) return category;
+    if (!term.ok) return term;
+    if (!textbook.ok) return textbook;
+    if (!unit.ok) return unit;
+    if (!difficulty.ok) return difficulty;
+    if (!keyword.ok) return keyword;
+    const targetClassIds = filters.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(filters.value.targetClassIds, 'filters.targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    const page = parseQuestionPage(exact.value.page);
+    if (!page.ok) return page;
+    return { ok: true, value: { action: request.action,
+      filters: { type: filters.value.type, ...compactOptional({ source: source.value, category: category.value, grade: grade.value,
+        term: term.value, textbook: textbook.value,
+        unit: unit.value, difficulty: difficulty.value, keyword: keyword.value, targetClassIds: targetClassIds.value }) },
+      page: page.value } };
+  }
+  if (request.action === 'listTaskCatalogFacets') {
+    const exact = parseExactObject(request.payload, ['type'], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    if (exact.value.type !== 'reading' && exact.value.type !== 'vocabulary') return invalid('type', '目录类型无效。');
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action, type: exact.value.type,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'getTaskCatalogResource') {
+    const exact = parseExactObject(request.payload, ['resourceId'], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    const resourceId = requiredId(exact.value.resourceId, 'resourceId');
+    if (!resourceId.ok) return resourceId;
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action, resourceId: resourceId.value,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'listSchoolQuestionFacets') {
+    const exact = parseExactObject(request.payload, [], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'getSchoolQuestion') {
+    const exact = parseExactObject(request.payload, ['resourceId'], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    const resourceId = requiredId(exact.value.resourceId, 'resourceId');
+    if (!resourceId.ok) return resourceId;
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action, resourceId: resourceId.value,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
   }
   const exact = parseExactObject(request.payload, ['resourceId']);
   if (!exact.ok) return exact;
@@ -182,9 +378,59 @@ export function validateContentQueryRequest(
   return { ok: true, value: { action: request.action, resourceId: resourceId.value } };
 }
 
+function parseQuestionPage(value: unknown): ContractValidation<Readonly<{ limit: number; offset: number }>> {
+  const parsed = parseExactObjectValue(value, ['limit', 'offset'], [], 'page');
+  if (!parsed.ok) return parsed;
+  if (!Number.isSafeInteger(parsed.value.limit) || typeof parsed.value.limit !== 'number'
+    || parsed.value.limit < 1 || parsed.value.limit > 50) return invalid('page.limit', '每页数量必须为 1 到 50 的整数。');
+  if (!Number.isSafeInteger(parsed.value.offset) || typeof parsed.value.offset !== 'number'
+    || parsed.value.offset < 0 || parsed.value.offset > 10000) return invalid('page.offset', '分页偏移必须为 0 到 10000 的整数。');
+  return { ok: true, value: { limit: parsed.value.limit, offset: parsed.value.offset } };
+}
+
 export function validateOrganizationAdminRequest(
   request: FunctionRequest<OrganizationAdminAction, JsonObject>,
 ): ContractValidation<OrganizationAdminInput> {
+  if (request.action === 'listDeletedWorkDrafts') {
+    const envelopeError = rejectQueryWriteFields<OrganizationAdminInput>(request);
+    if (envelopeError !== null) return envelopeError;
+    const exact = parseExactObject(request.payload, ['studentId', 'page']);
+    if (!exact.ok) return exact;
+    const studentId = requiredId(exact.value.studentId, 'studentId');
+    if (!studentId.ok) return studentId;
+    const page = parseAdminPage(exact.value.page);
+    return page.ok ? { ok: true, value: { action: request.action,
+      studentId: studentId.value, page: page.value } } : page;
+  }
+  if (request.action === 'listAdminQuestions') {
+    const envelopeError = rejectQueryWriteFields<OrganizationAdminInput>(request);
+    if (envelopeError !== null) return envelopeError;
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filter = parseExactObjectValue(exact.value.filters, [], ['keyword', 'status', 'questionType', 'classId'], 'filters');
+    if (!filter.ok) return filter;
+    const keyword = optionalBoundedString(filter.value.keyword, 'filters.keyword', 50);
+    const status = optionalEnum(filter.value.status, 'filters.status', ['draft', 'published', 'offline'] as const);
+    const questionType = optionalEnum(filter.value.questionType, 'filters.questionType', SCHOOL_QUESTION_TYPES);
+    const classId = optionalId(filter.value.classId, 'filters.classId');
+    if (!keyword.ok) return keyword;
+    if (!status.ok) return status;
+    if (!questionType.ok) return questionType;
+    if (!classId.ok) return classId;
+    const page = parseAdminPage(exact.value.page);
+    if (!page.ok) return page;
+    return { ok: true, value: { action: request.action, page: page.value,
+      filters: compactOptional({ keyword: keyword.value, status: status.value,
+        questionType: questionType.value, classId: classId.value }) } };
+  }
+  if (request.action === 'getAdminQuestion') {
+    const envelopeError = rejectQueryWriteFields<OrganizationAdminInput>(request);
+    if (envelopeError !== null) return envelopeError;
+    const exact = parseExactObject(request.payload, ['id']);
+    if (!exact.ok) return exact;
+    const id = requiredId(exact.value.id, 'id');
+    return id.ok ? { ok: true, value: { action: request.action, id: id.value } } : id;
+  }
   if (request.action === 'listClasses') {
     const envelopeError = rejectQueryWriteFields<OrganizationAdminInput>(request);
     if (envelopeError !== null) return envelopeError;
@@ -275,6 +521,96 @@ export function validateOrganizationAdminRequest(
   if (!expectedVersion.ok) return expectedVersion;
 
   switch (request.action) {
+    case 'restoreWorkDraft': {
+      const exact = parseExactObject(request.payload, ['studentId', 'workId', 'reason']);
+      if (!exact.ok) return exact;
+      const studentId = requiredId(exact.value.studentId, 'studentId');
+      const workId = requiredId(exact.value.workId, 'workId');
+      const reason = requiredBoundedString(exact.value.reason, 'reason', 200);
+      if (!studentId.ok) return studentId;
+      if (!workId.ok) return workId;
+      if (!reason.ok) return reason;
+      return { ok: true, value: { action: request.action, studentId: studentId.value,
+        workId: workId.value, reason: reason.value, expectedVersion: expectedVersion.value,
+        operationId: request.operationId } };
+    }
+    case 'setQuestionVisibility': {
+      const exact = parseExactObject(request.payload, ['id', 'visibility', 'reason']);
+      if (!exact.ok) return exact;
+      const id = requiredId(exact.value.id, 'id');
+      const reason = requiredBoundedString(exact.value.reason, 'reason', 300);
+      if (!id.ok) return id;
+      if (!reason.ok) return reason;
+      const raw = parseExactObjectValue(exact.value.visibility, ['type'], ['classIds'], 'visibility');
+      if (!raw.ok) return raw;
+      let visibility: QuestionVisibility;
+      if (raw.value.type === 'organization' && raw.value.classIds === undefined) visibility = { type: 'organization' };
+      else if (raw.value.type === 'classes' && Array.isArray(raw.value.classIds)
+        && raw.value.classIds.length >= 1 && raw.value.classIds.length <= 100
+        && raw.value.classIds.every(id => typeof id === 'string' && id.trim() && id.length <= 128)
+        && new Set(raw.value.classIds).size === raw.value.classIds.length) {
+        visibility = { type: 'classes', classIds: raw.value.classIds as string[] };
+      } else return invalid('visibility', '可见范围无效。');
+      return { ok: true, value: { action: request.action, id: id.value, visibility,
+        reason: reason.value, expectedVersion: expectedVersion.value, operationId: request.operationId } };
+    }
+    case 'batchSetQuestionVisibility': {
+      if (expectedVersion.value !== 1) return invalid('expectedVersion', '批量操作使用条目版本号。');
+      const exact = parseExactObject(request.payload, ['items', 'visibility', 'reason']);
+      if (!exact.ok) return exact;
+      const reason = requiredBoundedString(exact.value.reason, 'reason', 300);
+      if (!reason.ok) return reason;
+      const raw = parseExactObjectValue(exact.value.visibility, ['type'], ['classIds'], 'visibility');
+      if (!raw.ok) return raw;
+      let visibility: QuestionVisibility;
+      if (raw.value.type === 'organization' && raw.value.classIds === undefined) visibility = { type: 'organization' };
+      else if (raw.value.type === 'classes' && Array.isArray(raw.value.classIds)
+        && raw.value.classIds.length >= 1 && raw.value.classIds.length <= 100
+        && raw.value.classIds.every(id => typeof id === 'string' && id.trim() && id.length <= 128)
+        && new Set(raw.value.classIds).size === raw.value.classIds.length) {
+        visibility = { type: 'classes', classIds: raw.value.classIds as string[] };
+      } else return invalid('visibility', '可见范围无效。');
+      if (!Array.isArray(exact.value.items) || exact.value.items.length < 1 || exact.value.items.length > 20) {
+        return invalid('items', '每次最多处理 20 道题。');
+      }
+      const items: QuestionBatchItem[] = [];
+      for (const [index, item] of exact.value.items.entries()) {
+        const parsed = parseExactObjectValue(item, ['id', 'expectedVersion'], [], `items.${index}`);
+        if (!parsed.ok) return parsed;
+        const id = requiredId(parsed.value.id, `items.${index}.id`);
+        if (!id.ok || !Number.isSafeInteger(parsed.value.expectedVersion)
+          || Number(parsed.value.expectedVersion) < 1) return invalid(`items.${index}`, '题目与版本号无效。');
+        items.push({ id: id.value, expectedVersion: Number(parsed.value.expectedVersion) });
+      }
+      if (new Set(items.map(item => item.id)).size !== items.length) return invalid('items', '题目不能重复选择。');
+      return { ok: true, value: { action: request.action, items, visibility,
+        reason: reason.value, expectedVersion: 1, operationId: request.operationId } };
+    }
+    case 'batchSetQuestionStatus': {
+      if (expectedVersion.value !== 1) return invalid('expectedVersion', '批量操作使用条目版本号。');
+      const exact = parseExactObject(request.payload, ['items', 'status', 'reason']);
+      if (!exact.ok) return exact;
+      const reason = requiredBoundedString(exact.value.reason, 'reason', 300);
+      if (!reason.ok) return reason;
+      if (exact.value.status !== 'published' && exact.value.status !== 'offline') return invalid('status', '上架状态无效。');
+      if (!Array.isArray(exact.value.items) || exact.value.items.length < 1 || exact.value.items.length > 20) {
+        return invalid('items', '每次最多处理 20 道题。');
+      }
+      const items: QuestionBatchItem[] = [];
+      for (const [index, raw] of exact.value.items.entries()) {
+        const parsed = parseExactObjectValue(raw, ['id', 'expectedVersion'], [], `items.${index}`);
+        if (!parsed.ok) return parsed;
+        const id = requiredId(parsed.value.id, `items.${index}.id`);
+        if (!id.ok) return id;
+        if (!Number.isSafeInteger(parsed.value.expectedVersion) || Number(parsed.value.expectedVersion) < 1) {
+          return invalid(`items.${index}.expectedVersion`, '题目版本号无效。');
+        }
+        items.push({ id: id.value, expectedVersion: Number(parsed.value.expectedVersion) });
+      }
+      if (new Set(items.map(item => item.id)).size !== items.length) return invalid('items', '题目不能重复选择。');
+      return { ok: true, value: { action: request.action, items, status: exact.value.status,
+        reason: reason.value, expectedVersion: 1, operationId: request.operationId } };
+    }
     case 'createClass': {
       if (expectedVersion.value !== 1) return invalid('expectedVersion', '新建班级的初始版本号必须为 1。');
       const exact = parseExactObject(request.payload, ['name', 'grade', 'term', 'reason']);

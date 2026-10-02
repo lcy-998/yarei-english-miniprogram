@@ -57,6 +57,7 @@ export type RolePermission =
   | 'student.read'
   | 'student.manage'
   | 'student.bind-code.issue'
+  | 'student_work.restore'
   | 'content.read'
   | 'task.read'
   | 'task.publish'
@@ -133,6 +134,49 @@ export interface AdminPageView<T> {
   readonly nextOffset: number | null;
 }
 
+export type DeletedWorkDraftBlockReason = 'expired' | 'cleanup_locked' | 'staging_deleted' | 'invalid_record';
+export interface DeletedWorkDraftSummary {
+  readonly id: string;
+  readonly studentId: string;
+  readonly materialId: string;
+  readonly materialTitle?: string | null;
+  readonly version: number;
+  readonly deletedAt: string;
+  readonly recoverableUntil: string;
+  readonly stagingCleanupStatus: 'none' | 'deleting' | 'deleted' | 'unknown';
+  readonly restorable: boolean;
+  readonly blockedReason: DeletedWorkDraftBlockReason | null;
+}
+export interface DeletedWorkDraftPage {
+  readonly items: readonly DeletedWorkDraftSummary[];
+  readonly nextOffset: number | null;
+}
+export interface RestoredWorkDraftView {
+  readonly id: string;
+  readonly studentId: string;
+  readonly materialId: string;
+  readonly version: number;
+  readonly restoredAt: string;
+  readonly restoredByUserId: string;
+}
+
+export type AdminQuestionStatus = 'draft' | 'published' | 'offline';
+export type AdminQuestionType = 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
+export type AdminQuestionVisibility = Readonly<{ type: 'organization' }> | Readonly<{ type: 'classes'; classIds: readonly string[] }>;
+export interface AdminQuestionSummary {
+  readonly id: string; readonly title: string; readonly stemSummary: string; readonly grade: string;
+  readonly unit: string | null; readonly difficulty: string | null; readonly knowledgePoint: string | null; readonly questionType: AdminQuestionType;
+  readonly status: AdminQuestionStatus; readonly visibility: AdminQuestionVisibility;
+  readonly updatedAt: string | null; readonly version: number;
+}
+export interface AdminQuestionDetail extends AdminQuestionSummary {
+  readonly stem: string; readonly options: readonly string[]; readonly correctAnswer: unknown; readonly explanation: string;
+}
+export interface AdminQuestionFilters {
+  readonly keyword?: string; readonly status?: AdminQuestionStatus; readonly questionType?: AdminQuestionType;
+  readonly classId?: string;
+}
+
 export interface AdminDashboardOverviewView {
   readonly range: Readonly<{ from: string; to: string }>;
   readonly counts: Readonly<{
@@ -178,11 +222,20 @@ export interface AdminRoleAssignmentFilter { readonly userId?: string; readonly 
 export interface AdminAuditLogFilter { readonly actorUserId?: string; readonly action?: string; readonly result?: 'succeeded' | 'denied' | 'failed'; readonly targetType?: string; readonly from?: string; readonly to?: string }
 
 export type OrganizationAdminCall =
+  | { readonly action: 'listAdminQuestions'; readonly payload: Readonly<{ filters: AdminQuestionFilters; page: AdminPageRequest }> }
+  | { readonly action: 'getAdminQuestion'; readonly payload: Readonly<{ id: string }> }
+  | AdminWriteCall<'setQuestionVisibility', Readonly<{ id: string; visibility: AdminQuestionVisibility; reason: string }>>
+  | AdminWriteCall<'batchSetQuestionVisibility', Readonly<{ items: readonly Readonly<{ id: string; expectedVersion: number }>[];
+      visibility: AdminQuestionVisibility; reason: string }>>
+  | AdminWriteCall<'batchSetQuestionStatus', Readonly<{ items: readonly Readonly<{ id: string; expectedVersion: number }>[];
+      status: 'published' | 'offline'; reason: string }>>
   | { readonly action: 'listClasses'; readonly payload: Readonly<Record<string, never>> }
   | { readonly action: 'getDashboardOverview'; readonly payload: AdminDashboardFilter }
   | { readonly action: 'listRoleAssignments'; readonly payload: Readonly<{ filter: AdminRoleAssignmentFilter; page: AdminPageRequest }> }
   | { readonly action: 'listAuditLogs'; readonly payload: Readonly<{ filter: AdminAuditLogFilter; page: AdminPageRequest }> }
   | { readonly action: 'listUsers'; readonly payload: Readonly<{ classId?: string; role?: UserRole; status?: 'active' | 'disabled'; keyword?: string }> }
+  | { readonly action: 'listDeletedWorkDrafts'; readonly payload: Readonly<{ studentId: string; page: AdminPageRequest }> }
+  | AdminWriteCall<'restoreWorkDraft', Readonly<{ studentId: string; workId: string; reason: string }>>
   | AdminWriteCall<'createClass', Readonly<{ name: string; grade: string; term: string; reason: string }>>
   | AdminWriteCall<'updateClass', Readonly<{ classId: string; name: string; grade: string; term: string; reason: string }>>
   | AdminWriteCall<'disableClass', Readonly<{ classId: string; reason: string }>>

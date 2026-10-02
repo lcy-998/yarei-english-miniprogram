@@ -59,7 +59,9 @@ function isAudienceAllowed(functionName: FunctionName, session: Readonly<{
   role: string | null;
 }>): boolean {
   const audience = sessionAudience(session);
-  if (functionName === 'organization-admin' || functionName === 'admin-session') {
+  if (functionName === 'organization-admin' || functionName === 'admin-session'
+    || functionName === 'admin-task-activity-query' || functionName === 'admin-task-activity-command'
+    || functionName === 'textbook-admin-query' || functionName === 'textbook-admin-command') {
     return audience === 'admin-console' && session.role === 'admin';
   }
   if (functionName === 'relationship-command' && session.role === 'admin') {

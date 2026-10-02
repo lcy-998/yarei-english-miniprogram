@@ -1,0 +1,23 @@
+@import "../../../styles/m1-pages.less";
+.my-works-page{min-height:100vh;padding-bottom:40px}
+.my-works-content{padding:18px 16px 28px}
+.works-heading,.works-empty,.work-card{margin-bottom:14px;padding:20px;border-radius:24px;background:rgba(255,249,240,.97);box-shadow:@yr-card-shadow}
+.works-heading text:first-child{display:block;color:@yr-text-primary;font-size:22px;font-weight:900}
+.works-heading text:last-child{display:block;margin-top:7px;color:@yr-text-secondary;font-size:13px}
+.works-empty{text-align:center;color:@yr-text-secondary;font-size:15px}
+.works-empty button{display:flex;align-items:center;justify-content:center;width:166px;min-height:48px;margin:14px auto 0;border-radius:24px;background:@yr-gradient-primary;color:#fff;font-size:15px;font-weight:800;line-height:1.2;box-sizing:border-box}
+.work-filters{display:flex;gap:8px;margin-bottom:14px}
+.work-filters button{display:flex;align-items:center;justify-content:center;flex:1;min-height:42px;margin:0;padding:0 6px;border-radius:21px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:13px;line-height:1.2;text-align:center;box-sizing:border-box}
+.work-filters button.active{background:@yr-gradient-primary;color:#fff}
+.work-filters button::after,.work-actions button::after,.works-empty button::after{border:0}
+.work-title{display:block;color:@yr-text-primary;font-size:18px;font-weight:900}
+.work-status{display:inline-block;margin-top:11px;padding:6px 10px;border-radius:12px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:12px;font-weight:800}
+.work-meta,.work-note{display:block;margin-top:11px;color:@yr-text-secondary;font-size:13px;line-height:1.5}
+.work-note{color:@yr-text-primary}
+.playback-error{display:block;margin-bottom:12px;color:@yr-danger;font-size:13px}
+.work-actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:14px}
+.work-actions button{flex:none;width:166px;max-width:100%;min-height:42px;margin:0;padding:0 14px;box-sizing:border-box;line-height:1.2;text-align:center}
+.play-work{display:flex;align-items:center;justify-content:center;border-radius:21px;background:@yr-surface-blue;color:@yr-brand-primary;font-size:13px;font-weight:800}
+.play-work::after{border:0}
+.delete-draft{display:flex;align-items:center;justify-content:center;border-radius:21px;background:#fff;color:@yr-danger;font-size:13px;font-weight:800}
+.delete-draft[disabled]{opacity:.55}

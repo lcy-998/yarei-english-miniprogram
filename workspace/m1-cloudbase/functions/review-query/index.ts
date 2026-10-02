@@ -17,8 +17,9 @@ const unavailable = createUnconfiguredFunction(
 export const main = createDefaultCloudBaseTaskQueryFunction(
   'review-query',
   unavailable,
-  (_capabilities, infrastructure) => createReviewQueryFunction({
+  (capabilities, infrastructure) => createReviewQueryFunction({
     ...infrastructure,
     handler: infrastructure.reviewHandler,
+    ...(capabilities.playbackStorage === undefined ? {} : { readingMediaStorage: capabilities.playbackStorage }),
   }),
 );

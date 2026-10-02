@@ -70,6 +70,7 @@ Component({
     },
     loadMore() { this.loadStudents(true) },
     openStudent(event: WechatMiniprogram.TouchEvent) { setCurrentStudentId(event.currentTarget.dataset.id as string); wx.navigateTo({ url: '/pages/teacher/student-detail/student-detail' }) },
+    openStats() { wx.navigateTo({ url: '/pages/teacher/learning-stats/learning-stats' }) },
     importStudents() {
       this.setData({ importPreviewOpen: true })
     },

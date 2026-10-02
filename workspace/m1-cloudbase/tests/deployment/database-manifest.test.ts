@@ -35,6 +35,12 @@ describe('M1 数据库机器可读清单', () => {
           { field: 'status', direction: 'asc' },
         ] }),
       ]));
+    expect(M1_DATABASE_MANIFEST.find((item) => item.name === 'submissions')?.indexes)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ unique: true, fields: [
+        { field: 'organizationId', direction: 'asc' },
+        { field: 'assignmentId', direction: 'asc' },
+        { field: 'submissionVersion', direction: 'asc' },
+      ] })]));
   });
 
   it('完整观测无差异，条件索引缺失不误报', () => {

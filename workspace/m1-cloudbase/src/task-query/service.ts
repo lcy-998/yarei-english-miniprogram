@@ -1,7 +1,11 @@
 import type { TrustedActorContext } from '../auth/trusted-actor';
+import { readExerciseQuestionSnapshot } from '../task-core/exercise-evidence';
+import { automaticTaskScore, manualTaskItemIds, taskScoringItems } from '../task-core/task-score';
+import { selectedReadingPageIds } from '../task-core/reading-range';
+import { summarizeVocabularyFirstAttempts, vocabularyWordIds } from '../vocabulary-evidence/summary';
 import { failure, success, type RequestIdGenerator, type ResultClock } from '../shared/result';
-import type { JsonObject, ServiceResult } from '../shared/protocol';
-import type { AssignmentStatus, ReviewFeedbackRecord, SubmissionRecord, TaskAssignmentRecord, TaskRecord } from '../task-core/types';
+import type { JsonObject, JsonValue, ServiceResult } from '../shared/protocol';
+import type { AssignmentStatus, ReviewFeedbackRecord, SubmissionAnswer, SubmissionRecord, TaskAssignmentRecord, TaskRecord } from '../task-core/types';
 import {
   serializeBatchReviewPreviewIntent,
   type BatchReviewPreviewCodec,
@@ -105,9 +109,13 @@ export class TeacherTaskQueryService {
     return this.page(actor, 'teacher-tasks', filters, page, items);
   }
 
-  public async getDraftOptions(actor: TrustedActorContext): Promise<ServiceResult<TaskDraftOptions>> {
+  public async getDraftOptions(actor: TrustedActorContext, catalogMode?: 'selector'): Promise<ServiceResult<TaskDraftOptions>> {
     const grants = await this.authorizedGrants(actor, 'task.publish');
     if (grants === null) return failure('FORBIDDEN', this.meta());
+    if (catalogMode === 'selector') return success({
+      classes: grants.map((item) => ({ id: item.classId, name: item.className })),
+      resources: [],
+    }, this.meta());
     const classIds = grants.map((item) => item.classId);
     const resources = await this.dependencies.repository.listPublishedResourceOptions(actor.organizationId);
     return success({
@@ -138,23 +146,26 @@ export class TeacherTaskQueryService {
       if (task.version !== input.expectedVersion) return failure('CONFLICT', this.meta());
       const preview = taskPreview(task, task.targetClassIds.filter((classId) => classIds.includes(classId)));
       if (task.status !== 'draft') return success(preview, this.meta());
-      const resources = await this.dependencies.repository.listPublishedResourceOptions(actor.organizationId);
-      const items = task.itemRefs.map((item) => {
-        const resource = resources.find((candidate) => candidate.id === item.resourceId);
-        return resource === undefined ? null : {
+      const items: SafeTaskItemView[] = [];
+      for (const item of task.itemRefs) {
+        const resource = await this.dependencies.repository.findPublishedResourceOption(actor.organizationId, item.resourceId);
+        if (resource === null || !task.targetClassIds.every((classId) => resource.allowedClassIds.includes(classId))) {
+          return failure('RESOURCE_OFFLINE', this.meta());
+        }
+        items.push({
           id: item.id, resourceId: item.resourceId, resourceVersion: 1, snapshotSchemaVersion: 1 as const,
           title: resource.title, type: resource.type, completionRule: item.completionRule ?? {}, order: item.order,
-        };
-      }).filter((item): item is NonNullable<typeof item> => item !== null);
+        });
+      }
       return success({ ...preview, items }, this.meta());
     }
     if (input.draft.targetClassIds.length === 0 || input.draft.targetClassIds.some((classId) => !classIds.includes(classId))) {
       return failure('FORBIDDEN', this.meta());
     }
-    const resources = await this.dependencies.repository.listPublishedResourceOptions(actor.organizationId);
     for (const item of input.draft.items) {
-      const resource = resources.find((candidate) => candidate.id === item.resourceId);
-      if (resource === undefined || !input.draft.targetClassIds.every((classId) => resource.allowedClassIds.includes(classId))) {
+      const resource = await this.dependencies.repository.findPublishedResourceOption(actor.organizationId, item.resourceId);
+      if (resource === null || resource.type !== item.type
+        || !input.draft.targetClassIds.every((classId) => resource.allowedClassIds.includes(classId))) {
         return failure('RESOURCE_OFFLINE', this.meta());
       }
     }
@@ -189,7 +200,10 @@ export class TeacherTaskQueryService {
       || task.targetClassIds.some((classId) => !allowedClassIds.has(classId))) return failure('NOT_FOUND', this.meta());
     return success({
       taskId: task.id, title: task.title, status: task.status, version: task.version,
-      description: task.description, teacherNote: task.teacherNote, startsAt: task.startsAt, dueAt: task.dueAt,
+      description: task.description, teacherNote: task.teacherNote,
+      copiedFromTaskId: task.copiedFromTaskId ?? null,
+      copiedFromTemplateId: task.copiedFromTemplateId ?? null,
+      startsAt: task.startsAt, dueAt: task.dueAt,
       latePolicy: { ...task.latePolicy },
       target: { type: task.targetType, classIds: [...task.targetClassIds], studentIds: [...task.targetStudentIds] },
       itemRefs: task.itemRefs.map((item) => ({ ...item, ...(item.completionRule === undefined ? {} : { completionRule: { ...item.completionRule } }), ...(item.scoringRule === undefined ? {} : { scoringRule: { ...item.scoringRule } }) })),
@@ -224,7 +238,8 @@ export class TeacherTaskQueryService {
     if (!paged.ok) return failure('CONFLICT', this.meta());
     const visibleItems = await Promise.all(paged.value.items.map(async (item) => {
       const feedback = item.latestSubmissionId === null ? null : await this.dependencies.repository.findFeedback(actor.organizationId, item.latestSubmissionId);
-      return { ...item, score: feedback?.score ?? null };
+      const submission = item.latestSubmissionId === null ? null : await this.dependencies.repository.findSubmission(actor.organizationId, item.latestSubmissionId);
+      return { ...item, score: feedback?.score ?? (submission && item.status !== 'redo_required' ? automaticTaskScore(task, submission) : null) };
     }));
     const countedAssignments = assignments.filter((item) => item.taskId === taskId && classIds.includes(item.classId));
     const counts = Object.fromEntries(COMPLETION_STATUSES.map((status) => [status, countedAssignments.filter((item) => item.status === status).length])) as Readonly<Record<AssignmentStatus, number>>;
@@ -249,6 +264,7 @@ export class TeacherTaskQueryService {
 function draftOptionCompletionRule(type: QueryResourceOptionRecord['type']): JsonObject {
   if (type === 'reading') return { kind: 'reading_pages', requiredPageCount: 1 };
   if (type === 'vocabulary') return { kind: 'vocabulary_words', requiredWordCount: 1 };
+  if (type === 'recording') return { kind: 'recording_upload' };
   return { kind: 'exercise_questions', requiredQuestionCount: 1 };
 }
 
@@ -267,17 +283,32 @@ export class StudentTaskQueryService {
     ]);
     const ownAssignments = assignments.filter((item) => item.studentId === actor.actorUserId);
     const taskById = new Map(tasks.filter((task) => task.status !== 'draft' && task.status !== 'withdrawn').map((task) => [task.id, task]));
-    const today = ownAssignments
-      .filter((assignment) => {
-        const task = taskById.get(assignment.taskId);
-        return task !== undefined && isStudentTaskVisible(task, assignment) && (task.startsAt.slice(0, 10) === localDate || task.dueAt.slice(0, 10) === localDate);
-      })
+    const visible = ownAssignments.filter((assignment) => {
+      const task = taskById.get(assignment.taskId);
+      return task !== undefined && task.visibility !== 'recycled' && isStudentTaskVisible(task, assignment);
+    });
+    const isUrgent = (assignment: TaskAssignmentRecord): boolean => assignment.status === 'redo_required'
+      || assignment.status === 'overdue'
+      || (assignment.status !== 'completed' && assignment.status !== 'awaiting_review' && assignment.redoDueAt !== null);
+    const onDate = (assignment: TaskAssignmentRecord): boolean => {
+      const task = taskById.get(assignment.taskId)!;
+      return task.startsAt.slice(0, 10) === localDate || task.dueAt.slice(0, 10) === localDate;
+    };
+    const completedToday = (assignment: TaskAssignmentRecord): boolean =>
+      (assignment.status === 'awaiting_review' || assignment.status === 'completed')
+      && (assignment.submittedAt?.slice(0, 10) === localDate
+        || assignment.reviewedAt?.slice(0, 10) === localDate);
+    const counted = visible.filter((assignment) => (onDate(assignment) || completedToday(assignment))
+      && !isUrgent(assignment));
+    const today = visible.filter((assignment) => onDate(assignment) || completedToday(assignment)
+      || isUrgent(assignment))
       .map((assignment) => studentTaskItem(taskById.get(assignment.taskId) as TaskRecord, assignment));
     today.sort(studentTaskOrder);
     return success({
       localDate,
-      completedCount: today.filter((item) => item.status === 'awaiting_review' || item.status === 'completed').length,
-      totalCount: today.length,
+      completedCount: counted.filter((item) => item.status === 'awaiting_review' || item.status === 'completed').length,
+      totalCount: counted.length,
+      todayTasks: today,
       nextTask: today.find((item) => item.status !== 'awaiting_review' && item.status !== 'completed') ?? null,
     }, this.meta());
   }
@@ -327,13 +358,30 @@ export class StudentTaskQueryService {
       ? null
       : await this.dependencies.repository.findSubmission(actor.organizationId, assignment.latestSubmissionId);
     const submission = draft ?? latestSubmitted;
-    const feedback = submission === null || submission.status === 'draft'
-      ? null
-      : await this.dependencies.repository.findFeedback(actor.organizationId, submission.id);
+    const latestFeedback = latestSubmitted === null ? null
+      : await this.dependencies.repository.findFeedback(actor.organizationId, latestSubmitted.id);
+    const feedback = assignment.redoDueAt !== null && latestFeedback?.decision === 'returned'
+      ? latestFeedback : submission === null || submission.status === 'draft' ? null : latestFeedback;
+    const readingCutoff = assignment.redoDueAt !== null && latestFeedback?.decision === 'returned'
+      ? latestFeedback.publishedAt : task.publishedAt;
     const history = (await this.dependencies.repository.listTaskSubmissions(actor.organizationId, taskId))
       .filter((item) => item.assignmentId === assignment.id && item.studentId === actor.actorUserId && item.submittedAt !== null)
-      .sort((left, right) => right.submissionVersion - left.submissionVersion);
-    return success(studentTaskDetail(task, assignment, submission, feedback, history), this.meta());
+      .sort((left, right) => right.submissionVersion - left.submissionVersion)
+      .slice(0, 3);
+    const historyFeedback = new Map(await Promise.all(history.map(async item =>
+      [item.id, await this.dependencies.repository.findFeedback(actor.organizationId, item.id)] as const)));
+    const readingPageProgress = await Promise.all(task.items.flatMap(item => {
+      const pageIds = item.resourceSnapshot.type === 'reading' ? selectedReadingPageIds(item.completionRule) : null;
+      const resourceId = item.resourceId || task.itemRefs.find(reference => reference.id === item.id)?.resourceId;
+      if (pageIds === null || !resourceId) return [];
+      return [this.dependencies.repository.listReadingPageEvents(actor.organizationId, actor.actorUserId, resourceId)
+        .then(events => ({ itemId: item.id, completedPageCount: new Set(events.filter(event =>
+          event.contentVersion === String(item.resourceVersion) && readingCutoff !== null
+          && Date.parse(event.visitedAt) >= Date.parse(readingCutoff)
+          && Date.parse(event.visitedAt) <= Date.parse(this.dependencies.clock.nowIso())
+          && pageIds.includes(event.pageId)).map(event => event.pageId)).size }))];
+    }));
+    return success({ ...studentTaskDetail(task, assignment, submission, feedback, history, historyFeedback), readingPageProgress }, this.meta());
   }
 
   private meta() { return createServiceMeta(this.dependencies); }
@@ -387,13 +435,23 @@ export class ReviewQueryService {
     if (submission === null || submission.status === 'draft' || submission.submittedAt === null) return failure('NOT_FOUND', this.meta());
     const assignment = await this.dependencies.repository.findAssignmentById(actor.organizationId, submission.assignmentId);
     if (assignment === null
-      || assignment.latestSubmissionId !== submission.id
-      || assignment.latestSubmissionVersion !== submission.submissionVersion
+      || assignment.taskId !== submission.taskId || assignment.studentId !== submission.studentId
+      || submission.submissionVersion > assignment.latestSubmissionVersion
       || !grants.some((item) => item.classId === assignment.classId)) return failure('NOT_FOUND', this.meta());
     const task = await this.dependencies.repository.findTask(actor.organizationId, submission.taskId);
     if (task === null) return failure('NOT_FOUND', this.meta());
+    const history = (await this.dependencies.repository.listTaskSubmissions(actor.organizationId, task.id))
+      .filter(item => item.assignmentId === assignment.id && item.studentId === assignment.studentId
+        && item.status !== 'draft' && item.submittedAt !== null
+        && item.submissionVersion <= assignment.latestSubmissionVersion)
+      .sort((left, right) => right.submissionVersion - left.submissionVersion);
+    if (!history.some(item => item.id === submission.id)) return failure('NOT_FOUND', this.meta());
     const feedback = await this.dependencies.repository.findFeedback(actor.organizationId, submission.id);
-    return success(reviewSubmission(task, assignment, submission, feedback), this.meta());
+    const vocabularyEvidence = await taskVocabularyEvidence(this.dependencies.repository, task, submission);
+    if (vocabularyEvidence === null) return failure('SERVICE_UNAVAILABLE', this.meta());
+    return success(reviewSubmission(task, assignment, submission, feedback, vocabularyEvidence,
+      history.map(item => ({ id: item.id, version: item.submissionVersion,
+        status: item.status, submittedAt: item.submittedAt as string }))), this.meta());
   }
 
   public async previewBatchComment(
@@ -435,6 +493,7 @@ export class ReviewQueryService {
         && submission.status === 'submitted'
         && submission.submittedAt !== null
         && feedback === null
+        && manualTaskItemIds(task, submission)?.length === 0
         && (assignment.status === 'awaiting_review' || assignment.status === 'completed')) {
         eligibleCount += 1;
         previewVersion = Math.max(previewVersion, submission.submissionVersion, submission.recordVersion);
@@ -575,12 +634,57 @@ function studentTaskItem(task: TaskRecord, assignment: TaskAssignmentRecord): St
     dueAt: task.dueAt,
     submittedAt: assignment.submittedAt,
     isLate: assignment.isLate,
+    redoDueAt: assignment.redoDueAt,
   };
 }
 
 function studentTaskOrder(left: StudentTaskListItem, right: StudentTaskListItem): number {
-  const priority = (status: AssignmentStatus): number => status === 'redo_required' ? 0 : status === 'overdue' ? 1 : status === 'in_progress' ? 2 : status === 'not_started' ? 3 : 4;
-  return priority(left.status) - priority(right.status) || left.dueAt.localeCompare(right.dueAt) || left.taskId.localeCompare(right.taskId);
+  const priority = (item: StudentTaskListItem): number => item.status === 'redo_required' || Boolean(item.redoDueAt) ? 0
+    : item.status === 'overdue' ? 1 : item.status === 'in_progress' ? 2 : item.status === 'not_started' ? 3 : 4;
+  return priority(left) - priority(right)
+    || (left.redoDueAt ?? left.dueAt).localeCompare(right.redoDueAt ?? right.dueAt)
+    || left.taskId.localeCompare(right.taskId);
+}
+
+function studentSafeSubmissionAnswer(task: TaskRecord, answer: SubmissionAnswer,
+  revealJudgement: boolean): SubmissionAnswer {
+  const item = task.items.find((candidate) => candidate.id === answer.itemId);
+  const value = answer.value;
+  if (typeof value === 'string') return { itemId: answer.itemId, value };
+  if (item === undefined || !isJsonRecord(value)) return { itemId: answer.itemId, value: '' };
+  if (item.resourceSnapshot.type === 'reading' && value.kind === 'reading'
+    && typeof value.completedPageCount === 'number' && Number.isSafeInteger(value.completedPageCount)) {
+    return { itemId: answer.itemId, value: { kind: 'reading', completedPageCount: value.completedPageCount } };
+  }
+  if (item.resourceSnapshot.type === 'vocabulary' && value.kind === 'vocabulary'
+    && typeof value.completedWordCount === 'number' && Number.isSafeInteger(value.completedWordCount)
+    && typeof value.correctWordCount === 'number' && Number.isSafeInteger(value.correctWordCount)) {
+    return { itemId: answer.itemId, value: { kind: 'vocabulary', completedWordCount: value.completedWordCount,
+      correctWordCount: value.correctWordCount } };
+  }
+  if (item.resourceSnapshot.type === 'recording' && value.kind === 'recording'
+    && typeof value.recordingId === 'string') {
+    return { itemId: answer.itemId, value: { kind: 'recording', recordingId: value.recordingId,
+      ...(typeof value.durationMs === 'number' ? { durationMs: value.durationMs } : {}),
+      ...(typeof value.sizeBytes === 'number' ? { sizeBytes: value.sizeBytes } : {}) } };
+  }
+  if (item.resourceSnapshot.type === 'exercise' && value.kind === 'exercise'
+    && typeof value.answeredQuestionCount === 'number' && Number.isSafeInteger(value.answeredQuestionCount)) {
+    const questionResponses = Array.isArray(value.questionResponses) ? value.questionResponses.flatMap((entry) => {
+      if (!isJsonRecord(entry) || typeof entry.questionId !== 'string') return [];
+      const response = typeof entry.response === 'string' ? entry.response
+        : Array.isArray(entry.response) && entry.response.every((part) => typeof part === 'string')
+          ? [...entry.response] : null;
+      if (response === null) return [];
+      return [{ questionId: entry.questionId, response,
+        ...(revealJudgement && typeof entry.isCorrect === 'boolean' ? { isCorrect: entry.isCorrect } : {}) }];
+    }) : [];
+    return { itemId: answer.itemId, value: { kind: 'exercise', answeredQuestionCount: value.answeredQuestionCount,
+      questionResponses,
+      ...(revealJudgement && typeof value.correctQuestionCount === 'number'
+        ? { correctQuestionCount: value.correctQuestionCount } : {}) } };
+  }
+  return { itemId: answer.itemId, value: '' };
 }
 
 function studentTaskDetail(
@@ -589,15 +693,20 @@ function studentTaskDetail(
   submission: SubmissionRecord | null,
   feedback: ReviewFeedbackRecord | null,
   history: readonly SubmissionRecord[],
+  historyFeedback: ReadonlyMap<string, ReviewFeedbackRecord | null>,
 ): StudentTaskDetailView {
   return {
     taskId: task.id,
     title: task.title,
     description: task.description,
+    status: task.status,
     startsAt: task.startsAt,
     dueAt: task.dueAt,
+    latePolicy: { ...task.latePolicy },
     items: task.items.map((item) => safeTaskItem(item, task.itemRefs)),
+    automaticScore: submission === null ? null : automaticTaskScore(task, submission),
     assignment: {
+      classId: assignment.classId,
       status: assignment.status,
       isLate: assignment.isLate,
       submittedAt: assignment.submittedAt,
@@ -609,12 +718,16 @@ function studentTaskDetail(
       id: submission.id,
       version: submission.submissionVersion,
       status: submission.status,
-      answers: submission.answers,
+      answers: submission.answers.map((answer) => studentSafeSubmissionAnswer(task, answer,
+        feedback?.decision === 'approved' && feedback.submissionId === submission.id)),
       submittedAt: submission.submittedAt,
       recordVersion: submission.recordVersion,
       assignmentVersion: assignment.version,
     },
-    submissionHistory: history.map((item) => ({ version: item.submissionVersion, status: item.status, submittedAt: item.submittedAt! })),
+    submissionHistory: history.map((item) => ({ version: item.submissionVersion, status: item.status,
+      submittedAt: item.submittedAt!, answers: item.answers.map((answer) => studentSafeSubmissionAnswer(task, answer,
+        historyFeedback.get(item.id)?.decision === 'approved')),
+      feedback: safeFeedback(historyFeedback.get(item.id) ?? null) })),
     feedback: safeFeedback(feedback),
   };
 }
@@ -624,7 +737,46 @@ function reviewSubmission(
   assignment: TaskAssignmentRecord,
   submission: SubmissionRecord,
   feedback: ReviewFeedbackRecord | null,
+  vocabularyEvidence: ReviewSubmissionView['vocabularyEvidence'],
+  submissionHistory: ReviewSubmissionView['submissionHistory'],
 ): ReviewSubmissionView {
+  const readingPages = task.items.flatMap((item) => {
+    if (item.resourceSnapshot.type !== 'reading') return [];
+    const selectedIds = selectedReadingPageIds(item.completionRule);
+    const chapters = item.resourceSnapshot.payload.chapters;
+    if (selectedIds === null || !Array.isArray(chapters)) return [];
+    const pages = chapters.flatMap((rawChapter) => {
+      if (!isJsonRecord(rawChapter) || !Array.isArray(rawChapter.pages)) return [];
+      return rawChapter.pages.flatMap((rawPage) => {
+        if (!isJsonRecord(rawPage) || typeof rawPage.id !== 'string'
+          || typeof rawPage.pageNumber !== 'number' || !Number.isSafeInteger(rawPage.pageNumber)
+          || typeof rawPage.imageAssetKey !== 'string' || typeof rawPage.thumbnailAssetKey !== 'string') return [];
+        return [{ itemId: item.id, pageId: rawPage.id, pageNumber: rawPage.pageNumber,
+          chapterTitle: typeof rawChapter.title === 'string' ? rawChapter.title : '',
+          imageAssetKey: rawPage.imageAssetKey, thumbnailAssetKey: rawPage.thumbnailAssetKey }];
+      });
+    });
+    return selectedIds.flatMap(id => pages.find(page => page.pageId === id) ?? []);
+  });
+  const exerciseEvidence = task.items.flatMap((item) => {
+    if (item.resourceSnapshot.type !== 'exercise') return [];
+    const question = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
+    if (question === null) return [];
+    const answer = submission.answers.find((candidate) => candidate.itemId === item.id);
+    const value = answer?.value;
+    const responseEntries = isJsonRecord(value) && Array.isArray(value.questionResponses) ? value.questionResponses : [];
+    const response = responseEntries.find((entry): entry is JsonObject => isJsonRecord(entry)
+      && entry.questionId === question.questionId);
+    const recorded = response !== undefined && response.response !== undefined;
+    return [{
+      itemId: item.id, questionId: question.questionId, questionType: question.questionType,
+      stem: question.stem, options: [...question.options],
+      studentResponse: recorded ? response.response! : null,
+      correctAnswer: question.correctAnswer, explanation: question.explanation,
+      isCorrect: response?.isCorrect === true ? true : response?.isCorrect === false ? false : null,
+      recorded,
+    }];
+  });
   return {
     taskId: task.id,
     taskTitle: task.title,
@@ -634,14 +786,74 @@ function reviewSubmission(
     classId: assignment.classId,
     submissionId: submission.id,
     submissionVersion: submission.submissionVersion,
+    submissionHistory,
+    taskItems: task.items.map(item => ({ id: item.id, title: item.resourceSnapshot.title,
+      type: item.resourceSnapshot.type, completionRule: item.completionRule, order: item.order,
+      ...(item.resourceSnapshot.type === 'recording' && typeof item.resourceSnapshot.payload.promptText === 'string'
+        ? { recordingPrompt: item.resourceSnapshot.payload.promptText } : {}) })),
+    scoringItems: taskScoringItems(task, submission),
+    readingPages,
     answers: submission.answers,
+    automaticScore: automaticTaskScore(task, submission),
+    exerciseEvidence,
+    vocabularyEvidence,
     isLate: submission.isLate,
     submittedAt: submission.submittedAt as string,
-    feedback: safeFeedback(feedback),
+    feedback: feedback === null ? null : {
+      ...safeFeedback(feedback)!,
+      ...(feedback.originalAutomaticScore === undefined ? {} : { originalAutomaticScore: feedback.originalAutomaticScore }),
+      ...(feedback.overrideReason === undefined ? {} : { overrideReason: feedback.overrideReason }),
+      ...(feedback.itemScores === undefined ? {} : { itemScores: feedback.itemScores.map(item => ({ ...item })) }),
+    },
   };
 }
 
+async function taskVocabularyEvidence(repository: TaskQueryRepository, task: TaskRecord,
+  submission: SubmissionRecord): Promise<ReviewSubmissionView['vocabularyEvidence'] | null> {
+  const rows: ReviewSubmissionView['vocabularyEvidence'][number][] = [];
+  for (const item of task.items) {
+    if (item.resourceSnapshot.type !== 'vocabulary' || item.snapshotSchemaVersion !== 2) continue;
+    const wordIds = vocabularyWordIds(item.resourceSnapshot.payload);
+    if (wordIds === null) return null;
+    const attempts = await repository.listVocabularyAttempts(task.organizationId, submission.studentId,
+      item.resourceId, task.id, item.id, submission.submissionVersion, String(item.resourceVersion));
+    if (summarizeVocabularyFirstAttempts(wordIds, attempts) === null) return null;
+    const rawWords = item.resourceSnapshot.payload.words;
+    if (!Array.isArray(rawWords)) return null;
+    for (const rawWord of rawWords) {
+      if (!isJsonRecord(rawWord) || typeof rawWord.id !== 'string' || typeof rawWord.word !== 'string') return null;
+      const wordAttempts = attempts.filter((attempt) => attempt.wordId === rawWord.id)
+        .sort((left, right) => left.attemptNumber - right.attemptNumber)
+        .map((attempt) => ({ studentInput: attempt.studentInput, isCorrect: attempt.isCorrect,
+          firstAttempt: attempt.firstAttempt, attemptNumber: attempt.attemptNumber, attemptedAt: attempt.attemptedAt }));
+      rows.push({ itemId: item.id, wordId: rawWord.id, targetWord: rawWord.word,
+        ...(typeof rawWord.meaning === 'string' ? { meaning: rawWord.meaning } : {}),
+        ...(typeof rawWord.example === 'string' ? { example: rawWord.example } : {}),
+        ...(Array.isArray(rawWord.syllables) && rawWord.syllables.every(part => typeof part === 'string')
+          ? { syllables: rawWord.syllables as string[] } : {}),
+        attempts: wordAttempts, firstCorrect: wordAttempts[0]?.isCorrect ?? null });
+    }
+  }
+  return rows;
+}
+
+function isJsonRecord(value: JsonValue | undefined): value is JsonObject {
+  return value !== undefined && value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function safeTaskItem(item: TaskRecord['items'][number], references: TaskRecord['itemRefs']): SafeTaskItemView {
+  const question = item.resourceSnapshot.type === 'exercise'
+    ? readExerciseQuestionSnapshot(item.resourceSnapshot.payload) : null;
+  const vocabularyWords = item.resourceSnapshot.type === 'vocabulary' && item.snapshotSchemaVersion === 2
+    ? item.resourceSnapshot.payload.words : null;
+  const vocabularyWordIds = Array.isArray(vocabularyWords)
+    ? vocabularyWords.flatMap((word) => isJsonRecord(word) && typeof word.id === 'string' ? [word.id] : []) : [];
+  const vocabularyPack = safeVocabularyPack(item);
+  const readingPageNumbers = item.resourceSnapshot.type === 'reading'
+    ? pageNumbersFromSnapshot(item.resourceSnapshot.payload, item.completionRule) : null;
+  const recordingPrompt = item.resourceSnapshot.type === 'recording'
+    && typeof item.resourceSnapshot.payload.promptText === 'string'
+    ? item.resourceSnapshot.payload.promptText : null;
   return {
     id: item.id,
     resourceId: item.resourceId || references.find((reference) => reference.id === item.id)?.resourceId || '',
@@ -650,13 +862,49 @@ function safeTaskItem(item: TaskRecord['items'][number], references: TaskRecord[
     title: item.resourceSnapshot.title,
     type: item.resourceSnapshot.type,
     completionRule: item.completionRule,
+    ...(readingPageNumbers === null ? {} : { readingPageNumbers }),
+    ...(recordingPrompt === null ? {} : { recordingPrompt }),
+    ...(vocabularyWordIds.length ? { vocabularyWordIds } : {}),
+    ...(vocabularyPack === null ? {} : { vocabularyPack }),
+    ...(question === null ? {} : { exerciseQuestion: {
+      questionId: question.questionId, questionType: question.questionType,
+      stem: question.stem, options: [...question.options],
+    } }),
     order: item.order,
   };
+}
+
+function pageNumbersFromSnapshot(payload: JsonObject, rule: JsonObject): readonly number[] | null {
+  const selected = selectedReadingPageIds(rule);
+  if (selected === null || !Array.isArray(payload.chapters)) return null;
+  const pages = payload.chapters.flatMap(chapter => isJsonRecord(chapter) && Array.isArray(chapter.pages)
+    ? chapter.pages.filter(isJsonRecord) : []);
+  const numbers = selected.map(id => pages.find(page => page.id === id)?.pageNumber);
+  return numbers.every(number => typeof number === 'number' && Number.isSafeInteger(number) && number > 0)
+    ? numbers as number[] : null;
+}
+
+function safeVocabularyPack(item: TaskRecord['items'][number]): SafeTaskItemView['vocabularyPack'] | null {
+  if (item.resourceSnapshot.type !== 'vocabulary' || item.snapshotSchemaVersion !== 2) return null;
+  const payload = item.resourceSnapshot.payload;
+  if (!Array.isArray(payload.words) || typeof payload.grade !== 'string' || typeof payload.unit !== 'string') return null;
+  const words: Array<{ id: string; word: string; meaning: string; syllables: string[]; example?: string }> = [];
+  for (const raw of payload.words) {
+    if (!isJsonRecord(raw) || typeof raw.id !== 'string' || typeof raw.word !== 'string'
+      || typeof raw.meaning !== 'string' || !Array.isArray(raw.syllables)
+      || !raw.syllables.every((part) => typeof part === 'string' && part.trim())) return null;
+    words.push({ id: raw.id, word: raw.word, meaning: raw.meaning, syllables: [...raw.syllables],
+      ...(typeof raw.example === 'string' ? { example: raw.example } : {}) });
+  }
+  return { id: item.resourceId, title: item.resourceSnapshot.title, grade: payload.grade,
+    ...(typeof payload.textbook === 'string' ? { textbook: payload.textbook } : {}),
+    unit: payload.unit, contentVersion: String(item.resourceVersion), words };
 }
 
 function safeFeedback(feedback: ReviewFeedbackRecord | null): StudentTaskDetailView['feedback'] {
   return feedback === null ? null : {
     id: feedback.id,
+    submissionId: feedback.submissionId,
     decision: feedback.decision,
     score: feedback.score,
     textComment: feedback.textComment,

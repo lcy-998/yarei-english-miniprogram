@@ -8,6 +8,8 @@ import { createOrgContentDocumentPersistence } from '../../src/repositories/org-
 import { createTaskQueryDocumentRepository } from '../../src/repositories/task-query-document-adapter';
 import { createDefaultCloudBaseFunction } from '../shared/default-cloudbase-function';
 import { createOrganizationAdminFunction } from './function-entry';
+import { QuestionAdminService } from '../../src/question-admin/service';
+import { StudentWorkAdminService } from '../../src/student-work/admin-service';
 
 export { createOrganizationAdminFunction } from './function-entry';
 
@@ -27,6 +29,8 @@ export const main = createDefaultCloudBaseFunction(
     const persistence = createOrgContentDocumentPersistence(infrastructure.documents);
     return createOrganizationAdminFunction({
       ...infrastructure,
+      questions: new QuestionAdminService(infrastructure.documents, infrastructure.clock),
+      studentWorks: new StudentWorkAdminService(infrastructure.documents, infrastructure.clock),
       handler: new OrganizationService(
         persistence.repository,
         infrastructure.clock,

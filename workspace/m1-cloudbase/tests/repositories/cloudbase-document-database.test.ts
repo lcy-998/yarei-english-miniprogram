@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCloudBaseDocumentDatabase } from '../../src/repositories/cloudbase-document-database';
 import { DocumentDatabasePlatformError, type VersionedDocument } from '../../src/repositories/document-database-port';
+import { FakeDocumentDatabase } from '../../src/repositories/fake-document-database';
 import { NativeDatabaseDouble } from '../support/native-database-double';
 
 describe('CloudBase native document database bridge', () => {
@@ -15,6 +16,21 @@ describe('CloudBase native document database bridge', () => {
     await expect(database.get('tasks', 'missing')).resolves.toBeNull();
     await expect(database.find('tasks', { organizationId: 'organization_demo', status: 'active' }))
       .resolves.toEqual([first, second]);
+  });
+
+  it('returns the same bounded _id page in CloudBase and fake repositories', async () => {
+    const seed = [document('task_3', 1, 'active'), document('task_1', 1, 'active'), document('task_2', 1, 'active')];
+    const cloud = createCloudBaseDocumentDatabase(new NativeDatabaseDouble({ tasks: seed }));
+    const fake = new FakeDocumentDatabase({ tasks: seed });
+    const criteria = { organizationId: 'organization_demo', status: 'active' };
+    const first = { limit: 2, offset: 0 };
+    const second = { limit: 2, offset: 2 };
+    expect(await cloud.findPage('tasks', criteria, first)).toEqual(await fake.findPage('tasks', criteria, first));
+    expect(await cloud.findPage('tasks', criteria, second)).toEqual(await fake.findPage('tasks', criteria, second));
+    expect(await cloud.findPage('tasks', criteria, first)).toMatchObject({
+      items: [{ _id: 'task_1' }, { _id: 'task_2' }], hasMore: true,
+    });
+    await expect(cloud.findPage('tasks', criteria, { limit: 51, offset: 0 })).rejects.toMatchObject({ kind: 'invalid-data' });
   });
 
   it('binds create, CAS replace, append and delete to one native transaction', async () => {

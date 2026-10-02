@@ -260,6 +260,358 @@
         "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
         "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
       }
+    },
+    {
+      "name": "activity-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "activity-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "vocabulary-evidence-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "vocabulary-evidence-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "student-work-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "student-work-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "phonics-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "phonics-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 15,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "task-template-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "notification-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "notification-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "task-template-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "learning-stats-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "teacher-textbook-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "admin-task-activity-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "admin-task-activity-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "teacher-textbook-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "textbook-admin-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "maintenance-timer",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "task-recording-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "task-recording-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "textbook-admin-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
     }
   ]
 }

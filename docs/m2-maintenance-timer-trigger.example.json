@@ -1,0 +1,8 @@
+{
+  "functionName": "maintenance-timer",
+  "trigger": {
+    "name": "yarei_maintenance_minute",
+    "type": "timer",
+    "config": "0 * * * * * *"
+  }
+}

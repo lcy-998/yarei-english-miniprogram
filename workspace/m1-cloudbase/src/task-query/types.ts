@@ -1,4 +1,4 @@
-import type { JsonObject } from '../shared/protocol';
+import type { JsonObject, JsonValue } from '../shared/protocol';
 import type {
   AssignmentStatus,
   ReviewFeedbackRecord,
@@ -22,7 +22,7 @@ export interface QueryResourceOptionRecord {
   readonly id: string;
   readonly organizationId: string;
   readonly title: string;
-  readonly type: 'reading' | 'vocabulary' | 'exercise';
+  readonly type: 'reading' | 'vocabulary' | 'exercise' | 'recording';
   readonly status: 'draft' | 'published' | 'offline';
   readonly allowedClassIds: readonly string[];
 }
@@ -123,6 +123,8 @@ export interface TeacherTaskEditView {
   readonly version: number;
   readonly description: string | null;
   readonly teacherNote: string | null;
+  readonly copiedFromTaskId?: string | null;
+  readonly copiedFromTemplateId?: string | null;
   readonly startsAt: string;
   readonly dueAt: string;
   readonly latePolicy: TaskRecord['latePolicy'];
@@ -159,12 +161,14 @@ export interface StudentTaskListItem {
   readonly dueAt: string;
   readonly submittedAt: string | null;
   readonly isLate: boolean;
+  readonly redoDueAt?: string | null;
 }
 
 export interface StudentHomeView {
   readonly localDate: string;
   readonly completedCount: number;
   readonly totalCount: number;
+  readonly todayTasks: readonly StudentTaskListItem[];
   readonly nextTask: StudentTaskListItem | null;
 }
 
@@ -231,10 +235,15 @@ export interface StudentTaskDetailView {
   readonly taskId: string;
   readonly title: string;
   readonly description: string | null;
+  readonly status: TaskRecord['status'];
   readonly startsAt: string;
   readonly dueAt: string;
+  readonly latePolicy: TaskRecord['latePolicy'];
   readonly items: readonly SafeTaskItemView[];
+  readonly readingPageProgress?: readonly Readonly<{ itemId: string; completedPageCount: number }>[];
+  readonly automaticScore: number | null;
   readonly assignment: Readonly<{
+    classId: string;
     status: AssignmentStatus;
     isLate: boolean;
     submittedAt: string | null;
@@ -251,9 +260,11 @@ export interface StudentTaskDetailView {
     recordVersion: number;
     assignmentVersion: number;
   }> | null;
-  readonly submissionHistory: readonly Readonly<{ version: number; status: SubmissionRecord['status']; submittedAt: string }>[];
+  readonly submissionHistory: readonly Readonly<{ version: number; status: SubmissionRecord['status']; submittedAt: string;
+    answers: readonly SubmissionAnswer[]; feedback: StudentTaskDetailView['feedback'] }>[];
   readonly feedback: Readonly<{
     id: string;
+    submissionId?: string;
     decision: ReviewFeedbackRecord['decision'];
     score: number | null;
     textComment: string | null;
@@ -275,7 +286,37 @@ export interface ReviewSubmissionView {
   readonly classId: string;
   readonly submissionId: string;
   readonly submissionVersion: number;
+  readonly submissionHistory: readonly Readonly<{ id: string; version: number; status: SubmissionRecord['status']; submittedAt: string }>[];
+  readonly taskItems: readonly Readonly<{ id: string; title: string; type: QueryResourceOptionRecord['type']; completionRule: JsonObject; order: number; recordingPrompt?: string }>[];
+  readonly scoringItems: readonly Readonly<{ itemId: string; weightPercent: number; automaticScore: number | null;
+    teacherScoreRequired: boolean; complete: boolean }>[];
+  readonly readingPages: readonly Readonly<{ itemId: string; pageId: string; pageNumber: number; chapterTitle: string;
+    imageAssetKey: string; thumbnailAssetKey: string }>[];
   readonly answers: readonly SubmissionAnswer[];
+  readonly automaticScore: number | null;
+  readonly exerciseEvidence: readonly Readonly<{
+    itemId: string;
+    questionId: string;
+    questionType: 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
+    stem: string;
+    options: readonly string[];
+    studentResponse: JsonValue | null;
+    correctAnswer: JsonValue;
+    explanation: string;
+    isCorrect: boolean | null;
+    recorded: boolean;
+  }>[];
+  readonly vocabularyEvidence: readonly Readonly<{
+    itemId: string;
+    wordId: string;
+    targetWord: string;
+    meaning?: string;
+    example?: string;
+    syllables?: readonly string[];
+    attempts: readonly Readonly<{ studentInput: string; isCorrect: boolean; firstAttempt: boolean;
+      attemptNumber: number; attemptedAt: string }>[];
+    firstCorrect: boolean | null;
+  }>[];
   readonly isLate: boolean;
   readonly submittedAt: string;
   readonly feedback: Readonly<{
@@ -285,6 +326,9 @@ export interface ReviewSubmissionView {
     textComment: string | null;
     returnReason: string | null;
     publishedAt: string;
+    originalAutomaticScore?: number | null;
+    overrideReason?: string | null;
+    itemScores?: readonly Readonly<{ itemId: string; score: number }>[];
   }> | null;
 }
 
@@ -324,9 +368,21 @@ export interface SafeTaskItemView {
   readonly id: string;
   readonly resourceId: string;
   readonly resourceVersion: number;
-  readonly snapshotSchemaVersion: 1;
+  readonly snapshotSchemaVersion: 1 | 2;
   readonly title: string;
   readonly type: QueryResourceOptionRecord['type'];
   readonly completionRule: JsonObject;
+  readonly readingPageNumbers?: readonly number[];
+  readonly recordingPrompt?: string;
+  readonly vocabularyWordIds?: readonly string[];
+  readonly vocabularyPack?: Readonly<{ id: string; title: string; grade: string; textbook?: string;
+    unit: string; contentVersion: string; words: readonly Readonly<{ id: string; word: string; meaning: string;
+      syllables: readonly string[]; example?: string }>[] }>;
+  readonly exerciseQuestion?: Readonly<{
+    questionId: string;
+    questionType: 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
+    stem: string;
+    options: readonly string[];
+  }>;
   readonly order: number;
 }

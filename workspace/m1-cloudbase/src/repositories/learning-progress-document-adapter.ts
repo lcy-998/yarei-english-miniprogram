@@ -6,6 +6,7 @@ import {
   type LearningProgressOperationRecord,
   type LearningResourceAccessRecord,
   type ReadingProgressRecord,
+  type ReadingPageEventRecord,
   type VocabularyProgressRecord,
 } from '../learning-progress/types';
 import {
@@ -19,6 +20,7 @@ import {
 export const LEARNING_PROGRESS_COLLECTIONS = {
   resources: 'learning_resources',
   reading: 'reading_progress',
+  readingPageEvents: 'reading_page_events',
   vocabulary: 'vocabulary_progress',
   idempotency: 'idempotency_records',
   audit: 'operation_logs',
@@ -44,6 +46,10 @@ class LearningProgressDocumentRepository implements LearningProgressRepository {
   ): Promise<ReadingProgressRecord | null> {
     return this.read((reader) => new LearningProgressDocumentReader(reader)
       .findReadingProgress(organizationId, studentId, resourceId));
+  }
+
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    return this.read(reader => new LearningProgressDocumentReader(reader).listReadingPageEvents(organizationId, studentId, resourceId));
   }
 
   public async findVocabularyProgress(
@@ -87,7 +93,7 @@ class LearningProgressDocumentRepository implements LearningProgressRepository {
 }
 
 class LearningProgressDocumentReader {
-  public constructor(protected readonly documents: Pick<DocumentDatabaseReaderPort, 'get'>) {}
+  public constructor(protected readonly documents: Pick<DocumentDatabaseReaderPort, 'get' | 'find'>) {}
 
   public async findResource(
     organizationId: string,
@@ -110,6 +116,14 @@ class LearningProgressDocumentReader {
     if (!isVisible(document, organizationId)) return null;
     const record = decodeReadingProgress(document);
     return record.studentId === studentId && record.resourceId === resourceId ? record : null;
+  }
+
+  public async listReadingPageEvents(organizationId: string, studentId: string, resourceId: string): Promise<readonly ReadingPageEventRecord[]> {
+    const documents = await this.documents.find(LEARNING_PROGRESS_COLLECTIONS.readingPageEvents, {
+      organizationId, studentId, resourceId, deletedAt: null,
+    });
+    return documents.filter(document => isVisible(document, organizationId)).map(decodeReadingPageEvent)
+      .sort((left, right) => left.visitedAt.localeCompare(right.visitedAt) || left.id.localeCompare(right.id));
   }
 
   public async findVocabularyProgress(
@@ -152,6 +166,11 @@ class LearningProgressDocumentTransaction extends LearningProgressDocumentReader
       (document) => decodeReadingProgress(document),
       (current) => current.studentId === record.studentId && current.resourceId === record.resourceId,
     );
+  }
+
+  public async appendReadingPageEvent(record: ReadingPageEventRecord): Promise<void> {
+    if (!(await this.transaction.create(LEARNING_PROGRESS_COLLECTIONS.readingPageEvents,
+      createDocument(record.id, record.organizationId, 1, record)))) throw new LearningProgressError('CONFLICT');
   }
 
   public async saveVocabularyProgress(record: VocabularyProgressRecord): Promise<void> {
@@ -282,6 +301,10 @@ function decodeResource(document: VersionedDocument): LearningResourceAccessReco
   const status = requireEnum(document.status, ['published', 'offline'] as const);
   const allowedStudentIds = requireStringArray(document.allowedStudentIds);
   const legacyPayload = document.payload === undefined ? null : requireObject(document.payload);
+  const rawContentVersion = document.contentVersion;
+  const contentVersion = typeof rawContentVersion === 'string' && rawContentVersion.trim()
+    ? rawContentVersion : typeof rawContentVersion === 'number' && Number.isSafeInteger(rawContentVersion)
+      && rawContentVersion > 0 ? String(rawContentVersion) : undefined;
   const rawPages = document.pages ?? (legacyPayload?.demoOnly === true ? legacyPayload.pages : undefined);
   const pages = requireObjectArray(rawPages).map((page) => ({
     id: requireString(page.id),
@@ -293,6 +316,7 @@ function decodeResource(document: VersionedDocument): LearningResourceAccessReco
     organizationId: document.organizationId,
     type,
     status,
+    ...(contentVersion === undefined ? {} : { contentVersion }),
     allowedStudentIds,
     pages,
     wordIds: document.wordIds === undefined && type === 'reading' && legacyPayload?.demoOnly === true ? [] : requireStringArray(document.wordIds),
@@ -312,6 +336,20 @@ function decodeReadingProgress(document: VersionedDocument): ReadingProgressReco
     version: document.version,
     updatedAt: requireString(document.updatedAt),
   };
+}
+
+function decodeReadingPageEvent(document: VersionedDocument): ReadingPageEventRecord {
+  const pageNumber = requireNonNegativeInteger(document.pageNumber);
+  const progressVersion = requireNonNegativeInteger(document.progressVersion);
+  if (pageNumber < 1 || progressVersion < 1) throw new LearningProgressError('INTERNAL_ERROR');
+  if (document.contentVersion !== null && (typeof document.contentVersion !== 'string'
+    || !document.contentVersion.trim())) throw new LearningProgressError('INTERNAL_ERROR');
+  return { id: readDomainId(document), organizationId: document.organizationId,
+    studentId: requireString(document.studentId), resourceId: requireString(document.resourceId),
+    chapterId: requireString(document.chapterId), pageId: requireString(document.pageId),
+    pageNumber, progressVersion, contentVersion: document.contentVersion,
+    operationId: requireString(document.operationId),
+    visitedAt: requireString(document.visitedAt) };
 }
 
 function decodeVocabularyProgress(document: VersionedDocument): VocabularyProgressRecord {

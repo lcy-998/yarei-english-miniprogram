@@ -116,7 +116,9 @@ class CloudBaseRuntimeAdapter implements CloudBaseRuntimePort {
 }
 
 function audiencesForFunction(functionName: FunctionName): readonly BusinessSessionAudience[] {
-  if (functionName === 'admin-session' || functionName === 'organization-admin') return ['admin-console'];
+  if (functionName === 'admin-session' || functionName === 'organization-admin'
+    || functionName === 'admin-task-activity-query' || functionName === 'admin-task-activity-command'
+    || functionName === 'textbook-admin-query' || functionName === 'textbook-admin-command') return ['admin-console'];
   if (functionName === 'relationship-command') return ['mini-program', 'admin-console'];
   return ['mini-program'];
 }

@@ -1,0 +1,72 @@
+<g0-page-shell nature="{{true}}" tone="teacher">
+  <view class="m1-page activity-page">
+    <app-header title="打卡活动" back="{{true}}" backUrl="/pages/teacher/task-center/task-center" backIntercept="{{true}}" bind:back="onNavigateBack"></app-header>
+    <view class="activity-content">
+      <view class="activity-hero m1-card"><text class="hero-kicker">长期学习　每日打卡</text><text class="hero-title">打卡活动</text><text class="hero-note">休息日不生成任务，完成情况以实际学习证据为准。</text></view>
+      <state-panel wx:if="{{loading && !rows.length && !formOpen && !overrideOpen && !restChangeOpen}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error && !rows.length && !formOpen && !overrideOpen && !restChangeOpen}}" state="error" message="{{error}}" bind:retry="loadPage"></state-panel>
+      <view wx:else>
+        <text wx:if="{{error}}" class="activity-error">{{error}}</text>
+        <view wx:if="{{!formOpen && !overrideOpen && !restChangeOpen}}">
+          <view class="section-heading"><text>我的打卡活动</text><button bindtap="startNew" disabled="{{loading || !classes.length}}">新建活动</button></view>
+          <view wx:for="{{rows}}" wx:for-item="activity" wx:key="id" class="activity-card m1-card">
+            <view class="card-top"><view class="activity-mark">✓</view><text class="card-title">{{activity.title}}</text><text class="status-tag">{{activity.statusLabel}}</text></view>
+            <text class="card-meta">{{activity.className}}　{{activity.schedule.startsOn}} 至 {{activity.schedule.endsOn}}</text>
+            <text class="card-meta">有效任务日 {{activity.effectiveDayCount}} 天　休息日 {{activity.schedule.restDates.length}} 天</text>
+            <text class="card-meta">参与 {{activity.status === 'draft' ? '发布时确定' : activity.participants.length + ' 人'}}</text>
+            <view class="evidence-note"><text>今日完成：未记录</text><text>排行榜：待接入</text></view>
+            <view wx:if="{{activity.status === 'draft'}}" class="card-actions"><button data-id="{{activity.id}}" bindtap="editDraft">编辑草稿</button><button class="primary" data-id="{{activity.id}}" loading="{{publishingId === activity.id}}" disabled="{{!!publishingId}}" bindtap="publishDraft">发布活动</button></view>
+            <view wx:if="{{activity.status === 'published'}}" class="card-actions"><button data-id="{{activity.id}}" bindtap="openRestChangePanel">新增未来休息日</button><button data-id="{{activity.id}}" bindtap="openOverridePanel">学员补记或撤销</button><button class="primary" data-id="{{activity.id}}" bindtap="openLeaderboard">查看榜单</button></view>
+          </view>
+          <view wx:if="{{!rows.length}}" class="empty-card m1-card">暂无打卡活动。填写内容与参与班级后即可发布。</view>
+        </view>
+        <view wx:elif="{{restChangeOpen}}" class="activity-form">
+          <view class="section-heading"><text>新增未来休息日</text><button bindtap="closeRestChangePanel">返回列表</button></view>
+          <view class="form-card m1-card"><text class="field-title">{{restChangeTitle}}</text><text class="field-note">仅可新增学校当地尚未开始的日期。已有打卡证据与过去日期保持原样。</text>
+            <text class="field-label">休息日期</text><picker mode="date" value="{{restChangeDate}}" bindchange="chooseRestChangeDate"><view class="picker-value">{{restChangeDate || '选择未来日期'}}　⌄</view></picker>
+            <text class="field-label">变更原因</text><textarea maxlength="300" value="{{restChangeReason}}" bindinput="onRestChangeReason" placeholder="说明新增休息日原因"></textarea>
+            <text wx:if="{{restChangeError}}" class="activity-error">{{restChangeError}}</text>
+            <view class="form-actions"><button bindtap="closeRestChangePanel" disabled="{{restChangeSaving}}">取消</button><button class="primary" loading="{{restChangeSaving}}" disabled="{{restChangeSaving}}" bindtap="submitRestChange">确认添加</button></view>
+          </view>
+          <view wx:if="{{restChangeHistory.length}}" class="form-card m1-card"><text class="field-title">变更记录</text>
+            <view wx:for="{{restChangeHistory}}" wx:key="id" class="condition-row"><view class="condition-copy"><text>{{item.date}}　{{item.reason}}</text><text>{{item.changedAt}}　版本 {{item.activityVersion}}</text></view></view>
+          </view>
+        </view>
+        <view wx:elif="{{overrideOpen}}" class="override-form">
+          <view class="section-heading"><text>学员补记与撤销</text><button bindtap="closeOverridePanel">返回列表</button></view>
+          <view class="form-card m1-card"><text class="field-title">活动：{{overrideActivityTitle}}</text><text class="field-note">仅对该活动已发布的学员和有效任务日操作，原因会保留供审计。</text>
+            <text class="field-label">学员</text><picker class="override-picker" range="{{overrideStudentNames}}" value="{{overrideStudentIndex}}" bindchange="chooseOverrideStudent"><view class="picker-value override-picker-value {{overrideStudentId ? 'is-selected' : ''}}"><text class="override-picker-text">{{overrideStudentName}}</text><view class="override-picker-chevron" aria-hidden="true"></view></view></picker>
+            <text class="field-label">业务日期</text><picker class="override-picker" mode="date" value="{{overrideDate}}" start="{{overrideStartsOn}}" end="{{overrideEndsOn}}" bindchange="chooseOverrideDate"><view class="picker-value override-picker-value {{overrideDate ? 'is-selected' : ''}}"><text class="override-picker-text">{{overrideDate || '选择打卡日期'}}</text><view class="override-picker-chevron" aria-hidden="true"></view></view></picker>
+            <state-panel wx:if="{{overrideLoading}}" state="loading"></state-panel>
+            <view wx:if="{{overrideState}}" class="override-current"><text>{{overrideState.active ? '当前状态：教师已补记' : '当前状态：未补记'}}</text><text>记录版本 {{overrideState.version}}</text><text wx:if="{{overrideState.reason}}">上次原因：{{overrideState.reason}}</text></view>
+            <text class="field-label">操作原因</text><textarea maxlength="300" value="{{overrideReason}}" bindinput="onOverrideReason" placeholder="说明补记或撤销依据"></textarea>
+            <text wx:if="{{overrideError}}" class="activity-error">{{overrideError}}</text>
+            <view class="form-actions"><button disabled="{{overrideSaving || overrideLoading || !overrideState || !overrideState.active}}" data-active="false" bindtap="submitOverride">撤销补记</button><button class="primary" loading="{{overrideSaving}}" disabled="{{overrideSaving || overrideLoading || !overrideState}}" data-active="true" bindtap="submitOverride">确认补记</button></view>
+          </view>
+        </view>
+        <view wx:else class="activity-form">
+          <view class="section-heading"><text>{{activityId ? '编辑活动草稿' : '新建打卡活动'}}</text><button bindtap="closeForm" disabled="{{saving}}">返回列表</button></view>
+          <view class="form-card m1-card">
+            <text class="field-label">活动名称</text><input maxlength="50" value="{{title}}" bindinput="onTitle" placeholder="例如：动物阅读七日打卡"/>
+            <text class="field-label">活动说明</text><textarea maxlength="300" value="{{description}}" bindinput="onDescription" placeholder="告诉学员每日需要完成什么"></textarea>
+            <text class="field-label">参与班级</text><picker range="{{classNames}}" bindchange="chooseClass"><view class="picker-value">{{className}}　⌄</view></picker>
+            <view class="date-grid"><view><text class="field-label">开始日期</text><picker mode="date" value="{{startsOn}}" end="{{maxStartDate}}" bindchange="chooseStartDate"><view class="picker-value">{{startsOn || '选择开始日期'}}　⌄</view></picker></view><view><text class="field-label">结束日期</text><picker mode="date" value="{{endsOn}}" start="{{minEndDate}}" bindchange="chooseEndDate"><view class="picker-value">{{endsOn || '选择结束日期'}}　⌄</view></picker></view></view>
+            <text class="field-label">快捷周期</text><view class="cycle-row"><button data-days="7" bindtap="chooseCycle">7 天</button><button data-days="14" bindtap="chooseCycle">14 天</button><button data-days="21" bindtap="chooseCycle">21 天</button><button data-days="30" bindtap="chooseCycle">30 天</button></view>
+            <text class="field-label">每周休息日</text>
+            <view class="weekday-grid"><view wx:for="{{restWeekdayOptions}}" wx:key="day" class="weekday-chip {{restWeekdayLookup[item.day] ? 'selected' : ''}} {{availableWeekdayLookup[item.day] ? '' : 'unavailable'}}" data-day="{{item.day}}" bindtap="toggleRestWeekday" hover-class="weekday-pressed" aria-role="button" aria-label="{{item.label}}{{availableWeekdayLookup[item.day] ? restWeekdayLookup[item.day] ? '已选' : '未选' : '不在活动日期内'}}">{{item.label}}</view></view>
+            <text class="weekday-note">{{legacyRestDates ? '保留旧草稿已设的 ' + restDates.length + ' 天休息日' : restWeekdays.length ? '已在活动范围内设置 ' + restDates.length + ' 天休息日' : '不设置每周休息日'}}</text>
+            <text wx:if="{{legacyRestDates}}" class="legacy-rest-note">旧草稿含逐日休息日；选择星期后将改为每周重复。</text>
+          </view>
+          <view class="form-card m1-card"><view class="condition-head"><view><text class="field-title">每日完成条件</text><text class="field-note">所有已选条件均达到后才计为当日完成</text></view><button bindtap="openCatalog">选择内容</button></view>
+            <view wx:for="{{conditions}}" wx:for-item="condition" wx:key="resourceId" class="condition-row"><view class="condition-copy"><text>{{condition.title}}</text><text>{{condition.kind === 'reading' ? '阅读完成' : condition.kind === 'vocabulary' ? '单词数量' : condition.kind === 'exercise' ? '练习分数' : '提交作品'}}</text></view><input wx:if="{{condition.kind === 'vocabulary' || condition.kind === 'exercise'}}" class="threshold-input" type="number" value="{{condition.threshold}}" data-id="{{condition.resourceId}}" bindinput="onThreshold" placeholder="{{condition.kind === 'vocabulary' ? '词数' : '最低分'}}"/><button class="remove-condition" data-id="{{condition.resourceId}}" bindtap="removeCondition" aria-label="移除条件">×</button></view>
+            <view wx:if="{{!conditions.length}}" class="empty-inline">尚未选择每日内容。</view>
+            <text class="disabled-condition">跟读 AI 分数条件将在 M3 开放</text>
+          </view>
+          <text wx:if="{{formError}}" class="activity-error">{{formError}}</text>
+          <view class="form-actions"><button loading="{{savingAction === 'draft'}}" disabled="{{saving}}" bindtap="saveDraft">保存草稿</button><button class="primary" loading="{{savingAction === 'publish'}}" disabled="{{saving}}" bindtap="publishForm">发布活动</button></view>
+        </view>
+      </view>
+    </view>
+    <g0-tab-bar wx:if="{{!formOpen && !overrideOpen && !restChangeOpen}}" role="teacher" active="tasks"></g0-tab-bar>
+  </view>
+</g0-page-shell>

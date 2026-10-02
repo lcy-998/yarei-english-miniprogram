@@ -1,0 +1,15 @@
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="textbook-page"><app-header title="教材中心"></app-header>
+  <view class="textbook-content">
+    <view class="material-search"><input placeholder="搜索教材、题目或媒体" value="{{keyword}}" bindinput="onKeyword" confirm-type="search" bindconfirm="search"/><button loading="{{searching}}" disabled="{{searching}}" bindtap="search">搜索</button></view>
+    <view class="module-grid">
+      <button wx:if="{{classTextbooksEnabled}}" class="module-card module-card--blue" bindtap="openClasses"><g0-icon name="reading" size="{{54}}"></g0-icon><text>班级教材</text><text class="module-hint">{{classes.length}} 个班级　{{classes.length - configuredCount}} 个待配置</text></button>
+      <button wx:if="{{synchronizedTextbooksEnabled}}" class="module-card module-card--green" bindtap="openSynchronized"><g0-icon name="reading" tone="success" size="{{54}}"></g0-icon><text>同步学教材</text><text class="module-hint">全部已授权课本</text></button>
+      <button class="module-card module-card--yellow" bindtap="openQuestions"><g0-icon name="task" tone="warning" size="{{54}}"></g0-icon><text>学校习题库</text><text class="module-hint">只读预览与引用</text></button>
+      <button class="module-card module-card--purple disabled" bindtap="openMedia"><g0-icon name="publish" tone="ai" size="{{54}}"></g0-icon><text>音视频材料库</text><text class="module-hint">M3 开放</text></button>
+    </view>
+    <state-panel wx:if="{{loading}}" state="loading" message="正在加载教材中心"></state-panel><state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else><view class="textbook-card"><text class="textbook-card-title">最近使用教材</text><text wx:if="{{!recentBooks.length}}" class="textbook-card-meta">暂无可追溯的最近使用教材</text><view wx:for="{{recentBooks}}" wx:key="id" data-id="{{item.id}}" bindtap="openBook" class="search-result"><text class="textbook-card-meta">{{item.title}}　{{item.grade}}　{{item.edition}}</text></view></view>
+      <view class="textbook-card"><text class="textbook-card-title">最近引用</text><text class="textbook-card-meta">暂无可追溯的题目或媒体引用记录</text></view>
+      <view wx:if="{{keyword && !searching}}" class="textbook-card"><text class="textbook-card-title">搜索结果</text><text wx:if="{{!books.length && !readings.length && !questions.length}}" class="textbook-card-meta">当前条件下没有授权内容</text><view wx:for="{{books}}" wx:key="id" data-id="{{item.id}}" bindtap="openBook" class="search-result"><text class="textbook-card-meta">同步课本　{{item.title}}</text></view><view wx:for="{{readings}}" wx:key="id" data-id="{{item.id}}" bindtap="openReadingResult" class="search-result"><text class="textbook-card-meta">阅读　{{item.title}}</text></view><view wx:for="{{questions}}" wx:key="id" data-id="{{item.id}}" bindtap="openQuestionResult" class="search-result"><text class="textbook-card-meta">题目　{{item.title}}</text></view></view>
+    </view>
+  </view><g0-tab-bar role="teacher" active="materials"></g0-tab-bar></view></g0-page-shell>

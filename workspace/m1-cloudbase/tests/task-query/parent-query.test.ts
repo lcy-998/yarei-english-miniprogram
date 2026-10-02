@@ -59,7 +59,7 @@ function feedback(): ReviewFeedbackRecord {
   };
 }
 
-function harness() {
+function harness(overrides: Readonly<{ task?: TaskRecord; assignment?: TaskAssignmentRecord; submission?: SubmissionRecord; feedback?: ReviewFeedbackRecord | null }> = {}) {
   const links: ParentStudentLinkRecord[] = [{
     _id: 'link_demo', organizationId: ORGANIZATION_ID, parentId: PARENT_ID, studentId: CHILD_ID,
     status: 'active', version: 1, deletedAt: null, confirmedAt: '2026-09-16T00:00:00.000Z',
@@ -74,7 +74,9 @@ function harness() {
     identities: [], roles: [], teacherGrants: [], parentLinks: links,
   } satisfies AuthorizationFixture);
   const repository = new InMemoryTaskQueryRepository({
-    tasks: [task()], assignments: [assignment()], submissions: [submission(), draftSubmission()], feedback: [feedback()],
+    tasks: [overrides.task ?? task()], assignments: [overrides.assignment ?? assignment()],
+    submissions: [overrides.submission ?? submission(), draftSubmission()],
+    feedback: overrides.feedback === null ? [] : [overrides.feedback ?? feedback()],
   });
   let sequence = 0;
   const service = new ParentTaskQueryService({
@@ -144,5 +146,28 @@ describe('M1 家长只读查询', () => {
     expect(await service.listChildTasks(revoked, CHILD_ID, {}, { limit: 10 })).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     expect(await service.getParentTaskResult(revoked, CHILD_ID, 'task_demo')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     expect(await service.getFeedback(revoked, CHILD_ID, 'feedback_demo')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+  });
+});
+
+describe('M2 家长自动分只读口径', () => {
+  it('未点评时显示当前提交的自动分，同时不泄露任务快照答案', async () => {
+    const exerciseTask: TaskRecord = { ...task(), items: [{
+      id: 'item_demo', resourceId: 'question_demo', resourceVersion: 1, snapshotSchemaVersion: 1,
+      resourceSnapshot: { title: '动物选择题', type: 'exercise', payload: {
+        questionIds: ['question_demo'], questionType: 'single_choice', stem: 'Which animal can fly?',
+        options: ['A. bird', 'B. lion'], correctAnswer: 'A. bird', explanation: 'Birds can fly.',
+      } }, completionRule: { kind: 'exercise_questions', requiredQuestionCount: 1 },
+      scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1,
+    }] };
+    const exerciseSubmission: SubmissionRecord = { ...submission(), status: 'submitted', answers: [{
+      itemId: 'item_demo', value: { kind: 'exercise', answeredQuestionCount: 1, correctQuestionCount: 1,
+        questionResponses: [{ questionId: 'question_demo', response: 'A. bird', isCorrect: true }] },
+    }] };
+    const { service } = harness({ task: exerciseTask, assignment: { ...assignment(), status: 'awaiting_review' },
+      submission: exerciseSubmission, feedback: null });
+    const result = await service.getParentTaskResult(parent, CHILD_ID, 'task_demo');
+    expect(result).toMatchObject({ ok: true, data: { automaticScore: 100, feedback: null } });
+    expect(JSON.stringify(result)).not.toContain('correctAnswer');
+    expect(JSON.stringify(result)).not.toContain('Birds can fly.');
   });
 });

@@ -81,6 +81,17 @@ describe('M0 returned-work rules', () => {
     expect(getState()).toEqual(before)
   })
 
+  it('requires an explicit teacher score when returning a submitted task', async () => {
+    const submitted = await submitAt('2026-09-14T01:00:00.000Z', '待订正作答')
+    if (!submitted.ok) throw new Error('submission expected')
+    const before = getState()
+    expect(await reviewSubmission(TEACHER_ID, { operationId: 'return_without_score',
+      expectedVersion: submitted.data.version, taskId: TASK_ID, assignmentId: ASSIGNMENT_ID,
+      decision: 'returned', comment: '请订正' })).toMatchObject({ ok: false,
+      error: { code: 'VALIDATION_ERROR' } })
+    expect(getState()).toEqual(before)
+  })
+
   it('allows resubmission within the redo period and creates an incremented version', async () => {
     const first = await submitAt('2026-09-14T01:00:00.000Z', '旧版本')
     await returnAt('2026-09-14T02:00:00.000Z', '请重做')
@@ -100,6 +111,16 @@ describe('M0 returned-work rules', () => {
     expect(submissions).toHaveLength(2)
     expect(submissions[0]).toMatchObject({ id: first.data.id, status: 'returned', answers: [{ value: '旧版本' }] })
     expect(submissions[1]).toMatchObject({ id: result.data.id, version: 2, status: 'submitted', answers: [{ value: '新版本' }] })
+  })
+
+  it('rejects resubmitting the unchanged returned answer', async () => {
+    await submitAt('2026-09-14T01:00:00.000Z', '原作答')
+    await returnAt('2026-09-14T02:00:00.000Z', '请订正')
+    const before = getState()
+    expect(await submitAt('2026-09-15T01:00:00.000Z', '原作答')).toMatchObject({
+      ok: false, error: { code: 'VALIDATION_ERROR' },
+    })
+    expect(getState()).toEqual(before)
   })
 
   it('allows saving a redo draft before resubmission', async () => {

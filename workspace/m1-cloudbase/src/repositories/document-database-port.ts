@@ -35,6 +35,11 @@ export interface DocumentDatabaseTransactionPort {
 
 /** The only document database dependency required by repository adapters. */
 export interface DocumentDatabasePort extends DocumentDatabaseReaderPort {
+  /** A bounded, stable _id-ordered page for user-facing directories. */
+  findPage(collection: string, criteria: DocumentData, page: Readonly<{ limit: number; offset: number }>): Promise<Readonly<{
+    items: readonly VersionedDocument[];
+    hasMore: boolean;
+  }>>;
   runTransaction<T>(work: (transaction: DocumentDatabaseTransactionPort) => Promise<T>): Promise<T>;
 }
 

@@ -1,7 +1,7 @@
 import { CloudAppService, createCloudAppService } from '../services/cloudbase-app-service'
 import { configureM1AppRepository, useMemoryM1AppRepository } from '../services/m1-app-service'
 import { createCloudBaseM1AppRepository } from './cloudbase/cloudbase-m1-app-repository'
-import { getCurrentChildId } from '../session/session'
+import { clearSession, getCurrentChildId } from '../session/session'
 import {
   CloudAuthenticationPort,
   CloudClientContextProvider,
@@ -36,7 +36,8 @@ export function configureRepositories(configuration: RepositoryConfiguration): v
     return { ...configured, ...(selectedChildId ? { activeChildId: selectedChildId } : {}) }
   }
   cloudService = createCloudAppService(
-    createCloudRepositoryClient(configuration.invoker, context),
+    createCloudRepositoryClient(configuration.invoker, context,
+      () => { if (context().sessionId !== null) clearSession() }),
     configuration.authentication,
     context,
   )

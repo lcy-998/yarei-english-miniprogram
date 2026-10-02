@@ -3,7 +3,7 @@
     <app-header title="{{openedFromAssignment ? '作业详情' : '快速点评'}}" back="{{true}}"></app-header>
     <state-panel wx:if="{{loading}}" state="loading"></state-panel>
     <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadRows"></state-panel>
-    <view wx:else class="quick-review-content">
+    <view wx:if="{{!loading && !error}}" class="quick-review-content">
       <view wx:if="{{!openedFromAssignment}}" class="review-scope">
         <view class="scope-head"><text class="scope-heading">点评范围</text><text class="scope-count">{{taskOptions.length}} 项任务</text></view>
         <scroll-view wx:if="{{orderedTaskOptions.length}}" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{true}}" class="task-options" style="height: {{orderedTaskOptions.length > 3 ? 280 : orderedTaskOptions.length * 96 - 8}}px">
@@ -16,33 +16,39 @@
         <view wx:else class="task-options-empty">暂无待点评任务</view>
         <view wx:if="{{classOptions.length > 1}}" class="queue-class-filter"><text>筛选班级</text><scroll-view scroll-x="{{true}}" class="queue-class-tabs"><button wx:for="{{classOptions}}" wx:key="id" class="queue-class-chip {{classFilter === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectClassFilter"><text>{{item.label}}　{{item.count}}</text></button></scroll-view></view>
       </view>
-      <view wx:if="{{taskId}}" class="review-summary {{visibleRows.length > 1 ? '' : 'review-summary--single'}}"><view class="summary-icon">评</view><view class="summary-copy"><text>{{readOnlyMode ? '作业记录' : '待点评'}}</text><text class="summary-count">{{visibleRows.length}}</text></view><text class="summary-position">第 {{visibleRows.length ? activeRowIndex + 1 : 0}}/{{visibleRows.length}} 条</text><button wx:if="{{!readOnlyMode && visibleRows.length > 1}}" class="skip-button" bindtap="skipCurrent">跳过</button></view>
-      <view wx:if="{{activeRow}}" class="student-summary"><view class="student-avatar">{{activeRow.studentName}}</view><view class="student-copy"><text class="student-name">{{activeRow.studentName}}　{{activeRow.className}}</text><text class="task-name">{{taskTitle}}</text><text class="submitted-at">{{submittedLabel || '正在读取提交时间'}}</text></view><view class="system-score"><text>当前得分</text><text>{{activeRow.score === undefined ? '--' : activeRow.score}}</text></view></view>
-      <view wx:elif="{{taskId && visibleRows.length === 0}}" class="empty-review">当前任务暂无待点评提交。</view>
+      <view wx:if="{{taskId}}" class="review-summary"><view class="summary-icon">评</view><view class="summary-copy"><text>{{readOnlyMode ? '作业记录' : '待点评'}}</text><text class="summary-count">{{visibleRows.length}}</text></view><text class="summary-position">第 {{visibleRows.length ? activeRowIndex + 1 : 0}}/{{visibleRows.length}} 条</text></view>
+      <view wx:if="{{!readOnlyMode && visibleRows.length > 1}}" class="student-queue"><view class="student-queue-head"><text>待点评学员</text><text>{{visibleRows.length > 8 ? '滑动并点选' : '点选切换'}}</text></view><scroll-view scroll-y="{{true}}" show-scrollbar="{{true}}" class="student-queue-scroll" style="height: {{visibleRows.length > 6 ? 224 : visibleRows.length > 4 ? 166 : visibleRows.length > 2 ? 108 : 50}}px"><view class="student-queue-grid"><view wx:for="{{visibleRows}}" wx:key="assignmentId" class="student-queue-option {{item.assignmentId === activeRowId ? 'active' : ''}}" data-index="{{index}}" bindtap="selectStudent" aria-role="button" aria-label="切换到{{item.studentName}}，{{item.className}}"><text class="student-queue-name">{{item.studentName}}</text><text class="student-queue-class">{{item.className}}</text></view></view></scroll-view></view>
+      <view wx:if="{{activeRow}}" class="student-summary"><view class="student-avatar">{{activeRow.studentName}}</view><view class="student-copy"><text class="student-name">{{activeRow.studentName}}　{{activeRow.className}}</text><text class="task-name">{{taskTitle}}</text><text class="submitted-at">{{submittedLabel || '正在读取提交时间'}}</text></view><view class="system-score"><text>{{displayedScoreLabel}}</text><text>{{displayedScore}}</text></view></view>
+      <view wx:elif="{{taskId && visibleRows.length === 0}}" class="empty-review">当前筛选下暂无待点评提交。</view>
       <view wx:if="{{activeRow}}" class="submission-card">
-        <view class="section-heading"><text>作业详情</text><button class="view-detail" bindtap="openDetail"><text>{{detailExpanded ? '收起详情' : '查看详情'}} ›</text></button></view>
-        <view class="submission-note">已提交　版本 {{activeRow.submissionVersion}}　{{detailRows.length}} 项内容</view>
-        <view wx:if="{{detailExpanded}}" class="detail-list">
-          <text wx:if="{{taskItemsLoading || submissionLoading}}" class="submission-note">正在读取学生作业…</text>
-          <text wx:elif="{{taskItemsError || submissionError}}" class="submission-note">{{taskItemsError || submissionError}}</text>
-          <view wx:for="{{detailRows}}" wx:key="id" class="detail-item detail-item--{{item.tone}}"><view class="detail-item-head"><text class="detail-type">{{item.typeLabel}}</text><text class="detail-title">{{item.title}}</text></view><text class="detail-requirement">{{item.requirement}}</text><text class="detail-result">{{item.result}}</text><text class="detail-explanation">{{item.detail}}</text></view>
-          <text wx:if="{{!taskItemsLoading && !submissionLoading && !taskItemsError && !submissionError && !detailRows.length}}" class="submission-note">当前提交暂无可展示的任务项。</text>
+        <view class="section-heading"><text>作业详情</text></view>
+        <view class="submission-note">已提交　版本 {{selectedSubmissionVersion || activeRow.submissionVersion}}　{{detailRows.length}} 项内容</view>
+        <view wx:if="{{submissionHistory.length > 1}}" class="submission-versions"><text>查看提交版本</text><scroll-view scroll-x="{{true}}" class="submission-version-scroll"><button wx:for="{{submissionHistory}}" wx:key="id" class="submission-version-chip {{selectedSubmissionId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectSubmissionVersion">第 {{item.version}} 次{{item.status === 'returned' ? '　已退回' : ''}}</button></scroll-view></view>
+        <text wx:if="{{taskItemsLoading || submissionLoading}}" class="submission-note">正在读取学生作业…</text>
+        <view wx:elif="{{taskItemsError || submissionError}}" class="submission-note"><text>{{taskItemsError || submissionError}}</text><button class="submission-retry" bindtap="retrySubmissionDetail">重试</button></view>
+        <view wx:if="{{!taskItemsLoading && !submissionLoading && !taskItemsError && !submissionError}}" class="detail-list">
+          <view wx:for="{{detailRows}}" wx:key="id" class="detail-item detail-item--{{item.tone}}" data-id="{{item.id}}" bindtap="openReviewItem" aria-role="button" aria-label="查看{{item.title}}的学生作答">
+            <view class="detail-item-head"><text class="detail-type">{{item.typeLabel}}</text><text class="detail-title">{{item.title}}</text><text class="detail-open-arrow">›</text></view>
+            <text class="detail-result">{{item.result}}</text>
+          </view>
+          <text wx:if="{{!detailRows.length}}" class="submission-note">本次提交缺少可查看的作业内容。</text>
         </view>
-        <view wx:if="{{!readOnlyMode}}" class="detail-score">
+        <view wx:if="{{!readOnlyMode && !viewingHistory}}" class="detail-score">
           <view class="heading-with-icon"><view class="heading-icon heading-icon--score">分</view><text>作业打分</text></view>
-          <view class="score-input-row"><input type="number" maxlength="3" value="{{scoreInput}}" bindinput="onScore" placeholder="输入 0 到 100"/><text>分</text><button wx:if="{{scoreInput}}" bindtap="clearScore"><text>清除</text></button></view>
-          <text wx:if="{{scoreError}}" class="score-error">{{scoreError}}</text>
-          <view class="score-picker"><view wx:for="{{starValues}}" wx:key="*this" class="star {{score !== null && item * 20 <= score ? 'active' : ''}}" data-score="{{item * 20}}" bindtap="setScore" aria-role="button" aria-label="{{item * 20}}分">★</view><text>{{score === null ? '未评分' : score + ' 分'}}</text></view>
-          <text class="score-hint">发布点评后，分数会显示给学生和家长。</text>
+          <view wx:if="{{manualScoreRows.length}}" class="manual-score-list"><view wx:for="{{manualScoreRows}}" wx:key="id" class="manual-score-row"><text>{{item.title}}</text><input type="number" maxlength="3" value="{{item.input}}" data-id="{{item.id}}" bindinput="onManualItemScore" placeholder="0—100"/><text>分</text><text wx:if="{{item.error}}" class="score-error">{{item.error}}</text></view><view wx:if="{{scoringBreakdown.length}}" class="score-breakdown"><text class="score-hint">按发布时的权重核对总分</text><view wx:for="{{scoringBreakdown}}" wx:key="id" class="score-breakdown-row"><text>{{item.title}}</text><text>{{item.score}} × {{item.weight}}</text></view><text class="score-preview">{{scorePreview ? '预计总分 ' + scorePreview + ' 分' : '填完逐项分数后显示预计总分'}}</text></view><text wx:else class="score-hint">当前提交缺少逐项计分明细，无法预览总分；发布时仍由服务端按任务快照核算。</text></view>
+          <block wx:else><view class="score-input-row"><input type="number" maxlength="3" value="{{scoreInput}}" bindinput="onScore" placeholder="输入 0 到 100"/><text>分</text><button wx:if="{{scoreInput}}" bindtap="clearScore"><text>清除</text></button></view>
+            <text wx:if="{{automaticScore !== null}}" class="score-hint">系统自动分 {{automaticScore}} 分；不手动改分时沿用此分数。</text>
+            <view wx:if="{{automaticScore !== null && score !== null && score !== automaticScore}}" class="score-input-row"><input maxlength="200" value="{{overrideReason}}" bindinput="onOverrideReason" placeholder="覆盖自动分的原因（必填）"/></view>
+            <text wx:if="{{scoreError}}" class="score-error">{{scoreError}}</text>
+            <view class="score-picker"><view wx:for="{{starValues}}" wx:key="*this" class="star {{score !== null && item * 20 <= score ? 'active' : ''}}" data-score="{{item * 20}}" bindtap="setScore" aria-role="button" aria-label="{{item * 20}}分">★</view><text>{{score === null ? '未评分' : score + ' 分'}}</text></view></block>
+          <text class="score-hint">发布点评后，总分会显示给学生和家长。</text>
         </view>
       </view>
-      <view wx:if="{{activeRow && !readOnlyMode}}" class="feedback-card">
+      <view wx:if="{{activeRow && !readOnlyMode && !viewingHistory}}" class="feedback-card">
         <view class="feedback-block"><view class="heading-with-icon"><view class="heading-icon heading-icon--text">文</view><text>文字点评</text></view><textarea maxlength="200" value="{{comment}}" bindinput="onComment" placeholder="写下对学生的鼓励和建议"></textarea><text class="char-count">{{comment.length}}/200</text></view>
-        <view class="feedback-block"><view class="heading-with-icon"><view class="heading-icon heading-icon--voice">语</view><text>语音点评</text></view><view class="voice-box"><view class="voice-icon">语</view><text>语音点评将在媒体能力接入后开放</text></view></view>
       </view>
-      <view wx:if="{{activeRow && readOnlyMode}}" class="feedback-card readonly-feedback"><text class="queue-title">教师反馈</text><text class="readonly-feedback-status">{{publishedFeedback ? (publishedFeedback.decision === 'returned' ? '已退回重做' : '已点评') : '暂无正式点评'}}</text><text wx:if="{{publishedFeedback && publishedFeedback.score !== null}}" class="readonly-feedback-score">{{publishedFeedback.score}} 分</text><text wx:if="{{publishedFeedback && (publishedFeedback.textComment || publishedFeedback.returnReason)}}" class="readonly-feedback-comment">{{publishedFeedback.textComment || publishedFeedback.returnReason}}</text></view>
-      <view wx:if="{{activeRow && !readOnlyMode}}" class="review-actions"><button class="return-button" bindtap="returned">退回重做</button><button class="publish-button" bindtap="approve">{{openedFromAssignment ? '发布点评' : '发布并进入下一条'}}</button></view>
-      <view wx:if="{{visibleRows.length > 1}}" class="queue-list"><text class="queue-title">待点评队列</text><view wx:for="{{visibleRows}}" wx:key="assignmentId" class="queue-row {{item.assignmentId === activeRowId ? 'active' : ''}}" data-index="{{index}}" bindtap="selectRow"><text>{{item.studentName}}</text><text>{{item.status === 'awaiting_review' ? '待点评' : item.status === 'completed' ? '已完成' : '未提交'}}</text></view></view>
+      <view wx:if="{{activeRow && (readOnlyMode || viewingHistory)}}" class="feedback-card readonly-feedback"><text class="queue-title">教师反馈</text><text class="readonly-feedback-status">{{publishedFeedback ? (publishedFeedback.decision === 'returned' ? '已退回重做' : '已点评') : '暂无正式点评'}}</text><text wx:if="{{publishedFeedback && publishedFeedback.score !== null}}" class="readonly-feedback-score">{{publishedFeedback.score}} 分</text><view wx:for="{{reviewedItemScoreRows}}" wx:key="id" class="reviewed-item-score"><text>{{item.title}}</text><text>{{item.score}} 分</text></view><text wx:if="{{publishedFeedback && (publishedFeedback.textComment || publishedFeedback.returnReason)}}" class="readonly-feedback-comment">{{publishedFeedback.textComment || publishedFeedback.returnReason}}</text><text wx:if="{{publishedFeedback && publishedFeedback.overrideReason}}" class="readonly-feedback-comment">原自动分 {{publishedFeedback.originalAutomaticScore}} 分；调整原因：{{publishedFeedback.overrideReason}}</text></view>
+      <view wx:if="{{activeRow && !readOnlyMode && !viewingHistory}}" class="review-actions"><button class="return-button" disabled="{{submissionLoading || taskItemsLoading || submissionError || taskItemsError || reviewingId}}" bindtap="returned">退回重做</button><button class="publish-button" disabled="{{submissionLoading || taskItemsLoading || submissionError || taskItemsError || reviewingId}}" bindtap="approve">{{openedFromAssignment ? '发布点评' : '发布并进入下一条'}}</button></view>
     </view>
   </view>
 </g0-page-shell>

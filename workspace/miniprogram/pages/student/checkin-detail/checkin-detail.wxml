@@ -1,0 +1,30 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page checkin-detail">
+    <app-header title="今日打卡任务" back="{{true}}"></app-header>
+    <view class="checkin-content">
+      <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+      <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadActivity"></state-panel>
+      <view wx:elif="{{activity}}">
+        <view class="checkin-card checkin-hero">
+          <view class="checkin-hero-main"><g0-icon name="calendar" tone="yellow" size="{{64}}"></g0-icon><view class="checkin-hero-copy"><text class="checkin-eyebrow">{{date}} · 打卡活动</text><text class="checkin-title">{{activity.title}}</text><text class="checkin-status {{day && day.complete ? 'is-complete' : ''}}">{{statusLabel}}</text></view></view>
+          <view class="checkin-meta"><text>活动时间</text><text>{{activity.schedule.startsOn}} 至 {{activity.schedule.endsOn}}</text></view>
+          <view wx:if="{{activity.description}}" class="checkin-description-row"><text>活动说明</text><text>{{activity.description}}</text></view>
+          <view class="checkin-progress-heading"><text>今日进度</text><text>{{progressLabel}}</text></view>
+          <view wx:if="{{activeToday && day && day.evidenceStatus === 'available'}}" class="checkin-progress">
+            <view style="width: {{day.totalConditions ? day.verifiedConditions * 100 / day.totalConditions : 0}}%;"></view>
+          </view>
+        </view>
+        <view class="checkin-card">
+          <view class="checkin-section-head"><g0-icon name="check" tone="primary" size="{{48}}"></g0-icon><view><text class="checkin-heading">活动要求</text><text class="checkin-help">点击任务卡进入学习，返回后自动核对状态。</text></view></view>
+          <view wx:for="{{conditions}}" wx:key="key" class="requirement-card {{item.canOpen ? 'is-actionable' : 'is-unavailable'}}" data-index="{{item.index}}" bindtap="openCondition" hover-class="requirement-card--pressed" aria-role="{{item.canOpen ? 'button' : 'text'}}">
+            <g0-icon name="{{item.iconName}}" tone="{{item.iconTone}}" size="{{56}}"></g0-icon>
+            <view class="requirement-copy"><view class="requirement-heading"><view><text class="requirement-index">第 {{index + 1}} 项</text><text class="requirement-title">{{item.label}}</text></view><text class="requirement-status {{item.complete ? 'is-complete' : ''}}">{{item.statusLabel}}</text></view><text class="requirement-detail">{{item.detail}}</text><text wx:if="{{item.kind === 'exercise' && !item.taskId && activeToday && !taskLookupError}}" class="requirement-note">老师尚未布置对应课堂习题，请联系老师。</text><text wx:if="{{item.kind === 'exercise' && item.taskId && !item.exerciseActionable && !item.complete && activeToday}}" class="requirement-note">习题已提交，当前不能再次作答。</text></view>
+            <view wx:if="{{item.canOpen}}" class="requirement-arrow" aria-hidden="true"></view>
+          </view>
+        </view>
+        <text wx:if="{{progressError}}" class="checkin-error">{{progressError}}</text>
+        <view class="checkin-actions"><button class="checkin-refresh" loading="{{refreshing}}" disabled="{{refreshing}}" bindtap="refreshProgress"><text>刷新打卡结果</text></button><button class="checkin-board" bindtap="openLeaderboard"><text>班级榜单</text></button></view>
+      </view>
+    </view>
+  </view>
+</g0-page-shell>
