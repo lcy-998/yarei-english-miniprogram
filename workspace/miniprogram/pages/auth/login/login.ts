@@ -1,4 +1,4 @@
-import { login } from '../../../services/app-service'
+import { login } from '../../../services/auth-service'
 import { postLoginPath, ROLE_SELECT_PATH } from '../../../session/auth-flow'
 import { saveSession } from '../../../session/session'
 

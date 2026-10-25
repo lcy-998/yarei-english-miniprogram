@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { SchoolQuestionFacet } from '../../miniprogram/domain/types'
-import { questionFacetOptions, questionTypeLabel } from '../../miniprogram/pages/teacher/school-questions/school-question-facets'
+import type { SchoolQuestionFacet } from '../../miniprogram/subpackages/teacher/domain/types'
+import { questionFacetOptions, questionTypeLabel } from '../../miniprogram/subpackages/teacher/school-questions/school-question-facets'
 
 const authorized: SchoolQuestionFacet[] = [
   { grade: '三年级', textbook: '演示教材甲', unit: 'Unit 3', knowledgePoint: '动物', questionType: 'single_choice', difficulty: '基础' },

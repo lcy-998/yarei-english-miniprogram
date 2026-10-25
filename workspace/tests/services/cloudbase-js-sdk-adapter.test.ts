@@ -5,6 +5,7 @@ import {
   type CloudBaseJsSdkAuthPort,
 } from '../../miniprogram/repositories/cloudbase/js-sdk-adapter'
 import { createCloudRepositoryClient } from '../../miniprogram/repositories/cloudbase/protocol'
+import { createCloudAppService } from '../../miniprogram/services/cloudbase-app-service'
 import { parseFunctionRequest } from '../../m1-cloudbase/src/shared/validation'
 
 describe('@cloudbase/js-sdk v3 client adapter', () => {
@@ -77,6 +78,167 @@ describe('@cloudbase/js-sdk v3 client adapter', () => {
     await adapter.authentication.signIn({ mobile: '13800000000', password: 'not-forwarded' })
 
     expect(signInWithPassword).toHaveBeenCalledWith({ phone: '+8613800000000', password: 'not-forwarded' })
+  })
+
+  it('reports a missing verification token as an invalid recovery code', async () => {
+    const app: CloudBaseJsSdkAppPort = {
+      auth: () => ({
+        signInWithPassword: async () => ({ data: { user: {}, session: {} }, error: null }),
+        getVerification: async () => ({ verification_id: 'ver_test' }),
+        verify: async () => ({}),
+        resetPassword: async () => undefined,
+      }),
+      async callFunction() { return { result: { ok: true, data: null } } },
+    }
+    const adapter = createCloudBaseJsSdkAdapter(app)
+    const requestCode = adapter.authentication.requestPasswordResetCode
+    const verifyCode = adapter.authentication.verifyPasswordResetCode
+    if (!requestCode || !verifyCode) throw new Error('Password recovery methods are unavailable')
+    await requestCode('13800000000')
+
+    await expect(verifyCode('13800000000', '000000')).rejects.toEqual({
+      code: 'INVALID_VERIFICATION_CODE',
+    })
+  })
+
+  it('stores the verification token before password entry and resets with that token', async () => {
+    const getVerification = vi.fn(async () => ({ verification_id: 'ver_test' }))
+    const verify = vi.fn(async () => ({ verification_token: 'token_test', expires_in: 600 }))
+    const resetPassword = vi.fn(async () => undefined)
+    const app: CloudBaseJsSdkAppPort = {
+      auth: () => ({
+        signInWithPassword: async () => ({ data: { user: {}, session: {} }, error: null }),
+        getVerification,
+        verify,
+        resetPassword,
+      }),
+      async callFunction() { return { result: { ok: true, data: null } } },
+    }
+    const adapter = createCloudBaseJsSdkAdapter(app)
+    const requestCode = adapter.authentication.requestPasswordResetCode
+    const verifyCode = adapter.authentication.verifyPasswordResetCode
+    const setPassword = adapter.authentication.resetPassword
+    if (!requestCode || !verifyCode || !setPassword) throw new Error('Password recovery methods are unavailable')
+
+    await requestCode('13800000000')
+    await expect(verifyCode('13800000000', '000000')).resolves.toBe(600)
+    await setPassword('13800000000', 'StrongPass123')
+
+    expect(getVerification).toHaveBeenCalledWith({ phone_number: '+86 13800000000', usage: 'recovery', target: 'USER' })
+    expect(verify).toHaveBeenCalledWith({ verification_id: 'ver_test', verification_code: '000000' })
+    expect(resetPassword).toHaveBeenCalledWith({ phone_number: '+86 13800000000',
+      new_password: 'StrongPass123', verification_token: 'token_test' })
+  })
+
+  it('shows a verification error when Auth reports an invalid argument during code verification', async () => {
+    const repository = createCloudRepositoryClient({
+      async call() { return { ok: true, data: null } },
+    }, () => ({ sessionId: null }))
+    const service = createCloudAppService(repository, {
+      async signIn() {},
+      async requestPasswordResetCode() {},
+      async verifyPasswordResetCode() { throw { code: 'invalid_argument' } },
+      async resetPassword() {},
+    }, () => ({ sessionId: null }))
+
+    await expect(service.verifyPasswordResetCode('13800000000', '000000')).resolves.toEqual({
+      ok: false,
+      error: { code: 'VALIDATION_ERROR', message: '验证码无效或已过期', retryable: false },
+    })
+  })
+
+  it('stops password recovery when the verified phone has no Auth user', async () => {
+    const adapter = createCloudBaseJsSdkAdapter({
+      auth: () => ({
+        signInWithPassword: async () => ({ data: { user: {}, session: {} }, error: null }),
+        getVerification: async () => ({ verification_id: 'ver_test', is_user: false }),
+        verify: async () => ({ verification_token: 'unused' }),
+        resetPassword: async () => undefined,
+      }),
+      async callFunction() { return { result: { ok: true, data: null } } },
+    })
+    const service = createCloudAppService(
+      createCloudRepositoryClient(adapter.invoker, () => ({ sessionId: null })),
+      adapter.authentication, () => ({ sessionId: null }))
+
+    await expect(service.requestPasswordResetCode('13800000000')).resolves.toEqual({
+      ok: false,
+      error: { code: 'NOT_FOUND', message: '该手机号未对应可找回的账号，请联系学校管理员核对', retryable: false },
+    })
+  })
+
+  it('does not mislabel a password policy failure as a code expiry', async () => {
+    const repository = createCloudRepositoryClient({
+      async call() { return { ok: true, data: null } },
+    }, () => ({ sessionId: null }))
+    const service = createCloudAppService(repository, {
+      async signIn() {},
+      async requestPasswordResetCode() {},
+      async verifyPasswordResetCode() { return 600 },
+      async resetPassword() { throw { code: 'INVALID_ARGUMENT' } },
+    }, () => ({ sessionId: null }))
+
+    await expect(service.resetPassword('13800000000', 'StrongPass123')).resolves.toEqual({
+      ok: false,
+      error: { code: 'VALIDATION_ERROR', message: '新密码不符合要求，请检查密码长度和格式', retryable: false },
+    })
+  })
+
+  it.each([
+    [{ error: 'user_not_found', error_description: 'private account detail' }, 'NOT_FOUND',
+      '该手机号未对应可找回的账号，请联系学校管理员核对'],
+    [{ error: 'weak_password', error_description: 'private policy detail' }, 'VALIDATION_ERROR',
+      '新密码不符合要求，请检查密码长度和格式'],
+    [{ error: 'invalid_grant', error_description: 'private token detail' }, 'VALIDATION_ERROR',
+      '验证码已过期，请重新验证'],
+  ] as const)('maps password reset provider errors without exposing details', async (providerError, code, message) => {
+    const app: CloudBaseJsSdkAppPort = {
+      auth: () => ({
+        signInWithPassword: async () => ({ data: { user: {}, session: {} }, error: null }),
+        getVerification: async () => ({ verification_id: 'ver_test' }),
+        verify: async () => ({ verification_token: 'token_test', expires_in: 600 }),
+        resetPassword: async () => { throw providerError },
+      }),
+      async callFunction() { return { result: { ok: true, data: null } } },
+    }
+    const adapter = createCloudBaseJsSdkAdapter(app)
+    const repository = createCloudRepositoryClient(adapter.invoker, () => ({ sessionId: null }))
+    const service = createCloudAppService(repository, adapter.authentication, () => ({ sessionId: null }))
+    await service.requestPasswordResetCode('13800000000')
+    await service.verifyPasswordResetCode('13800000000', '000000')
+
+    const result = await service.resetPassword('13800000000', 'StrongPass123')
+
+    expect(result).toEqual({ ok: false, error: { code, message, retryable: false } })
+    expect(JSON.stringify(result)).not.toContain('private')
+  })
+
+  it('logs only an unrecognized provider code for follow-up diagnosis', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const adapter = createCloudBaseJsSdkAdapter({
+        auth: () => ({
+          signInWithPassword: async () => ({ data: { user: {}, session: {} }, error: null }),
+          getVerification: async () => ({ verification_id: 'ver_test' }),
+          verify: async () => ({ verification_token: 'token_test', expires_in: 600 }),
+          resetPassword: async () => { throw { error: 'failed_precondition', error_description: 'private phone and token' } },
+        }),
+        async callFunction() { return { result: { ok: true, data: null } } },
+      })
+      const service = createCloudAppService(
+        createCloudRepositoryClient(adapter.invoker, () => ({ sessionId: null })),
+        adapter.authentication, () => ({ sessionId: null }))
+      await service.requestPasswordResetCode('13800000000')
+      await service.verifyPasswordResetCode('13800000000', '000000')
+
+      const result = await service.resetPassword('13800000000', 'StrongPass123')
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'SERVICE_UNAVAILABLE' } })
+      expect(warning).toHaveBeenCalledWith('[Auth] password reset provider code:', 'AUTH_PROVIDER_FAILED_PRECONDITION')
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('private')
+    } finally {
+      warning.mockRestore()
+    }
   })
 
   it('omits the business token for bootstrap and rejects malformed structured results', async () => {

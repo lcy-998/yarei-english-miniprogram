@@ -1,0 +1,51 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="pronunciation-page">
+    <app-header title="跟读评分" back="{{true}}" backIntercept="{{true}}" bind:back="onBack"></app-header>
+    <state-panel wx:if="{{error}}" state="error" message="{{error}}"></state-panel>
+    <view wx:else class="pronunciation-content">
+      <view class="m1-card pronunciation-reference">
+        <text class="pronunciation-heading">跟读原文</text>
+        <text wx:if="{{referencePreview}}" class="pronunciation-text">{{referencePreview}}</text>
+        <text wx:else class="pronunciation-muted">录制前将从已授权内容读取本句原文。</text>
+        <view wx:if="{{demonstrationUrl}}" class="pronunciation-actions"><button class="pronunciation-secondary" bindtap="playDemonstration">{{demonstrationPlaying ? '暂停示范' : '播放示范'}}</button><button class="pronunciation-secondary" bindtap="cycleDemonstrationSpeed">{{demonstrationSpeed}}×</button></view>
+        <view wx:if="{{demonstrationError}}" class="pronunciation-actions"><text class="pronunciation-muted">{{demonstrationError}}</text><button class="pronunciation-secondary" bindtap="retryDemonstration">重试示范音频</button></view>
+      </view>
+      <view class="m1-card pronunciation-recording">
+        <text class="pronunciation-heading">我的跟读</text>
+        <text class="pronunciation-duration">{{recordingState === 'recording' ? '录音中 ' : busy && recordingState === 'local' ? '正在提交录音 ' : localPath ? '已录制 ' : '尚未录制'}}{{recordingState === 'recording' || localPath ? durationLabel : ''}}</text>
+        <view class="pronunciation-actions">
+          <button wx:if="{{recordingState === 'idle'}}" class="pronunciation-primary" disabled="{{busy}}" bindtap="startRecording">{{busy ? '正在准备…' : '开始录音'}}</button>
+          <button wx:elif="{{recordingState === 'recording'}}" class="pronunciation-stop" bindtap="stopRecording">结束录音</button>
+          <block wx:else>
+            <button wx:if="{{localPath}}" class="pronunciation-secondary" disabled="{{busy}}" bindtap="playLocal">试听</button>
+            <button class="pronunciation-secondary" disabled="{{busy}}" bindtap="redoRecording">重录</button>
+          </block>
+        </view>
+        <text wx:if="{{recordingError}}" class="pronunciation-error">{{recordingError}}</text>
+        <button wx:if="{{permissionDenied}}" class="pronunciation-secondary" bindtap="openMicrophoneSettings">打开麦克风设置</button>
+        <text class="pronunciation-muted">录音需在 1 秒至 5 分钟之间，文件不超过 20 MB。上传失败会保留本机录音。</text>
+        <text wx:if="{{scoreStatusLabel}}" class="pronunciation-status">{{scoreStatusLabel}}</text>
+        <text wx:if="{{scoreMessage}}" class="pronunciation-muted">{{scoreMessage}}</text>
+        <view wx:if="{{showScore && scoreView.score}}" class="pronunciation-scores">
+          <view class="pronunciation-total"><text>总分</text><text>{{scoreView.score.total}}</text></view>
+          <view><text>发音</text><text>{{scoreView.score.pronunciation}}</text></view>
+          <view><text>流利度</text><text>{{scoreView.score.fluency}}</text></view>
+          <view><text>完整度</text><text>{{scoreView.score.completeness}}</text></view>
+        </view>
+        <text wx:if="{{showScore}}" class="pronunciation-muted">试验结果仅供参考，不计正式成绩。</text>
+        <text wx:if="{{source.kind === 'task' && effectiveAttemptNumber > 0}}" class="pronunciation-muted">本次为第 {{effectiveAttemptNumber}} / 5 次有效评分</text>
+        <text wx:if="{{scoreError}}" class="pronunciation-error">{{scoreError}}</text>
+        <button wx:if="{{localPath && !sealed && recordingError && durationMs >= 1000 && durationMs <= 300000 && sizeBytes > 0 && sizeBytes <= 20971520}}" class="pronunciation-secondary" disabled="{{busy}}" bindtap="uploadAndScore">重试提交录音</button>
+        <button wx:if="{{sealed && !scoreId && !busy}}" class="pronunciation-secondary" bindtap="uploadAndScore">重试请求评分</button>
+        <button wx:if="{{scoreId && scoreView.status === 'processing'}}" class="pronunciation-secondary" bindtap="manualRefreshScore">刷新评分结果</button>
+          <button wx:if="{{sealed && (scoreView.retryable || scoreView.status === 'sealed' || (!scoreView.status && scoreError) || (source.kind === 'reading' && scoreView.status === 'failed'))}}" class="pronunciation-secondary" disabled="{{busy}}" bindtap="retryScore">{{source.kind === 'reading' && scoreView.status === 'failed' && !scoreView.retryable ? '重新录制并评分' : '重新请求评分'}}</button>
+      </view>
+      <view wx:if="{{attemptRows.length || historyError}}" class="m1-card pronunciation-history">
+        <text class="pronunciation-heading">历史尝试</text>
+        <text wx:if="{{historyError}}" class="pronunciation-muted">历史记录暂不可用：{{historyError}}</text>
+        <view wx:for="{{attemptRows}}" wx:key="scoreId" class="pronunciation-history-row"><view><text>{{item.label}}</text><text>{{item.timeLabel}}</text></view><text>{{item.scoreLabel}}</text><button wx:if="{{item.status === 'processing'}}" data-id="{{item.scoreId}}" bindtap="recoverProcessingScore">继续查看</button></view>
+      </view>
+      <button wx:if="{{scoreView.status === 'scored'}}" class="pronunciation-primary pronunciation-finish" bindtap="finish">确认结果</button>
+    </view>
+  </view>
+</g0-page-shell>

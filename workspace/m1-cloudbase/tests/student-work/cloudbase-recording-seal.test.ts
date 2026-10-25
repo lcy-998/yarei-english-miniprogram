@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseBuffer } from 'music-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudBaseRecordingSeal, type AudioMetadataReader, type CloudBaseWorkStoragePort } from '../../src/student-work/cloudbase-recording-seal';
 
@@ -58,6 +60,24 @@ describe('M2 CloudBase recording seal', () => {
     const mp4 = fixture({ async read() { return { durationSeconds: 12, codec: 'AAC', container: 'MPEG-4' }; } });
     expect(await mp4.seal.inspectAndSeal(input)).toMatchObject({ codec: 'aac',
       fileId: expect.stringMatching(/\.m4a$/) });
+  });
+
+  it('normalizes a simulator WebM/Opus recording to a playable MP3 private work', async () => {
+    const webm = readFileSync(new URL('../task-recording/fixtures/synthetic-440hz-two-seconds.webm', import.meta.url));
+    const uploadFile = vi.fn<CloudBaseWorkStoragePort['uploadFile']>(async ({ cloudPath }) => ({
+      fileID: `cloud://demo-env.bucket/${cloudPath}`,
+    }));
+    const seal = new CloudBaseRecordingSeal({
+      downloadFile: async () => ({ fileContent: webm }), uploadFile,
+    }, 'demo-env');
+    const result = await seal.inspectAndSeal(input);
+    const saved = uploadFile.mock.calls[0]?.[0].fileContent;
+    expect(result).toMatchObject({ codec: 'mp3', durationMs: 2000,
+      fileId: expect.stringMatching(/\.mp3$/) });
+    expect(saved).toBeDefined();
+    const metadata = await parseBuffer(saved!, { size: saved!.length }, { duration: true });
+    expect(metadata.format.codec?.toLowerCase()).toContain('layer 3');
+    expect(metadata.format.duration).toBeCloseTo(2, 1);
   });
 
   it('rejects a provider result that does not point to the verified private path', async () => {

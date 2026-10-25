@@ -26,7 +26,15 @@ describe('M2 activity client boundary', () => {
       { async signIn() {} }, () => ({ sessionId: 'session_teacher_demo' }))
     await service.saveActivityDraft('forged_teacher', draft, 0, 'operation_activity_client_draft')
     await service.publishActivity('forged_teacher', 'activity_demo', 1, 'operation_activity_client_publish')
+    await service.closeActivity('forged_teacher', 'activity_demo', 2,
+      '教学安排提前结束', 'operation_activity_client_close')
+    await service.deleteActivityDraft('forged_teacher', 'activity_draft_demo', 1,
+      '清理未发布草稿', 'operation_activity_client_delete')
+    await service.recycleActivity('forged_teacher', 'activity_demo', 3,
+      '历史活动回收', 'operation_activity_client_recycle')
     await service.listTeacherActivities('forged_teacher')
+    await service.getTeacherActivityProgress('forged_teacher', 'activity_demo', '2026-09-27',
+      20, 0, '小宇', 'incomplete')
     await service.listStudentActivities('forged_student')
     await service.getStudentActivity('forged_student', 'activity_demo')
     await service.getMyActivityDay('forged_student', 'activity_demo', '2026-09-27')
@@ -39,8 +47,20 @@ describe('M2 activity client boundary', () => {
         operationId: 'operation_activity_client_draft', expectedVersion: 0, token: 'session_teacher_demo' },
       { functionName: 'activity-command', action: 'publish', payload: { activityId: 'activity_demo' },
         operationId: 'operation_activity_client_publish', expectedVersion: 1, token: 'session_teacher_demo' },
+      { functionName: 'activity-command', action: 'close', payload: { activityId: 'activity_demo', reason: '教学安排提前结束' },
+        operationId: 'operation_activity_client_close', expectedVersion: 2, token: 'session_teacher_demo' },
+      { functionName: 'activity-command', action: 'deleteDraft', payload: {
+        activityId: 'activity_draft_demo', reason: '清理未发布草稿' },
+      operationId: 'operation_activity_client_delete', expectedVersion: 1, token: 'session_teacher_demo' },
+      { functionName: 'activity-command', action: 'recycle', payload: {
+        activityId: 'activity_demo', reason: '历史活动回收' },
+      operationId: 'operation_activity_client_recycle', expectedVersion: 3, token: 'session_teacher_demo' },
       { functionName: 'activity-query', action: 'listForTeacher', payload: {},
         operationId: undefined, expectedVersion: undefined, token: 'session_teacher_demo' },
+      { functionName: 'activity-query', action: 'getTeacherProgress', payload: {
+        activityId: 'activity_demo', date: '2026-09-27', page: { limit: 20, offset: 0 },
+        keyword: '小宇', completion: 'incomplete' },
+      operationId: undefined, expectedVersion: undefined, token: 'session_teacher_demo' },
       { functionName: 'activity-query', action: 'listForStudent', payload: {},
         operationId: undefined, expectedVersion: undefined, token: 'session_teacher_demo' },
       { functionName: 'activity-query', action: 'getForStudent', payload: { activityId: 'activity_demo' },

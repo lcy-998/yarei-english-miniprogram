@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { publishErrorMessage } from '../../miniprogram/pages/teacher/publish-task/publish-error'
+import { publishErrorMessage } from '../../miniprogram/subpackages/teacher/publish-task/publish-error'
 
 describe('教师发布任务错误提示', () => {
   it('优先展示后端给出的具体校验原因', () => {

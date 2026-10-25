@@ -1,6 +1,7 @@
 import { ACTIVITY_QUERY_ACTIONS, validateActivityQueryRequest } from '../../src/contracts/activity-functions';
 import type { ActivityService } from '../../src/activity/activity-service';
-import type { ActivityDayView, ActivityEntity, ActivityLeaderboardView, ActivityOverrideState } from '../../src/activity/types';
+import type { ActivityDayView, ActivityEntity, ActivityLeaderboardView, ActivityOverrideState,
+  TeacherActivityProgressView } from '../../src/activity/types';
 import type { ServiceResult } from '../../src/shared/protocol';
 import { createMeta, success } from '../../src/shared/result';
 import { createActivityFailureMapper } from '../shared/activity-failure';
@@ -13,11 +14,13 @@ export function createActivityQueryFunction(dependencies: ActivityQueryDependenc
     'activity-query', ACTIVITY_QUERY_ACTIONS,
     { ...dependencies, mapFailure: createActivityFailureMapper(dependencies.mapFailure) },
     validateActivityQueryRequest,
-    async (input, actor): Promise<ServiceResult<ActivityEntity | readonly ActivityEntity[] | ActivityDayView | ActivityOverrideState | ActivityLeaderboardView>> => {
+    async (input, actor): Promise<ServiceResult<ActivityEntity | readonly ActivityEntity[] | ActivityDayView | ActivityOverrideState | ActivityLeaderboardView | TeacherActivityProgressView>> => {
       const result = input.action === 'listForTeacher'
         ? await dependencies.service.listForTeacher(actor)
         : input.action === 'listForStudent' ? await dependencies.service.listForStudent(actor)
         : input.action === 'getMyDay' ? await dependencies.service.getMyDay(actor, input.activityId, input.date)
+          : input.action === 'getTeacherProgress' ? await dependencies.service.getTeacherProgress(actor,
+            input.activityId, input.date, input.page, input.keyword, input.completion)
           : input.action === 'getOverrideForTeacher'
             ? await dependencies.service.getOverrideForTeacher(actor, input.activityId, input.studentId, input.date)
             : input.action === 'getLeaderboard' ? await dependencies.service.getLeaderboard(actor, input.activityId)

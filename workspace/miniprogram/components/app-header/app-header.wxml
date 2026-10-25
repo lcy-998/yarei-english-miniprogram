@@ -1,4 +1,4 @@
-<view class="app-header" style="padding-top: {{topInset}}px; min-height: {{headerHeight}}px;">
+<view class="app-header {{adminCompact ? 'app-header--admin' : ''}}" style="padding-top: {{topInset}}px; min-height: {{headerHeight}}px;">
   <view wx:if="{{back}}" class="header-icon" bindtap="onBack" aria-role="button" aria-label="返回"><view class="back-shape" aria-hidden="true"></view></view>
   <view wx:else class="header-placeholder"></view>
   <text class="header-title">{{title}}</text>

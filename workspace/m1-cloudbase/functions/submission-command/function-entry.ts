@@ -11,6 +11,7 @@ export interface SubmissionCommandHandler {
 
 export interface SubmissionCommandFunctionDependencies extends TrustedFunctionDependencies {
   readonly handler: SubmissionCommandHandler;
+  readonly queueTeacherSuggestion?: (organizationId: string, submissionId: string) => Promise<void>;
 }
 
 export function createSubmissionCommandFunction(dependencies: SubmissionCommandFunctionDependencies) {
@@ -19,8 +20,16 @@ export function createSubmissionCommandFunction(dependencies: SubmissionCommandF
     SUBMISSION_COMMAND_ACTIONS,
     dependencies,
     validateSubmissionCommandRequest,
-    async (input, actor) => input.action === 'saveDraft'
-      ? dependencies.handler.saveSubmissionDraft(actor, input.taskId, input.answers, input.expectedAssignmentVersion, input.expectedDraftRecordVersion, input.operationId)
-      : dependencies.handler.submit(actor, input.taskId, input.answers, input.expectedAssignmentVersion, input.expectedDraftRecordVersion, input.operationId),
+    async (input, actor) => {
+      if (input.action === 'saveDraft') return dependencies.handler.saveSubmissionDraft(actor, input.taskId,
+        input.answers, input.expectedAssignmentVersion, input.expectedDraftRecordVersion, input.operationId);
+      const result = await dependencies.handler.submit(actor, input.taskId, input.answers,
+        input.expectedAssignmentVersion, input.expectedDraftRecordVersion, input.operationId);
+      if (result.ok && typeof result.data.submissionId === 'string' && dependencies.queueTeacherSuggestion) {
+        try { await dependencies.queueTeacherSuggestion(actor.organizationId, result.data.submissionId); }
+        catch { /* A completed student submission never rolls back because a trial suggestion failed to queue. */ }
+      }
+      return result;
+    },
   );
 }

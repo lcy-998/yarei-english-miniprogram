@@ -338,6 +338,13 @@ export class InMemoryTaskCoreRepository implements TaskCoreUnitOfWork, TaskCoreT
     this.tasks = replaceById(this.tasks, cloneTask(task));
   }
 
+  public async deleteTask(task: TaskRecord): Promise<void> {
+    const index = this.tasks.findIndex(item => item.organizationId === task.organizationId
+      && item.id === task.id && item.version === task.version);
+    if (index < 0) throw new Error('task version conflict');
+    this.tasks.splice(index, 1);
+  }
+
   public async findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null> {
     const found = this.assignments.find((item) => item.organizationId === organizationId && item.taskId === taskId && item.studentId === studentId);
     return found === undefined ? null : { ...found };

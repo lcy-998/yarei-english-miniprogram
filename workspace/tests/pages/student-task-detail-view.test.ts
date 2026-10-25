@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import type { Task, TaskAssignment, Submission } from '../../miniprogram/domain/types'
-import { firstIncompleteTaskItemId, studentSubmissionAtVersion, submittedAnswerRows, taskWriteAvailability } from '../../miniprogram/pages/student/task-detail/task-detail-view'
+import type { Task, TaskAssignment, Submission } from '../../miniprogram/subpackages/student/domain/types'
+import { firstIncompleteTaskItemId, mediaTaskProgressFraction, studentSubmissionAtVersion, submittedAnswerRows, taskItemStatusLabel, taskWriteAvailability } from '../../miniprogram/shared/task-detail-view'
+
+describe('student media task progress', () => {
+  it('does not count absent questions as half of a video task', () => {
+    expect(mediaTaskProgressFraction(0, 1, false, false)).toBe(0)
+    expect(mediaTaskProgressFraction(0.5, 1, false, false)).toBe(0.5)
+    expect(mediaTaskProgressFraction(1, 1, false, true)).toBe(1)
+  })
+
+  it('combines playback and required answers for question and dubbing tasks', () => {
+    expect(mediaTaskProgressFraction(1, 0, true, false)).toBe(0.5)
+    expect(mediaTaskProgressFraction(0.5, 0.5, true, false)).toBe(0.5)
+  })
+})
+
+describe('student task item status labels', () => {
+  it('keeps completion first and uses short labels for the remaining states', () => {
+    expect(taskItemStatusLabel('已听 100% · 已作答', true)).toEqual({ label: '已完成', tone: 'complete' })
+    expect(taskItemStatusLabel('已听 60% · 已作答', false)).toEqual({ label: '进行中', tone: 'in-progress' })
+    expect(taskItemStatusLabel('已听完 · 待作答', false)).toEqual({ label: '待作答', tone: 'in-progress' })
+    expect(taskItemStatusLabel('已听完 · 作答中', false)).toEqual({ label: '作答中', tone: 'in-progress' })
+    expect(taskItemStatusLabel('已听 0%', false)).toEqual({ label: '未开始', tone: 'pending' })
+    expect(taskItemStatusLabel('已播放 0%', false)).toEqual({ label: '未开始', tone: 'pending' })
+    expect(taskItemStatusLabel('已播放 0% · 待录制', false)).toEqual({ label: '未开始', tone: 'pending' })
+    expect(taskItemStatusLabel('0/3', false)).toEqual({ label: '未开始', tone: 'pending' })
+    expect(taskItemStatusLabel('待服务端核对', false)).toEqual({ label: '待核对', tone: 'review' })
+    expect(taskItemStatusLabel('媒体进度不可用', false)).toEqual({ label: '资源异常', tone: 'unavailable' })
+  })
+})
 
 const task: Task = {
   id: 'task_fictional', title: '虚构作业', deliveryType: 'classroom', status: 'active',
@@ -66,5 +94,33 @@ describe('student submitted answer review', () => {
     const multi = { ...task, items: [...task.items, { ...task.items[0], id: 'item_2', title: '第二题' }] }
     expect(firstIncompleteTaskItemId(multi, [{ itemId: 'item_1' }, { itemId: 'item_2' }],
       { item_1: { complete: true }, item_2: { complete: false } })).toBe('item_2')
+  })
+
+  it('labels historical media evidence by its actual type without inventing playback completion', () => {
+    const mediaTask: Task = { ...task, items: [
+      { id: 'listening_1', type: 'listening', title: '听力', completionRule: '播放并作答',
+        mediaSnapshot: { kind: 'listening', mediaId: 'media_1', mediaVersion: 1, reviewVersion: 1,
+          durationMs: 10000, questionIds: ['q1'],
+          questions: [{ questionId: 'q1', questionType: 'single_choice', stem: '虚构听力题', options: ['A', 'B'] }],
+          clips: [{ questionId: 'q1', segmentId: 'clip_1', startMs: 0, endMs: 2000 }],
+          subtitleAvailable: false, continuousPlaybackEnforced: true } },
+      { id: 'video_1', type: 'video', title: '视频', completionRule: '有效观看' },
+      { id: 'dubbing_1', type: 'dubbing', title: '任务配音', completionRule: '提交最终作品' },
+    ] }
+    const submitted: Submission = { ...submission, status: 'submitted', answers: [
+      { taskItemId: 'listening_1', value: '', structuredValue: { kind: 'listening',
+        mediaSessionId: 'session_1', questionResponses: [{ questionId: 'q1', response: 'A' }] } },
+      { taskItemId: 'video_1', value: '', structuredValue: { kind: 'video', mediaSessionId: 'session_2' } },
+      { taskItemId: 'dubbing_1', value: '', structuredValue: { kind: 'dubbing',
+        mediaSessionId: 'session_3', finalWorkId: 'work_1' } },
+    ] }
+    expect(submittedAnswerRows(mediaTask, submitted).map(row => row.answer)).toEqual([
+      '本次已提交 1 道听力题；播放证据由服务端核对',
+      '本次已提交视频学习；有效观看由服务端核对',
+      '本次最终配音作品已提交；播放证据由服务端核对',
+    ])
+    expect(submittedAnswerRows(mediaTask, submitted)[0]?.mediaResponses).toEqual([
+      { questionId: 'q1', stem: '虚构听力题', answer: 'A' },
+    ])
   })
 })

@@ -1,0 +1,87 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="m1-page reading-detail">
+    <app-header title="阅读详情" back="{{true}}" backUrl="{{returnUrl}}" backIntercept="{{true}}" bind:back="returnToCheckin"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error && !reading}}" state="error" message="{{error}}" bind:retry="loadReading"></state-panel>
+    <view wx:elif="{{reading}}" class="m1-content reading-task-content {{(audioMapReady || pageSegments.length) && !teacherReviewMode && !taskMode ? 'reading-with-audio' : ''}}">
+      <view wx:if="{{teacherReviewMode}}" class="m1-card task-reading-context"><text>教师只读查看 · 第 {{reviewSubmissionVersion}} 次提交</text><text>可自由翻阅指定页，查看学生逐页和跟读记录</text></view>
+      <view wx:if="{{teacherReviewMode && !teacherPronunciationSegments.length}}" class="m1-card task-reading-context"><text>本次任务快照未包含可核验的跟读句段</text><text>仍可查看本次提交的阅读页图和逐页记录</text></view>
+      <view wx:if="{{teacherPreviewMode}}" class="m1-card task-reading-context"><text>教师内容预览</text><text>学生阅读页界面 · 翻页不会保存学习进度</text></view>
+      <view wx:if="{{taskMode}}" class="m1-card task-reading-context">
+        <text>任务阅读</text>
+        <text wx:if="{{taskRequiredPageCount > 0}}">阅读至第 {{taskRequiredPageCount}} 页，返回任务后自动更新进度</text>
+        <text wx:else>完成本任务指定的阅读内容</text>
+      </view>
+      <view wx:if="{{checkinMode}}" class="m1-card task-reading-context">
+        <text>今日打卡阅读</text>
+        <text>请从第一页读到最后一页，页面保存后返回打卡任务核对结果</text>
+      </view>
+      <view class="m1-card reading-task-hero">
+        <text class="reading-task-eyebrow">{{teacherPreviewMode ? '教师内容预览' : teacherReviewMode ? '作业阅读记录' : taskMode ? '课堂阅读任务' : '阅读学习'}}</text>
+        <view class="detail-head"><view><text class="book-name">{{reading.book.title}}</text><text class="page-meta">{{teacherReviewMode ? '第 ' + displayPageNumber + ' 页 · 指定范围 ' + (reviewPageIndex + 1) + ' / ' + reading.pageCount : '第 ' + displayChapterNumber + ' 章　' + displayPageNumber + ' / ' + reading.pageCount}}</text></view><button wx:if="{{!teacherReviewMode && !teacherPreviewMode}}" class="detail-favorite {{reading.book.favorite ? 'active' : ''}}" bindtap="toggleFavorite">{{reading.book.favorite ? '已收藏' : '收藏'}}</button></view>
+        <view class="progress-card"><view><text>{{teacherPreviewMode ? '只读预览 · 不保存进度' : teacherReviewMode ? '本次提交已记录访问' : '已保存的阅读进度'}}</text><text>{{reading.hasSavedProgress ? reading.progressPercent : 0}}%</text></view><view class="m1-progress"><view style="width: {{reading.hasSavedProgress ? reading.progressPercent : 0}}%"></view></view></view>
+      </view>
+      <view class="m1-card reading-task-section">
+        <view class="reading-task-section-head"><text>阅读页图</text><text>第 {{displayPageNumber}} / {{reading.pageCount}} 页</text></view>
+      <view class="page-frame {{earMode ? 'page-frame--ear' : ''}}" bindtap="previewPage">
+        <view class="reading-image-stage">
+          <image class="reading-page-thumbnail" src="{{displayThumbnailUrl}}" mode="widthFix" data-page="{{displayPageNumber}}" data-src="{{displayThumbnailUrl}}" bindload="thumbnailLoaded" binderror="thumbnailFailed" aria-hidden="true"></image>
+          <image wx:if="{{showHighRes && !imageError}}" class="reading-page-image" src="{{displayImageUrl}}" mode="widthFix" data-page="{{displayPageNumber}}" data-src="{{displayImageUrl}}" bindload="imageLoaded" binderror="imageFailed" aria-label="{{reading.book.title}}第 {{displayPageNumber}} 页页图"></image>
+          <view wx:if="{{!earMode && !imageError && pageHotspots.length}}" class="reading-hotspot-layer">
+            <view wx:for="{{pageHotspots}}" wx:key="id" class="reading-hotspot {{activeHotspotId === item.id ? 'reading-hotspot--active' : ''}}" style="{{item.style}}" data-id="{{item.id}}" catchtap="playPointread" aria-role="button" aria-label="播放本页第 {{index + 1}} 处点读音频"></view>
+          </view>
+        </view>
+        <view wx:if="{{imageLoading}}" class="page-loading">高清页图加载中…</view>
+        <view wx:if="{{imageError}}" class="page-error"><text>{{imageErrorMessage || '页图加载失败，可刷新、翻页或退出'}}</text><view class="page-error-actions"><button catchtap="retryImage">刷新页图</button><button wx:if="{{pendingPageNumber > 0}}" catchtap="returnToSavedPage">返回已保存页</button><button catchtap="returnToCheckin">退出阅读</button></view></view>
+        <view class="zoom-hint">点击页图放大查看</view>
+        <view wx:if="{{earMode}}" class="reading-ear-cover"><text>文字已隐藏</text><text>{{mediaLoading ? '正在准备章节音频…' : mediaError ? mediaError : mediaPlaying ? '正在连续播放本章' : mediaProgress >= 100 ? '本章已播完，可重新播放' : '已暂停，可从当前位置继续'}}</text><slider class="reading-ear-seek" min="0" max="100" step="1" value="{{mediaProgress}}" disabled="{{mediaLoading || followReadingRecording || !audioMapReady}}" activeColor="#1764D8" backgroundColor="#C8DFF8" block-size="16" bindchange="seekMedia" aria-label="章节播放位置"></slider><view class="reading-ear-times"><text>{{mediaCurrentLabel}}</text><text>{{mediaDurationLabel}}</text></view><view class="reading-ear-actions"><button catchtap="toggleChapterPlayback" disabled="{{mediaLoading || followReadingRecording}}">{{mediaPlaying ? '暂停' : mediaProgress >= 100 ? '重新播放' : '继续播放'}}</button><button catchtap="exitEarMode">退出磨耳朵</button></view></view>
+      </view>
+      <view wx:if="{{audioMapError && !teacherReviewMode}}" class="reading-save-error"><text>{{audioMapError}}</text><button wx:if="{{audioMapRetryable}}" bindtap="retryReadingAudioMap">重试音频核对</button></view>
+      <view wx:if="{{pronunciationError && !teacherReviewMode}}" class="reading-save-error"><text>{{pronunciationError}}</text><button bindtap="retryPronunciationSegments">重试跟读核对</button></view>
+      <view wx:if="{{audioMapReady || pageSegments.length}}" class="reading-audio-section">
+        <view wx:if="{{!teacherReviewMode && (audioMapReady || !taskMode)}}" class="reading-audio-tools"><button class="reading-audio-speed" bindtap="cycleMediaSpeed" aria-label="切换音频速度，当前{{mediaSpeed}}倍">{{mediaSpeed}}× 倍速</button><button wx:if="{{audioMapReady && !earMode}}" class="reading-audio-inline-play" bindtap="toggleChapterPlayback" disabled="{{mediaLoading}}">{{audioMode === 'chapter' && mediaPlaying ? '暂停连听' : mediaProgress >= 100 ? '重新连听' : '继续连听'}}</button><button wx:if="{{audioMapReady && !earMode}}" class="reading-ear-entry" bindtap="enterEarMode" disabled="{{mediaLoading}}">磨耳朵</button></view>
+        <text wx:if="{{mediaLoading}}" class="reading-audio-status">正在准备音频…</text>
+        <view wx:if="{{mediaError}}" class="reading-audio-error"><text>{{mediaError}}</text><button bindtap="retryMedia">重试</button></view>
+        <text wx:if="{{audioMapReady && !taskMode && !pageHotspots.length && !earMode}}" class="reading-audio-note">本页暂无点读区域，可点击“继续连听”播放章节音频。</text>
+        <view wx:if="{{!earMode && pageSegments.length}}" class="reading-segment-heading">跟读练习</view>
+        <view wx:if="{{!earMode}}" class="reading-segment-list"><view wx:for="{{pageSegments}}" wx:key="id" class="reading-segment">
+          <text class="reading-segment__label">第 {{index + 1}} 段 · {{teacherReviewMode ? '本次提交的跟读情况' : '已审核示范音频与跟读'}}</text>
+          <view wx:if="{{teacherPreviewMode && !audioMapReady}}" class="reading-segment__actions"><button data-id="{{item.id}}" bindtap="playDemonstration">{{activeSegmentId === item.id && mediaPlaying ? '暂停示范' : '播放示范'}}</button></view>
+          <pronunciation-panel wx:if="{{teacherReviewMode}}" class="inline-pronunciation" teacherReadonly="{{true}}" teacherEvidenceState="{{item.teacherEvidenceState}}" teacherEvidence="{{item.teacherEvidence}}" teacherEvidenceStatusLabel="{{item.teacherEvidenceStatusLabel}}" teacherEvidenceMessage="{{item.teacherEvidenceMessage}}" referenceText="{{item.text}}" segmentId="{{item.id}}" bind:teacherrefresh="refreshTeacherPronunciationEvidence"></pronunciation-panel>
+          <pronunciation-panel wx:elif="{{!teacherPreviewMode}}" class="inline-pronunciation" resourceId="{{reading.book.id}}" segmentId="{{item.id}}" taskId="{{taskMode ? taskId : ''}}" itemId="{{taskMode ? taskItemId : ''}}" referenceText="{{item.text}}" translationText="{{item.translationText || ''}}" bind:followreadcomplete="onPronunciationFollowReadComplete" bind:recordingstart="onFollowReadingRecordingStart" bind:recordingend="onFollowReadingRecordingEnd"></pronunciation-panel>
+        </view></view>
+      </view>
+      </view>
+      <view wx:if="{{saveError && !teacherReviewMode && !teacherPreviewMode}}" class="reading-save-error"><text>{{saveError}}</text><button bindtap="saveVisiblePage">重试保存</button></view>
+      <view wx:if="{{!taskMode && !checkinMode && !teacherReviewMode && !teacherPreviewMode && nextPointreadPageNumber > 0 && nextPointreadPageNumber !== displayPageNumber}}" class="pointread-jump">
+        <g0-button variant="secondary" disabled="{{saving || saveError || (!imageError && !imageRefreshAttempted && (imageLoading || pendingPageNumber > 0))}}" bind:action="jumpToPointreadPage">前往点读课文 · 第 {{nextPointreadPageNumber}} 页</g0-button>
+      </view>
+      <view class="reading-page-navigation">
+        <button class="reading-nav-button reading-nav-button--previous" disabled="{{teacherReviewMode || teacherPreviewMode ? reviewPageIndex <= 0 : displayPageNumber <= 1 || saving || (!saveError && !imageError && !imageRefreshAttempted && (imageLoading || pendingPageNumber > 0))}}" bindtap="previousPage">上一页</button>
+        <button class="reading-nav-button reading-nav-button--next" disabled="{{teacherReviewMode || teacherPreviewMode ? reviewPageIndex + 1 >= reading.pageCount : displayPageNumber >= reading.pageCount || saving || ((taskMode || checkinMode) && followReadingBlocked) || (!saveError && !imageError && !imageRefreshAttempted && (imageLoading || pendingPageNumber > 0))}}" loading="{{saving}}" bindtap="nextPage">下一页</button>
+      </view>
+      <text wx:if="{{(taskMode || checkinMode) && !teacherReviewMode && !teacherPreviewMode && pageSegments.length}}" class="autosave">{{followReadingBlocked ? '完成本页全部跟读并提交录音后，才能翻到下一页。' + followReadingProgress : '本页跟读已完成，可以继续阅读。'}}</text>
+      <text wx:if="{{teacherReviewMode}}" class="autosave">{{reviewPageVisited[reviewPageIndex] ? '本次提交已记录访问该页' : '本次提交未记录访问该页'}}</text>
+      <text wx:elif="{{teacherPreviewMode}}" class="autosave">只读预览，不记录学生阅读进度</text>
+      <text wx:elif="{{!imageLoading && !imageError && !saving && !saveError}}" class="autosave">阅读位置已保存</text>
+    </view>
+  </view>
+</g0-page-shell>
+<view wx:if="{{zoomed}}" class="reading-fullscreen" style="{{fullscreenStyle}}" bindtap="onFullscreenTap" bindtouchstart="onFullscreenTouchStart" bindtouchend="onFullscreenTouchEnd">
+  <view class="reading-fullscreen-stage">
+    <view class="reading-fullscreen-image-frame" style="{{fullscreenImageStyle}}">
+      <image class="reading-fullscreen-image" src="{{imageError || !displayImageUrl ? displayThumbnailUrl : displayImageUrl}}" mode="aspectFit" bindload="fullscreenImageLoaded" data-page="{{displayPageNumber}}"></image>
+      <view wx:if="{{!followReadingRecording && !earMode && pageHotspots.length}}" class="reading-fullscreen-hotspot-layer">
+        <view wx:for="{{pageHotspots}}" wx:key="id" class="reading-hotspot {{activeHotspotId === item.id ? 'reading-hotspot--active' : ''}}" style="{{item.style}}" data-id="{{item.id}}" catchtap="playPointread" aria-role="button" aria-label="全屏播放本页第 {{index + 1}} 处点读音频"></view>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{pageSegments.length}}" class="reading-fullscreen-subtitles" catchtap="toggleFullscreenSubtitle" aria-role="button" aria-label="切换中英文字幕">
+    <view wx:for="{{pageSegments}}" wx:key="id" class="reading-fullscreen-caption">
+      <text wx:if="{{!subtitleInChinese}}">{{item.text}}</text>
+      <text wx:elif="{{item.translationText}}">{{item.translationText}}</text>
+      <text wx:else>中文译文暂未提供</text>
+    </view>
+    
+  </view>
+</view>

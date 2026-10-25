@@ -24,6 +24,29 @@ function contentVersion(value: unknown): string | null {
   if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return String(value);
   return null;
 }
+function verifiedSubtitleCues(payload: Record<string, unknown>): WorkMaterial['subtitleCues'] {
+  if (payload.subtitleTimingStatus !== 'verified' || !Number.isSafeInteger(payload.durationMs)
+    || Number(payload.durationMs) <= 0 || !Array.isArray(payload.subtitleCues)
+    || payload.subtitleCues.length === 0) return undefined;
+  let previousEnd = 0;
+  const cues: Array<NonNullable<WorkMaterial['subtitleCues']>[number]> = [];
+  for (const candidate of payload.subtitleCues) {
+    if (!isRecord(candidate) || !Number.isSafeInteger(candidate.startMs)
+      || !Number.isSafeInteger(candidate.endMs) || Number(candidate.startMs) < previousEnd
+      || Number(candidate.endMs) <= Number(candidate.startMs)
+      || typeof candidate.text !== 'string' || !candidate.text.trim()
+      || candidate.translationText !== undefined && (typeof candidate.translationText !== 'string'
+        || candidate.translationText.trim().length > 500)) return undefined;
+    const cue = { startMs: Number(candidate.startMs), endMs: Number(candidate.endMs),
+      text: candidate.text.trim(),
+      ...(typeof candidate.translationText === 'string' && candidate.translationText.trim()
+        ? { translationText: candidate.translationText.trim() } : {}) };
+    cues.push(cue);
+    previousEnd = cue.endMs;
+  }
+  if (previousEnd > Number(payload.durationMs)) return undefined;
+  return cues;
+}
 function projectMaterial(document: VersionedDocument, organizationId: string): WorkMaterial | null {
   if (!visible(document, organizationId) || document.type !== 'work'
     || typeof document.id !== 'string' || typeof document.title !== 'string'
@@ -36,9 +59,11 @@ function projectMaterial(document: VersionedDocument, organizationId: string): W
     : document.visibility.type === 'classes' && Array.isArray(document.visibility.classIds)
       && document.visibility.classIds.every(item => typeof item === 'string')
       ? { type: 'classes' as const, classIds: document.visibility.classIds as string[] } : null;
+  const subtitleCues = verifiedSubtitleCues(document.payload);
   return visibility ? { id: document.id, organizationId, title: document.title, contentVersion: version,
     status: document.status, visibility,
     demonstrationFileId: document.payload.demonstrationFileId, subtitle: document.payload.subtitle,
+    ...(subtitleCues ? { subtitleCues } : {}),
     ...(typeof document.grade === 'string' && document.grade.trim() ? { grade: document.grade.trim() }
       : typeof document.payload.grade === 'string' && document.payload.grade.trim()
         ? { grade: document.payload.grade.trim() } : {}),

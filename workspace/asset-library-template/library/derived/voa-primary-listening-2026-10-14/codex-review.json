@@ -1,0 +1,69 @@
+{
+  "reviewId": "codex-voa-primary-listening-2026-10-14-v1",
+  "reviewer": "Codex",
+  "reviewedAt": "2026-10-14T22:02:00+08:00",
+  "decision": "candidate_only_release_blocked",
+  "productionReady": false,
+  "checks": {
+    "sourceAndReuseTerms": "pass: VOA Learning English official terms state text and MP3 are public domain and may be reprinted for educational/commercial use with attribution; third-party media excluded",
+    "gradeAndLearningGoals": "pass: four beginner conversations are mapped by vocabulary/communication load to suggested grades 3-6; these are Codex recommendations, not VOA grade claims",
+    "transcriptAgainstOfficialPages": "pass: transcript text checked against the official VOA lesson pages",
+    "questionAccuracyAndAnswerOptions": "pass: five newly authored, answerable questions per audio; answer and explanation stay out of student preview",
+    "questionCount": "pass: all ten items have five questions, exceeding the requested minimum of three",
+    "mediaFileIntegrity": "pass: ten MP3 files downloaded from the official VOA audio links; SHA-256, byte size, MPEG frame integrity and duration recorded in the manifest",
+    "actualAudioListening": "not completed: no audio listening/transcription capability was available in this session",
+    "malwareScan": "blocked: Windows Defender custom scan returned an error; ClamAV 1.5.4 with the existing signature database did not return for the candidate files and the scan was stopped; no clean scan is claimed",
+    "preciseQuestionSegments": "pending: each question conservatively points to the full audio; per-question boundaries require listening review before publication",
+    "textbookOriginalListening": "candidate located, not yet packaged: official PEP Grade 4A Unit 1 audio tracks pep4s05Unit1ALetsspellRead.mp3, pep4s06Unit1ALetsspellLook.mp3 and pep4s10Unit1CProject.mp3 are present in G:/英语资产/inbox/pep-4a-unit1-official; the original exercises are visible on textbook pages 10 and 14. Still missing an approved single-audio composition, answer verification for the listening choices/jobs, complete transcript evidence, and Codex audio audition. The local book-pep-4a v1 remains needs_review.",
+    "productionContentChannel": "blocked: only the existing nonproduction personal CloudBase environment is configured; no production content channel/target has been verified",
+    "cloudReadbackAndAudit": "not performed"
+  },
+  "publishDecision": "Do not change a resource to publish_ready or published until audio-content review, malware scan, question-segment review, textbook source acquisition for the PEP portion, and production-channel preflight are complete.",
+  "existingResourcePlan": [
+    { "resourceId": "res_voa_lle1_l4_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l5_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l6_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l8_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l9_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l10_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l11_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l12_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" },
+    { "resourceId": "res_voa_lle1_l13_listening_formal_v1", "change": "revision 2 replaces the one-question set with five; retain historical task snapshots" }
+  ],
+  "newResourcePlan": [{ "resourceId": "res_voa_lle1_l7_listening_formal_v1", "change": "new extracurricular item with five questions" }],
+  "textbookCandidate": {
+    "bookResourceId": "book-pep-4a",
+    "grade": 4,
+    "unit": 1,
+    "originalExercises": [
+      { "textbookPage": 10, "prompt": "Read, listen and circle", "expectedItemCount": 4, "audioFile": "pep4s05Unit1ALetsspellRead.mp3" },
+      { "textbookPage": 10, "prompt": "Look, listen and write", "expectedItemCount": 2, "audioFile": "pep4s06Unit1ALetsspellLook.mp3" },
+      { "textbookPage": 14, "prompt": "What do Chen Jie's parents do? Listen, choose and match.", "expectedItemCount": 2, "audioFile": "pep4s10Unit1CProject.mp3" }
+    ],
+    "sourceAcquisitionReport": "G:/英语资产/reports/pep-4a-unit1-acquisition-2026-09-29.json",
+    "durationProbeReport": "G:/英语资产/reports/audio-probe-2026-09-29-all.json",
+    "candidateQuestionCount": 8,
+    "releaseStatus": "blocked_pending_answer_mapping_and_audio_review"
+  },
+  "nonproductionInventory": {
+    "publishedRecordsIncludingProjections": 20,
+    "uniqueSourceResources": 10,
+    "nonconformingUniqueSources": 9,
+    "questionsOnEachNonconformingSource": 1,
+    "compliantExistingSource": "res_launch_sbc0008_listening_v2_20261013 (4 questions)",
+    "questionCountsReadBack": true,
+    "activeTaskReferenceCountsByOldSource": {
+      "res_voa_lle1_l4_listening_formal_v1": 0,
+      "res_voa_lle1_l5_listening_formal_v1": 4,
+      "res_voa_lle1_l6_listening_formal_v1": 0,
+      "res_voa_lle1_l8_listening_formal_v1": 1,
+      "res_voa_lle1_l9_listening_formal_v1": 0,
+      "res_voa_lle1_l10_listening_formal_v1": 2,
+      "res_voa_lle1_l11_listening_formal_v1": 1,
+      "res_voa_lle1_l12_listening_formal_v1": 1,
+      "res_voa_lle1_l13_listening_formal_v1": 0
+    }
+  },
+  "nonproductionMutation": false,
+  "productionMutation": false
+}

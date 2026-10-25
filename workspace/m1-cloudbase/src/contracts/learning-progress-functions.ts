@@ -11,7 +11,8 @@ export type LearningProgressQueryInput =
   | Readonly<{ action: 'getReadingProgress'; resourceId: string }>
   | Readonly<{ action: 'getVocabularyProgress'; packId: string }>;
 
-export const LEARNING_PROGRESS_COMMAND_ACTIONS = ['saveReadingProgress', 'saveVocabularyProgress'] as const;
+export const LEARNING_PROGRESS_COMMAND_ACTIONS = ['saveReadingProgress', 'saveVocabularyProgress',
+  'beginTaskMediaSession', 'reportTaskMediaHeartbeat'] as const;
 export type LearningProgressCommandAction = (typeof LEARNING_PROGRESS_COMMAND_ACTIONS)[number];
 export type LearningProgressCommandInput =
   | Readonly<{
@@ -21,7 +22,10 @@ export type LearningProgressCommandInput =
   | Readonly<{
       action: 'saveVocabularyProgress'; packId: string; completedCount: number; correctCount: number;
       wrongWordIds: readonly string[]; expectedVersion: number; operationId: string;
-    }>;
+    }>
+  | Readonly<{ action: 'beginTaskMediaSession'; taskId: string; itemId: string; operationId: string }>
+  | Readonly<{ action: 'reportTaskMediaHeartbeat'; sessionId: string; playedFromMs: number;
+      playedToMs: number; positionMs: number; operationId: string }>;
 
 export function validateLearningProgressQueryRequest(
   request: FunctionRequest<LearningProgressQueryAction, JsonObject>,
@@ -44,6 +48,32 @@ export function validateLearningProgressCommandRequest(
   request: FunctionRequest<LearningProgressCommandAction, JsonObject>,
 ): ContractValidation<LearningProgressCommandInput> {
   if (request.operationId === undefined) return invalid('operationId', '写操作必须提供操作标识。');
+  if (request.action === 'beginTaskMediaSession') {
+    if (request.expectedVersion !== undefined) return invalid('expectedVersion', '媒体会话不接受客户端版本。');
+    const exact = parseExactObject(request.payload, ['taskId', 'itemId']);
+    if (!exact.ok) return exact;
+    const taskId = requiredId(exact.value.taskId, 'taskId');
+    const itemId = requiredId(exact.value.itemId, 'itemId');
+    if (!taskId.ok) return taskId;
+    if (!itemId.ok) return itemId;
+    return { ok: true, value: { action: request.action, taskId: taskId.value,
+      itemId: itemId.value, operationId: request.operationId } };
+  }
+  if (request.action === 'reportTaskMediaHeartbeat') {
+    if (request.expectedVersion !== undefined) return invalid('expectedVersion', '媒体心跳不接受客户端版本。');
+    const exact = parseExactObject(request.payload, ['sessionId', 'playedFromMs', 'playedToMs', 'positionMs']);
+    if (!exact.ok) return exact;
+    const sessionId = requiredId(exact.value.sessionId, 'sessionId');
+    if (!sessionId.ok) return sessionId;
+    if (!isNonNegativeInteger(exact.value.playedFromMs) || !isNonNegativeInteger(exact.value.playedToMs)
+      || !isNonNegativeInteger(exact.value.positionMs)
+      || exact.value.playedFromMs >= exact.value.playedToMs) {
+      return invalid('playedToMs', '媒体心跳时间轴无效。');
+    }
+    return { ok: true, value: { action: request.action, sessionId: sessionId.value,
+      playedFromMs: exact.value.playedFromMs, playedToMs: exact.value.playedToMs,
+      positionMs: exact.value.positionMs, operationId: request.operationId } };
+  }
   const expectedVersion = request.expectedVersion ?? 0;
   if (request.action === 'saveReadingProgress') {
     const exact = parseExactObject(request.payload, ['resourceId', 'chapterId', 'pageId', 'pageNumber', 'favorite']);

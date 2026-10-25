@@ -82,7 +82,7 @@ Page({
 
   openStudent(event: WechatMiniprogram.TouchEvent) {
     const studentId = event.currentTarget.dataset.id as string
-    wx.navigateTo({ url: `/pages/teacher/student-detail/student-detail?studentId=${encodeURIComponent(studentId)}` })
+    wx.navigateTo({ url: `/subpackages/teacher/student-detail/student-detail?studentId=${encodeURIComponent(studentId)}` })
   },
 
   showReadOnlyNotice() {

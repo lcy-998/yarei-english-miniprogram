@@ -1,0 +1,20 @@
+{
+  "batchId": "voa-primary-listening-2026-10-14",
+  "source": "VOA Learning English - Let's Learn English, Level 1",
+  "reviewer": "Codex",
+  "createdAt": "2026-10-14T21:42:46+08:00",
+  "items": [
+    { "id": "res_voa_lle1_l4_listening_formal_v1", "revision": 2, "lesson": 4, "suggestedGrade": 3, "title": "What Is It?", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l5_listening_formal_v1", "revision": 2, "lesson": 5, "suggestedGrade": 3, "title": "Where Are You?", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l6_listening_formal_v1", "revision": 2, "lesson": 6, "suggestedGrade": 4, "title": "Where Is the Gym?", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l7_listening_formal_v1", "revision": 1, "lesson": 7, "suggestedGrade": 5, "title": "What Are You Doing?", "questionCount": 5, "action": "new extracurricular content" },
+    { "id": "res_voa_lle1_l8_listening_formal_v1", "revision": 2, "lesson": 8, "suggestedGrade": 6, "title": "Are You Busy?", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l9_listening_formal_v1", "revision": 2, "lesson": 9, "suggestedGrade": 4, "title": "Is It Cold?", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l10_listening_formal_v1", "revision": 2, "lesson": 10, "suggestedGrade": 4, "title": "Come Over to My Place", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l11_listening_formal_v1", "revision": 2, "lesson": 11, "suggestedGrade": 4, "title": "This Is My Neighborhood", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l12_listening_formal_v1", "revision": 2, "lesson": 12, "suggestedGrade": 5, "title": "Meet My Family", "questionCount": 5, "action": "replace one-question content revision" },
+    { "id": "res_voa_lle1_l13_listening_formal_v1", "revision": 2, "lesson": 13, "suggestedGrade": 6, "title": "Happy Birthday, William Shakespeare!", "questionCount": 5, "action": "replace one-question content revision" }
+  ],
+  "releaseStatus": "candidate_blocked_pending_audio_review_and_environment_preflight",
+  "productionReady": false
+}

@@ -48,8 +48,8 @@
 | T-16 | 阅读内容选择 | M2 | `current/T-16.png` | N/F/C/D/S | 五类虚构阅读封面、虚构页图 | C/P | Sp |
 | T-17 | 完成情况 | M0 | `current/T-17.png` | N/F/C/D/S/T | 自然背景 | C/P/L | Sp |
 | T-18 | 课堂任务内容选择 | M2 | `current/T-18.png` | N/F/C/D/S | 虚构教材/阅读封面 | C/P/M | Sp |
-| T-19 | 音视频材料库 | M3 | `history/T-19/v001.png` 候选 | N/F/C/D/M/S/T | 媒体空状态插画；缩略图代码渲染 | C/P/M | Sp |
-| T-20 | 媒体编辑与题目对位 | M3 | `current/T-20.png` | N/F/C/D/M/S | 录音重试插画 | C/P/M | L/Sp |
+| T-19 | 后台资产库内容目录（教师只读） | M3 | 旧 `history/T-19/v001.png`，待重做 | N/F/C/D/M/S/T | 媒体空状态插画；缩略图代码渲染 | C/P/M | Sp |
+| T-20 | 媒体预览与逐题试听（教师只读） | M3 | 旧 `current/T-20.png`，需修改 | N/F/C/D/M/S | 不沿用上传/编辑状态稿 | C/P/M | L/Sp |
 | A-01 | 后台工作台 | M1 | `current/A-01.png` | N/C/S/T | Logo；图表代码渲染 | C/P | Sp |
 | A-02 | 学校/班级管理 | M1 | `current/A-02.png` | N/F/C/D/S/T | Logo；其余代码图标 | C/P | Tab/Sp |
 | A-03 | 用户管理 | M1 | `current/A-03.png` | N/F/C/D/S/T | Logo；头像占位代码/虚构 | C/P | Tab/Sp |

@@ -46,6 +46,18 @@ const item = { textbookId: 'book_sync_demo', contentVersion: 'v1',
   chapterIds: ['unit_2', 'unit_1'], lessonIds: ['lesson_2', 'lesson_1'] };
 
 describe('M2 teacher textbook service', () => {
+  it('已登录角色无需班级名单即可读取现有教材，班级配置仍限教师', async () => {
+    const { service } = fixture();
+    for (const role of ['student', 'parent', 'teacher', 'admin'] as const) {
+      const caller = { ...actor, actorRole: role, actorUserId: `${role}_material_reader`, permissions: [], scopeIds: [] };
+      await expect(service.listTextbooks(caller, {}, { limit: 20, offset: 0 }))
+        .resolves.toMatchObject({ items: [{ id: 'book_sync_demo' }] });
+      await expect(service.getTextbook(caller, 'book_sync_demo', otherClassId))
+        .resolves.toMatchObject({ id: 'book_sync_demo' });
+    }
+    await expect(service.listClasses({ ...actor, actorRole: 'parent', permissions: [], scopeIds: [] }))
+      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
   it('reads numeric grades from the accepted M1 class and resource documents', async () => {
     const original = fixture().database.snapshot();
     const database = new FakeDocumentDatabase({ ...original,
@@ -85,6 +97,34 @@ describe('M2 teacher textbook service', () => {
     expect(result.items.map(item => item.id)).toEqual(['book_sync_demo']);
   });
 
+  it('T-14 facets include authorized books beyond the first result page and narrow by parent selections', async () => {
+    const { service, database } = fixture();
+    const base = database.snapshot()[TEXTBOOK_COLLECTIONS.resources]?.find(row => row._id === 'book_sync_demo');
+    if (!base) throw new Error('missing textbook fixture');
+    await database.runTransaction(async transaction => {
+      for (let index = 0; index < 25; index += 1) {
+        const id = `book_sync_${String(index).padStart(3, '0')}`;
+        await transaction.create(TEXTBOOK_COLLECTIONS.resources, { ...base, _id: id,
+          title: `虚构同步课本 ${index}`, textbook: '虚构常规版' });
+      }
+      await transaction.create(TEXTBOOK_COLLECTIONS.resources, { ...base, _id: 'book_sync_zzz',
+        title: '虚构末页教材', textbook: '虚构末页版', payload: {
+          category: 'synchronized', grade: '三年级', term: '上学期', textbook: '虚构末页版',
+          textbookChapters: [{ id: 'unit_last', title: '末页单元',
+            lessons: [{ id: 'lesson_last', title: '末页课次' }] }],
+        } });
+    });
+    const all = await service.listTextbookFacets(actor, {}, classId);
+    expect(all.edition).toContain('虚构末页版');
+    const narrowed = await service.listTextbookFacets(actor,
+      { grade: '三年级', term: '上学期', edition: '虚构末页版', unit: '末页单元' }, classId);
+    expect(narrowed.unit).toEqual(['末页单元']);
+    expect(narrowed.lesson).toEqual(['末页课次']);
+    expect(validateTeacherTextbookQueryRequest({ apiVersion: 'm1.v1', action: 'listTextbookFacets',
+      payload: { filters: { edition: '虚构末页版' }, targetClassId: classId } })).toMatchObject({ ok: true });
+    await expect(service.listTextbookFacets(actor, {}, otherClassId)).resolves.toMatchObject({ grade: ['三年级'] });
+  });
+
   it('saves ordering, publishes a separate visible snapshot, and keeps idempotent retry stable', async () => {
     const { service, database } = fixture();
     const draft = await service.save(actor, { classId, textbooks: [item], note: '虚构教学安排' },
@@ -103,6 +143,31 @@ describe('M2 teacher textbook service', () => {
       textbooks: [{ chapterIds: ['unit_1', 'unit_2'] }], publishedTextbooks: [{ chapterIds: ['unit_2', 'unit_1'] }] });
     expect((await service.getClass(actor, classId)).config?.publishedTextbooks).toEqual(published.textbooks);
     expect(database.snapshot()[TEXTBOOK_COLLECTIONS.receipts]).toHaveLength(3);
+  });
+
+  it('publishes a currently listed school textbook despite legacy class grade and visibility labels', async () => {
+    const { service, database } = fixture();
+    const original = database.snapshot()[TEXTBOOK_COLLECTIONS.resources]?.find(row => row._id === 'book_sync_demo');
+    if (!original) throw new Error('missing textbook fixture');
+    await database.runTransaction(async transaction => {
+      await transaction.create(TEXTBOOK_COLLECTIONS.resources, { ...original,
+        _id: 'book_formal_demo', title: '虚构正式同步课本', grade: '三年级',
+        visibility: { type: 'classes', classIds: [otherClassId] },
+        contentVersion: 'formal-v1' });
+    });
+    const listed = (await service.listTextbooks(actor, {}, { limit: 20, offset: 0 }, classId)).items
+      .find(book => book.id === 'book_formal_demo');
+    expect(listed).toBeDefined();
+    const selected = { textbookId: listed!.id, contentVersion: listed!.contentVersion,
+      chapterIds: listed!.chapters.map(chapter => chapter.id),
+      lessonIds: listed!.chapters.flatMap(chapter => chapter.lessons.map(lesson => lesson.id)) };
+    await expect(service.save(actor, { classId, textbooks: [selected], note: '' },
+      0, 'operation_textbook_formal_draft', false)).resolves.toMatchObject({ status: 'draft', version: 1 });
+    await expect(service.save(actor, { classId, textbooks: [selected], note: '' },
+      1, 'operation_textbook_formal_publish', true)).resolves.toMatchObject({
+      status: 'published', publishedTextbooks: [{ textbookId: 'book_formal_demo' }],
+    });
+    await expect(service.getClass(actor, otherClassId)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('rejects revoked write permission, offline content and stale versions without changing prior config', async () => {

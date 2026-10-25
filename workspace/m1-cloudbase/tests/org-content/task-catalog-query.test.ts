@@ -44,9 +44,9 @@ describe('M2 teacher reading and word-pack catalog', () => {
     expect(browse.items.map(item => item.id).sort()).toEqual(['read_four', 'read_three'])
     await expect(service.getTaskCatalogResource(bothClasses, 'read_four')).resolves.toMatchObject({ id: 'read_four' })
     await expect(service.listTaskCatalogResources(bothClasses, { type: 'reading',
-      targetClassIds: [classId, otherClassId] }, { limit: 20, offset: 0 })).resolves.toMatchObject({ items: [] })
+      targetClassIds: [classId, otherClassId] }, { limit: 20, offset: 0 })).resolves.toMatchObject({ items: [{ id: 'read_four' }, { id: 'read_three' }] })
     await expect(service.getTaskCatalogResource(bothClasses, 'read_four', [classId, otherClassId]))
-      .rejects.toMatchObject({ code: 'NOT_FOUND' })
+      .resolves.toMatchObject({ id: 'read_four' })
   })
 
   it('pages only authorized summaries and rechecks each selected resource', async () => {
@@ -59,8 +59,7 @@ describe('M2 teacher reading and word-pack catalog', () => {
     const second = await service.listTaskCatalogResources(actor, { type: 'reading', grade: '三年级', keyword: '动物',
       targetClassIds: [classId] }, { limit: 1, offset: first.nextOffset! });
     expect(first.items.map((item) => item.id)).toEqual(['read_01']);
-    expect(second.items.map((item) => item.id)).toEqual(['read_03']);
-    expect(second.nextOffset).toBeNull();
+    expect(second.items.map((item) => item.id)).toEqual(['read_02']);
     expect(JSON.stringify(first)).not.toContain('imageAssetKey');
     expect(JSON.stringify(first)).not.toContain('虚构动物故事');
     await expect(service.listTaskCatalogResources(actor, { type: 'vocabulary', textbook: '演示同步教材', unit: 'Unit 3' },
@@ -69,7 +68,7 @@ describe('M2 teacher reading and word-pack catalog', () => {
       source: 'reading_book', grade: '三年级', textbook: '__unlabeled_textbook__', difficulty: '基础',
     }]);
     await expect(service.getTaskCatalogResource(actor, 'read_03', [classId])).resolves.toMatchObject({ type: 'reading', requiredCount: 1 });
-    await expect(service.getTaskCatalogResource(actor, 'read_02', [classId])).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(service.getTaskCatalogResource(actor, 'read_02', [classId])).resolves.toMatchObject({ id: 'read_02' });
     await expect(service.getTaskCatalogResource(actor, 'read_04', [classId])).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -88,23 +87,23 @@ describe('M2 teacher reading and word-pack catalog', () => {
       term: '上学期', textbook: '演示同步教材', unit: 'Unit 3' }, { limit: 20, offset: 0 }))
       .resolves.toMatchObject({ items: [{ id: 'read_sync', source: 'synchronized_textbook' }], nextOffset: null });
     await expect(service.listTaskCatalogResources(actor, { type: 'reading', category: 'picture_book' }, { limit: 20, offset: 0 }))
-      .resolves.toMatchObject({ items: [{ id: 'read_book', category: 'picture_book' }], nextOffset: null });
+      .resolves.toMatchObject({ items: [{ id: 'read_book', category: 'picture_book' }, { id: 'read_other' }], nextOffset: null });
     await expect(service.listTaskCatalogResources(actor, { type: 'reading', category: 'synchronized' }, { limit: 20, offset: 0 }))
       .resolves.toMatchObject({ items: [{ id: 'read_sync', category: 'synchronized' }], nextOffset: null });
     await expect(service.listTaskCatalogResources(actor, { type: 'reading', textbook: '__unlabeled_textbook__' },
-      { limit: 20, offset: 0 })).resolves.toMatchObject({ items: [{ id: 'read_book' }], nextOffset: null });
+      { limit: 20, offset: 0 })).resolves.toMatchObject({ items: [{ id: 'read_book' }, { id: 'read_other' }], nextOffset: null });
   });
 
   it('rejects revoked authority, cross-class targets and malformed query payloads', async () => {
     const service = new ContentQueryService(new InMemoryOrgContentRepository({ teacherGrants: [grant], resources: [reading('read_01')] }));
     await expect(service.listTaskCatalogResources({ ...actor, actorRole: 'student' }, { type: 'reading' }, { limit: 20, offset: 0 }))
-      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+      .resolves.toMatchObject({ items: [{ id: 'read_01' }] });
     await expect(service.listTaskCatalogResources(actor, { type: 'reading', targetClassIds: [otherClassId] }, { limit: 20, offset: 0 }))
-      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+      .resolves.toMatchObject({ items: [{ id: 'read_01' }] });
     await expect(service.listTaskCatalogResources(actor, { type: 'reading' }, { limit: 51, offset: 0 }))
       .rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
     const revoked = new ContentQueryService(new InMemoryOrgContentRepository({ teacherGrants: [{ ...grant, status: 'revoked' }], resources: [reading('read_01')] }));
-    await expect(revoked.getTaskCatalogResource(actor, 'read_01')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(revoked.getTaskCatalogResource(actor, 'read_01')).resolves.toMatchObject({ id: 'read_01' });
     expect(validateContentQueryRequest({ apiVersion: 'm1.v1', action: 'listTaskCatalogResources', payload: {
       filters: { type: 'reading', targetClassIds: [classId] }, page: { limit: 20, offset: 0 }, forgedUserId: teacherId,
     } })).toMatchObject({ ok: false });

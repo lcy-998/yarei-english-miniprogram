@@ -1,0 +1,8 @@
+{
+  "authorizationScope": "m3_public_media_nonproduction",
+  "approved": false,
+  "operation": "import_public_media",
+  "environmentId": "replace-with-reviewed-nonproduction-environment-id",
+  "sourceOrganizationId": "replace-with-existing-active-source-school-id",
+  "inputSha256": "replace-with-plan-input-sha256"
+}

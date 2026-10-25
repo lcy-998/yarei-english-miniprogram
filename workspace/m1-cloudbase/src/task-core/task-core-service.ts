@@ -12,14 +12,30 @@ import {
   type BatchReviewPreviewIntent,
 } from './batch-review-preview';
 import { evaluateExerciseSubmission, readExerciseQuestionSnapshot } from './exercise-evidence';
+import { validExerciseSections } from './exercise-section-guard';
 import { readingPageIdsFromPayload, selectedReadingPageIds, supportsReadingRangeSnapshot } from './reading-range';
+import { approvedReadingPronunciation } from './reading-pronunciation-gate';
 import { automaticTaskScore, manualTaskItemIds, scoreTaskWithManualItems,
   type ManualTaskItemScore } from './task-score';
 import { summarizeVocabularyFirstAttempts, vocabularyWordIds } from '../vocabulary-evidence/summary';
+import { validVocabularySyllableContent } from '../org-content/vocabulary-syllable-gate';
+import { freezeTeacherMediaForTask, type TeacherMediaCandidate,
+  type FrozenTeacherMediaSnapshot, type TeacherMediaTaskKind } from '../teacher-media/publish-gate';
+import { hasApprovedAssetLibraryOrigin } from '../teacher-media/asset-library-origin';
+import type { TaskMediaSubmissionEvidenceService, TaskMediaSubmissionRequest,
+  VerifiedTaskMediaSubmission } from '../task-media/submission-evidence';
+import type { ReviewVoiceCommentService } from '../review-voice/service';
+import type { TeacherSuggestionStore } from '../teacher-ai/types';
+import { safeTeacherSuggestionText } from '../teacher-ai/safety';
+import { automaticSuggestionOperationId } from '../teacher-ai/automatic-job';
+import { parentSafeAnswers } from '../task-query/parent-answer-projection';
+import { hasOnlyOfficialAutomaticItems } from '../task-query/official-score';
+import { parentVoiceCommentSummary } from '../task-query/parent-feedback-voice';
 import type { TaskCoreReader, TaskCoreTransaction, TaskCoreTransactionScope, TaskCoreUnitOfWork } from './repository';
 import type {
   ClassMembershipRecord,
   FrozenTaskItem,
+  LearningResourceRecord,
   ParentTaskResultView,
   ReviewFeedbackRecord,
   SaveTaskDraftInput,
@@ -36,6 +52,12 @@ const MAX_REDO_COUNT = 2;
 const MAX_TASK_TARGET_STUDENTS = 500;
 const PUBLISH_ASSIGNMENT_BATCH_SIZE = 20;
 const PUBLISH_BATCHES_PER_CALL = 3;
+const CURRENT_TEACHER_AI_MODEL_VERSION = 'qwen3-0.6b-q4_0-b11345';
+const CURRENT_TEACHER_AI_PROMPT_VERSION = 'teacher-v13';
+
+function isSynchronizedTextbook(resource: LearningResourceRecord): boolean {
+  return resource.type === 'reading' && resource.payload.category === 'synchronized';
+}
 
 /** Pure business slice whose command writes are committed through one unit of work. */
 export class TaskCoreService {
@@ -48,6 +70,9 @@ export class TaskCoreService {
     private readonly ids: IdentifierGenerator,
     private readonly requestIds: RequestIdGenerator,
     private readonly batchReviewPreviewCodec?: BatchReviewPreviewCodec,
+    private readonly mediaEvidence?: Pick<TaskMediaSubmissionEvidenceService, 'verify'>,
+    private readonly reviewVoice?: Pick<ReviewVoiceCommentService, 'resolveForFeedback'>,
+    private readonly teacherSuggestions?: Pick<TeacherSuggestionStore, 'findById'>,
   ) {
     this.authorization = new AuthorizationService(identities);
   }
@@ -234,7 +259,7 @@ export class TaskCoreService {
           if (!resource) return this.fail('NOT_FOUND');
           if (resource.status !== 'published') return this.fail('RESOURCE_OFFLINE');
           if (resource.type !== item.resourceSnapshot.type) return this.fail('VALIDATION_ERROR', { templateId: '模板原资源类型已变化。' });
-          if (resource.visibility === 'classes') {
+          if (resource.visibility === 'classes' && !isSynchronizedTextbook(resource)) {
             commonClassIds = commonClassIds.filter((classId) => resource.allowedClassIds.includes(classId));
           }
         }
@@ -329,7 +354,7 @@ export class TaskCoreService {
         if (!resolvedTarget.ok) return this.fail('VALIDATION_ERROR', resolvedTarget.fieldErrors);
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, resolvedTarget.classIds, 'task.publish'))) return this.fail('FORBIDDEN');
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, resolvedTarget.classIds, 'content.read'))) return this.fail('FORBIDDEN');
-        const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, resolvedTarget.classIds, current.items);
+        const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, resolvedTarget.classIds, actor.actorUserId, current.items);
         if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
         const frozenItems = frozen.items;
 
@@ -420,7 +445,7 @@ export class TaskCoreService {
             const found = await transaction.findClassMembershipGuard(actor.organizationId, guard.classId);
             if (!found || found.version !== guard.expectedVersion) return this.fail('CONFLICT');
           }
-          const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, target.classIds, current.items);
+          const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, current.itemRefs, target.classIds, actor.actorUserId, current.items);
           if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
           const entries = [...byStudent.values()].sort((left, right) => left.studentId.localeCompare(right.studentId))
             .map((membership) => ({ studentId: membership.studentId, classId: membership.classId }));
@@ -619,7 +644,7 @@ export class TaskCoreService {
 
           if (input.itemRefs !== undefined || targetChanged) {
             nextItemRefs = (input.itemRefs ?? current.itemRefs).map((item) => normalizeItemReference(item));
-            const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, nextItemRefs, nextTargetClassIds);
+            const frozen = await freezeTaskItemReferences(transaction, actor.organizationId, nextItemRefs, nextTargetClassIds, actor.actorUserId);
             if (!frozen.ok) return this.fail(frozen.code, frozen.fieldErrors);
             nextItems = frozen.items;
           }
@@ -713,6 +738,52 @@ export class TaskCoreService {
     });
   }
 
+  public async deleteDraftTask(
+    actor: TrustedActorContext,
+    taskId: string,
+    reason: string,
+    expectedVersion: number,
+    operationId: string,
+  ): Promise<ServiceResult<JsonObject>> {
+    const cleanedReason = cleanOptional(reason);
+    if (!taskId.trim() || cleanedReason === null || cleanedReason.length > 200
+      || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
+      return this.fail('VALIDATION_ERROR', { reason: '草稿删除须提供当前版本和 1—200 字原因。' });
+    }
+    if (actor.actorRole !== 'teacher' || !hasPermission(actor, 'task.publish')) return this.fail('FORBIDDEN');
+    const activeGrants = await this.repository.listActiveTeacherGrants(actor.organizationId,
+      actor.actorUserId, actor.scopeIds);
+    if (!activeGrants.some(grant => grant.permissions.includes('task.publish'))) return this.fail('FORBIDDEN');
+    const prepared = await this.repository.findTask(actor.organizationId, taskId);
+    const scope = await this.prepareScope(actor, { classIds: prepared?.targetClassIds.length
+      ? prepared.targetClassIds : actor.scopeIds });
+    return this.executeAtomic({ actor, functionName: 'task-command', action: 'deleteDraftTask',
+      operationId, expectedVersion, payload: { taskId, reason: cleanedReason }, scope,
+      perform: async transaction => {
+        const current = await transaction.findTask(actor.organizationId, taskId);
+        if (current === null || current.visibility === 'recycled') return this.fail('NOT_FOUND');
+        if (current.creatorTeacherId !== actor.actorUserId) return this.fail('FORBIDDEN');
+        if (current.version !== expectedVersion) return this.fail('CONFLICT');
+        if (current.status !== 'draft' || current.publishedAt !== null || current.publication != null
+          || current.publishOperationId != null) return this.fail('CONFLICT');
+        const authorized = current.targetClassIds.length === 0
+          ? await this.canTeacherAccessAnyInTransaction(transaction, actor, 'task.publish')
+          : await this.canTeacherAccessAllInTransaction(transaction, actor, current.targetClassIds, 'task.publish');
+        if (!authorized) return this.fail('FORBIDDEN');
+        if ((await transaction.listTaskAssignments(actor.organizationId, taskId)).length > 0
+          || (await transaction.listTaskSubmissions(actor.organizationId, taskId)).length > 0) {
+          return this.fail('CONFLICT');
+        }
+        await transaction.deleteTask(current);
+        const result = success<JsonObject>({ taskId, deleted: true }, createMeta(this.clock, this.requestIds));
+        await this.appendAudit(transaction, { actor, requestId: result.meta.requestId,
+          action: 'task.draft.deleted', targetType: 'task', targetId: taskId,
+          result: 'succeeded', metadata: { taskVersion: current.version, reason: cleanedReason } });
+        return result;
+      },
+    });
+  }
+
   public async recycleTask(
     actor: TrustedActorContext,
     taskId: string,
@@ -795,6 +866,8 @@ export class TaskCoreService {
       score?: number;
       itemScores?: readonly ManualTaskItemScore[];
       textComment?: string;
+      aiSuggestionId?: string;
+      voiceRecordingId?: string;
       returnReason?: string;
       overrideReason?: string;
       expectedSubmissionVersion: number;
@@ -811,7 +884,31 @@ export class TaskCoreService {
     const preparedFeedback = preparedSubmission === null
       ? null
       : await this.repository.findFeedbackBySubmission(actor.organizationId, preparedSubmission.id);
-    if (preparedFeedback !== null) return this.fail('CONFLICT');
+    let aiSuggestion = null;
+    if (input.aiSuggestionId !== undefined && preparedFeedback === null) {
+      if (!this.teacherSuggestions || cleanOptional(input.textComment) === null) {
+        return this.fail('VALIDATION_ERROR', { aiSuggestionId: 'AI 点评建议必须先被教师采纳为文字点评。' });
+      }
+      aiSuggestion = await this.teacherSuggestions.findById(actor.organizationId,
+        actor.actorUserId, input.aiSuggestionId);
+      if (aiSuggestion === null && preparedSubmission !== null) {
+        const task = await this.repository.findTask(actor.organizationId, preparedSubmission.taskId);
+        if (task !== null && task.creatorTeacherId !== actor.actorUserId) {
+          const automatic = await this.teacherSuggestions.findById(actor.organizationId,
+            task.creatorTeacherId, input.aiSuggestionId);
+          if (automatic?.operationId === automaticSuggestionOperationId({
+            organizationId: actor.organizationId, submissionId: input.submissionId,
+          })) aiSuggestion = automatic;
+        }
+      }
+      if (aiSuggestion === null || aiSuggestion.status !== 'trial' || aiSuggestion.text === null
+        || !safeTeacherSuggestionText(aiSuggestion.text)
+        || aiSuggestion.submissionId !== input.submissionId
+        || aiSuggestion.submissionVersion !== preparedSubmission?.submissionVersion
+        || aiSuggestion.assignmentVersion !== preparedAssignment?.version
+        || aiSuggestion.modelVersion !== CURRENT_TEACHER_AI_MODEL_VERSION
+        || aiSuggestion.promptVersion !== CURRENT_TEACHER_AI_PROMPT_VERSION) return this.fail('CONFLICT');
+    }
     const scope = await this.prepareScope(actor, {
       classIds: preparedAssignment === null ? [] : [preparedAssignment.classId],
       assignments: preparedAssignment === null ? [] : [preparedAssignment],
@@ -831,12 +928,16 @@ export class TaskCoreService {
         const assignment = await transaction.findAssignmentById(actor.organizationId, submission.assignmentId);
         if (assignment === null) return this.fail('NOT_FOUND');
         if (!(await this.canTeacherAccessAllInTransaction(transaction, actor, [assignment.classId], 'submission.review'))) return this.fail('FORBIDDEN');
+        if (await transaction.findFeedbackBySubmission(actor.organizationId, submission.id) !== null) return this.fail('CONFLICT');
         if (assignment.version !== expectedAssignmentVersion || submission.submissionVersion !== input.expectedSubmissionVersion) return this.fail('CONFLICT');
         if (submission.status !== 'submitted' || assignment.latestSubmissionId !== submission.id || assignment.status !== 'awaiting_review') return this.fail('CONFLICT');
         if (input.decision === 'returned' && assignment.redoCount >= MAX_REDO_COUNT) return this.fail('REDO_LIMIT_REACHED');
         const task = await transaction.findTask(actor.organizationId, submission.taskId);
         if (task === null) return this.fail('NOT_FOUND');
         const needsItemScores = task.items.some(item => item.resourceSnapshot.type === 'recording'
+          || item.resourceSnapshot.type === 'dubbing'
+          || (item.resourceSnapshot.type === 'listening' || item.resourceSnapshot.type === 'video')
+            && item.mediaSnapshot?.questions.some(question => question.questionType === 'subjective')
           || (item.resourceSnapshot.type === 'exercise' && item.resourceSnapshot.payload.questionType === 'subjective'));
         if (needsItemScores && input.itemScores === undefined) {
           return this.fail('VALIDATION_ERROR', { itemScores: '请逐项评分后发布点评。' });
@@ -859,6 +960,13 @@ export class TaskCoreService {
         }
         const overrideReason = isOverride ? requestedOverrideReason : null;
 
+        const voiceComment = input.voiceRecordingId === undefined ? null
+          : await this.reviewVoice?.resolveForFeedback(actor, submission.id,
+            submission.submissionVersion, input.voiceRecordingId) ?? null;
+        if (input.voiceRecordingId !== undefined && voiceComment === null) {
+          return this.fail('MEDIA_INVALID', { voiceRecordingId: '语音评语尚未由当前教师封存，或已失效。' });
+        }
+
         const now = this.clock.nowIso();
         const feedback: ReviewFeedbackRecord = {
           id: this.ids.next('feedback'),
@@ -874,6 +982,17 @@ export class TaskCoreService {
           ...(originalAutomaticScore === null ? {} : { originalAutomaticScore }),
           ...(overrideReason === null ? {} : { overrideReason }),
           textComment: cleanOptional(input.textComment),
+          ...(aiSuggestion === null ? {} : { aiAssistance: {
+            suggestionId: aiSuggestion.id, modelVersion: aiSuggestion.modelVersion,
+            promptVersion: aiSuggestion.promptVersion, generationNumber: aiSuggestion.generationNumber,
+            teacherEditedText: cleanOptional(input.textComment) !== aiSuggestion.text,
+          } }),
+          ...(voiceComment === null ? {} : { voiceComment: {
+            recordingId: voiceComment.recordingId, fileId: voiceComment.fileId,
+            sha256: voiceComment.contentSha256, durationMs: voiceComment.durationMs,
+            sizeBytes: voiceComment.sizeBytes, mediaVersion: voiceComment.mediaVersion,
+            mediaDeletedAt: null,
+          } }),
           returnReason: input.decision === 'returned' ? cleanOptional(input.returnReason) : null,
           publishedAt: now,
           source: 'manual',
@@ -912,7 +1031,11 @@ export class TaskCoreService {
           targetId: submission.id,
           result: 'succeeded',
           metadata: { submissionVersion: submission.submissionVersion, decision: input.decision,
-            ...(overrideReason === null ? {} : { overrideReasonLength: overrideReason.length }) },
+            ...(overrideReason === null ? {} : { overrideReasonLength: overrideReason.length }),
+            ...(feedback.aiAssistance === undefined ? {} : { aiSuggestionId: feedback.aiAssistance.suggestionId,
+              aiAssisted: true, modelVersion: feedback.aiAssistance.modelVersion,
+              promptVersion: feedback.aiAssistance.promptVersion,
+              teacherEditedText: feedback.aiAssistance.teacherEditedText }) },
         });
         return result;
       },
@@ -1070,11 +1193,12 @@ export class TaskCoreService {
       title: task.title,
       studentId,
       assignmentStatus: assignment.status,
-      automaticScore: submission === null ? null : automaticTaskScore(task, submission),
+      automaticScore: submission === null || !hasOnlyOfficialAutomaticItems(task)
+        ? null : automaticTaskScore(task, submission),
       submission: submission === null || submission.submittedAt === null ? null : {
         id: submission.id,
         version: submission.submissionVersion,
-        answers: submission.answers,
+        answers: parentSafeAnswers(task, submission.answers, submission.submittedAt, this.clock.nowIso()),
         submittedAt: submission.submittedAt,
       },
       feedback: feedback === null ? null : {
@@ -1082,6 +1206,8 @@ export class TaskCoreService {
         decision: feedback.decision,
         score: feedback.score,
         textComment: feedback.textComment,
+        ...(parentVoiceCommentSummary(feedback, this.clock.nowIso()) === undefined ? {}
+          : { voiceComment: parentVoiceCommentSummary(feedback, this.clock.nowIso()) }),
         returnReason: feedback.returnReason,
         publishedAt: feedback.publishedAt,
       },
@@ -1156,11 +1282,32 @@ export class TaskCoreService {
         }
         const verifiedReadingPages = new Map<string, readonly Readonly<{ pageId: string; pageNumber: number; visitedAt: string }>[]>();
         const verifiedRecordings = new Map<string, Readonly<{ recordingId: string; durationMs: number; sizeBytes: number }>>();
+        const verifiedMedia = new Map<string, VerifiedTaskMediaSubmission>();
         if (action === 'submit') {
           const answersByItem = new Map(answers.map((answer) => [answer.itemId, answer]));
           for (const item of task.items) {
             const answer = answersByItem.get(item.id);
-            if (answer === undefined || !satisfiesCompletionRule(item, answer.value)) {
+            if (answer === undefined) {
+              return this.fail('VALIDATION_ERROR', { answers: '任务完成结果不符合已发布的完成规则。' });
+            }
+            if (item.resourceSnapshot.type === 'listening' || item.resourceSnapshot.type === 'video'
+              || item.resourceSnapshot.type === 'dubbing') {
+              if (!item.mediaSnapshot || !this.mediaEvidence || !isJsonObject(answer.value)) {
+                return this.fail('SERVICE_UNAVAILABLE');
+              }
+              const verified = await this.mediaEvidence.verify(actor, {
+                organizationId: actor.organizationId, studentId: actor.actorUserId,
+                assignmentId: assignment.id, round: assignment.latestSubmissionVersion + 1,
+                taskId: task.id, itemId: item.id, writable: true, snapshot: item.mediaSnapshot,
+              }, answer.value as unknown as TaskMediaSubmissionRequest);
+              if (!verified.ok) return this.fail(verified.code === 'FORBIDDEN' ? 'FORBIDDEN'
+                : verified.code === 'PLAYBACK_INCOMPLETE' ? 'TASK_NOT_SUBMITTABLE'
+                  : verified.code === 'WORK_UNAVAILABLE' ? 'MEDIA_INVALID' : 'VALIDATION_ERROR',
+              { answers: '媒体播放、逐题作答或最终作品尚未通过服务端核验。' });
+              verifiedMedia.set(item.id, verified.data);
+              continue;
+            }
+            if (!satisfiesCompletionRule(item, answer.value)) {
               return this.fail('VALIDATION_ERROR', { answers: '任务完成结果不符合已发布的完成规则。' });
             }
             if (item.resourceSnapshot.type === 'reading') {
@@ -1261,6 +1408,14 @@ export class TaskCoreService {
           if (item?.resourceSnapshot.type === 'recording' && recording) {
             return { itemId: answer.itemId, value: { kind: 'recording', ...recording } };
           }
+          const media = verifiedMedia.get(answer.itemId);
+          if (media) return { itemId: answer.itemId, value: {
+            mediaSessionId: media.mediaSessionId,
+            mediaId: media.mediaId, mediaVersion: media.mediaVersion,
+            questionResponses: media.questionResponses.map(response => ({ ...response,
+              response: Array.isArray(response.response) ? [...response.response] : response.response })),
+            ...media.evidence,
+          } };
           if (item?.resourceSnapshot.type !== 'exercise') return { ...answer };
           const snapshot = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
           if (snapshot === null) return { ...answer };
@@ -1634,7 +1789,7 @@ function validatePublishedTaskUpdate(input: UpdatePublishedTaskInput): Readonly<
 }
 
 function validateReview(input: Readonly<{ decision: 'approved' | 'returned'; score?: number;
-  itemScores?: readonly ManualTaskItemScore[]; textComment?: string; returnReason?: string;
+  itemScores?: readonly ManualTaskItemScore[]; textComment?: string; voiceRecordingId?: string; returnReason?: string;
   overrideReason?: string }>): Readonly<Record<string, string>> | null {
   const errors: Record<string, string> = {};
   if (input.score !== undefined && (!Number.isFinite(input.score) || input.score < 0 || input.score > 100)) errors.score = '评分须为 0—100。';
@@ -1646,6 +1801,9 @@ function validateReview(input: Readonly<{ decision: 'approved' | 'returned'; sco
     errors.itemScores = '逐项评分无效。';
   }
   if ((input.textComment?.trim().length ?? 0) > 500) errors.textComment = '点评最多 500 字。';
+  if (input.voiceRecordingId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(input.voiceRecordingId)) {
+    errors.voiceRecordingId = '语音评语记录标识无效。';
+  }
   if (input.decision === 'returned' && cleanOptional(input.returnReason) === null) errors.returnReason = '退回重做必须填写原因。';
   if ((input.returnReason?.trim().length ?? 0) > 200) errors.returnReason = '退回原因最多 200 字。';
   if ((input.overrideReason?.trim().length ?? 0) > 200) errors.overrideReason = '自动分覆盖原因最多 200 字。';
@@ -1702,6 +1860,8 @@ function reviewPayload(input: Readonly<{
   score?: number;
   itemScores?: readonly ManualTaskItemScore[];
   textComment?: string;
+  aiSuggestionId?: string;
+  voiceRecordingId?: string;
   returnReason?: string;
   overrideReason?: string;
   expectedSubmissionVersion: number;
@@ -1712,6 +1872,8 @@ function reviewPayload(input: Readonly<{
     score: input.score ?? null,
     itemScores: input.itemScores?.map(item => ({ itemId: item.itemId, score: item.score })) ?? null,
     textComment: input.textComment ?? null,
+    aiSuggestionId: input.aiSuggestionId ?? null,
+    voiceRecordingId: input.voiceRecordingId ?? null,
     returnReason: input.returnReason ?? null,
     overrideReason: input.overrideReason ?? null,
     expectedSubmissionVersion: input.expectedSubmissionVersion,
@@ -1755,6 +1917,21 @@ function defaultCompletionRule(type: FrozenTaskItem['resourceSnapshot']['type'])
   return { kind: 'exercise_questions', requiredQuestionCount: 1 };
 }
 
+function mediaCompletionRule(kind: TeacherMediaTaskKind,
+  snapshot: FrozenTeacherMediaSnapshot): JsonObject {
+  const objectiveQuestionIds = snapshot.questions.filter(question => question.questionType !== 'subjective')
+    .map(question => question.questionId);
+  if (kind === 'listening') return { kind: 'listening', questionIds: [...snapshot.questionIds],
+    segmentIds: snapshot.clips.map(clip => clip.segmentId),
+    ...(objectiveQuestionIds.length === snapshot.questionIds.length ? {}
+      : { objectiveQuestionIds }) };
+  if (kind === 'video') return { kind: 'video', durationMs: snapshot.durationMs,
+    questionIds: [...snapshot.questionIds],
+    ...(objectiveQuestionIds.length === snapshot.questionIds.length ? {}
+      : { objectiveQuestionIds }) };
+  return { kind: 'dubbing' };
+}
+
 function defaultScoringRule(): JsonObject {
   return { kind: 'manual', maxScore: 100 };
 }
@@ -1782,6 +1959,9 @@ function copyableItemError(item: FrozenTaskItem): string | null {
   const type = item.resourceSnapshot.type;
   if (type !== 'reading' && type !== 'vocabulary' && type !== 'exercise' && type !== 'recording') {
     return '原任务含 M2 尚不可发布的内容类型。';
+  }
+  if (type === 'reading' && !approvedReadingPronunciation(item.resourceSnapshot.payload, item.resourceVersion)) {
+    return '原阅读跟读快照未通过媒体、版权与版本核验。';
   }
   if (!isSupportedCompletionRule(type, item.completionRule)
     || !supportsReadingRangeSnapshot(item.resourceSnapshot, item.completionRule)
@@ -1862,17 +2042,51 @@ async function freezeTaskItemReferences(
   organizationId: string,
   references: readonly TaskRecord['itemRefs'][number][],
   classIds: readonly string[],
+  teacherId: string,
   retainedItems: readonly FrozenTaskItem[] = [],
 ): Promise<FrozenItemsResult> {
   if (!validTaskItemWeights(references)) {
     return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '任务内容权重合计必须为 100%。' } };
   }
-  const items: FrozenTaskItem[] = [];
+  const resolvedResources: LearningResourceRecord[] = [];
   for (const reference of references) {
     const resource = await reader.findResource(organizationId, reference.resourceId);
     if (resource === null) return { ok: false, code: 'NOT_FOUND' };
+    resolvedResources.push(resource);
+  }
+  const exerciseRows = references.flatMap((reference, index) => {
+    const resource = resolvedResources[index];
+    const origin = resource && isJsonObject(resource.payload.assetLibrary) ? resource.payload.assetLibrary : null;
+    return resource?.type === 'exercise' && typeof origin?.exercisePackId === 'string'
+      ? [{ resourceId: reference.resourceId, packId: origin.exercisePackId }] : [];
+  });
+  const exerciseQuestionCount = references.filter((_, index) => resolvedResources[index]?.type === 'exercise').length;
+  const exerciseQuestionIds = exerciseRows.map(row => row.resourceId);
+  const exercisePackCounts = new Map<string, number>();
+  for (const row of exerciseRows) exercisePackCounts.set(row.packId, (exercisePackCounts.get(row.packId) ?? 0) + 1);
+  if (exerciseRows.length > 0 && (exerciseRows.length !== exerciseQuestionCount
+    || exerciseQuestionIds.length < 5
+    || new Set(exerciseQuestionIds).size !== exerciseQuestionIds.length
+    || [...exercisePackCounts.values()].some(count => count < 5))) {
+    return { ok: false, code: 'VALIDATION_ERROR',
+      fieldErrors: { itemRefs: '习题任务须按题组选择，每组至少 5 道不同题目。' } };
+  }
+  if (!validExerciseSections(resolvedResources)) {
+    return { ok: false, code: 'VALIDATION_ERROR',
+      fieldErrors: { itemRefs: '习题题组的大题、小题或共同阅读材料不完整。' } };
+  }
+  const items: FrozenTaskItem[] = [];
+  for (const [index, reference] of references.entries()) {
+    const resource = resolvedResources[index];
+    if (resource === undefined) return { ok: false, code: 'NOT_FOUND' };
     if (resource.status !== 'published') return { ok: false, code: 'RESOURCE_OFFLINE' };
-    if (resource.visibility === 'classes' && classIds.some((classId) => !resource.allowedClassIds.includes(classId))) {
+    const ownedPrivateVideo = resource.type === 'video'
+      && isJsonObject(resource.payload.teacherPrivate)
+      && resource.payload.teacherPrivate.ownerTeacherId === teacherId;
+    if (resource.type === 'video' && isJsonObject(resource.payload.teacherPrivate)
+      && !ownedPrivateVideo) return { ok: false, code: 'FORBIDDEN' };
+    if (resource.visibility === 'classes' && !ownedPrivateVideo && !isSynchronizedTextbook(resource)
+      && classIds.some((classId) => !resource.allowedClassIds.includes(classId))) {
       return { ok: false, code: 'FORBIDDEN' };
     }
     const retained = retainedItems.find((item) => sameFrozenReference(reference, item));
@@ -1882,6 +2096,41 @@ async function freezeTaskItemReferences(
         return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: error ?? '原资源类型已变化，无法再次布置。' } };
       }
       items.push(structuredClone(retained));
+      continue;
+    }
+    if (resource.type === 'listening' || resource.type === 'video' || resource.type === 'dubbing') {
+      const teacherPrivate = ownedPrivateVideo;
+      if (!teacherPrivate && !hasApprovedAssetLibraryOrigin(resource.payload, resource.id, resource.contentVersion)) {
+        return { ok: false, code: 'VALIDATION_ERROR',
+          fieldErrors: { itemRefs: '媒体未由后台资产库审核导入，不能布置。' } };
+      }
+      const mediaPayload = resource.payload.teacherMedia;
+      if (!isJsonObject(mediaPayload)) return { ok: false, code: 'VALIDATION_ERROR',
+        fieldErrors: { itemRefs: '媒体审核、题目映射或播放规则未准备好。' } };
+      const candidate = { ...(mediaPayload as unknown as TeacherMediaCandidate),
+        id: resource.id, organizationId, title: resource.title, kind: resource.type,
+        version: resource.contentVersion, status: resource.status };
+      const gated = freezeTeacherMediaForTask(candidate, organizationId, classIds,
+        teacherPrivate ? 'teacher_private' : 'central');
+      if (!gated.ready) return { ok: false, code: 'VALIDATION_ERROR',
+        fieldErrors: { itemRefs: `媒体尚不可发布：${gated.reason}` } };
+      const expectedRule = mediaCompletionRule(resource.type, gated.snapshot);
+      if (reference.completionRule !== undefined
+        && canonicalize(reference.completionRule) !== canonicalize(expectedRule)) {
+        return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '媒体完成规则与审核快照不一致。' } };
+      }
+      const scoringRule = reference.scoringRule;
+      const expectedScoringKind = resource.type === 'dubbing' ? 'manual'
+        : resource.type === 'video' && gated.snapshot.questionIds.length === 0 ? 'completion_only'
+          : gated.snapshot.questions.some(question => question.questionType === 'subjective')
+            ? 'manual' : 'automatic';
+      if (!scoringRule || scoringRule.kind !== expectedScoringKind) {
+        return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '媒体计分规则与内容类型不一致。' } };
+      }
+      items.push({ id: reference.id, resourceId: resource.id, resourceVersion: resource.contentVersion,
+        snapshotSchemaVersion: 2, resourceSnapshot: { title: resource.title, type: resource.type,
+          payload: resource.payload }, mediaSnapshot: gated.snapshot,
+        completionRule: expectedRule, scoringRule: { ...scoringRule }, order: reference.order });
       continue;
     }
     const completionRule = reference.completionRule ?? defaultCompletionRule(resource.type);
@@ -1900,6 +2149,13 @@ async function freezeTaskItemReferences(
     if (resource.type === 'recording' && reference.scoringRule?.kind === 'automatic') {
       return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '录音任务只能由教师人工评分。' } };
     }
+    if (resource.type === 'reading' && !approvedReadingPronunciation(resource.payload, resource.contentVersion,
+      resource.copyrightStatus ?? null)) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '阅读跟读句段未通过媒体、版权与版本核验。' } };
+    }
+    if (resource.type === 'vocabulary' && !validVocabularySyllableContent(resource.payload)) {
+      return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '三、四年级词条缺少有效音节，不能布置任务。' } };
+    }
     const wordIds = resource.type === 'vocabulary' ? vocabularyWordIds(resource.payload) : null;
     if (resource.type === 'vocabulary' && resource.payload.words !== undefined && wordIds === null) {
       return { ok: false, code: 'VALIDATION_ERROR', fieldErrors: { itemRefs: '单词词包快照无效。' } };
@@ -1909,7 +2165,9 @@ async function freezeTaskItemReferences(
       resourceId: resource.id,
       resourceVersion: resource.contentVersion,
       snapshotSchemaVersion: wordIds === null ? 1 : 2,
-      resourceSnapshot: { title: resource.title, type: resource.type, payload: resource.payload },
+      resourceSnapshot: { title: resource.title, type: resource.type,
+        payload: resource.type === 'reading' && resource.copyrightStatus
+          ? { ...resource.payload, copyrightStatus: resource.copyrightStatus } : resource.payload },
       completionRule,
       scoringRule: reference.scoringRule ?? defaultScoringRule(),
       order: reference.order,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-11T08:22:26.320955+00:00",
+  "generatedAt": "2026-10-01T12:58:19.474082+00:00",
   "target": "wechat_miniprogram_cloudbase",
   "items": [
     {
@@ -9,9 +9,15 @@
       "resourceType": "textbook",
       "assetKey": "book-join-in-5a-2026/v1",
       "localManifestRelativePath": "library/books/book-join-in-5a-2026/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_review",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 2,
+      "coverAssetKey": "books/book-join-in-5a-2026/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 2,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-join-in-5a-2026/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-join-in-6a-2026",
@@ -19,9 +25,15 @@
       "resourceType": "textbook",
       "assetKey": "book-join-in-6a-2026/v1",
       "localManifestRelativePath": "library/books/book-join-in-6a-2026/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_review",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 2,
+      "coverAssetKey": "books/book-join-in-6a-2026/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 2,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-join-in-6a-2026/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-unknown-3a",
@@ -29,9 +41,15 @@
       "resourceType": "textbook",
       "assetKey": "book-unknown-3a/v1",
       "localManifestRelativePath": "library/books/book-unknown-3a/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_ocr",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 1,
+      "coverAssetKey": "books/book-unknown-3a/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 1,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-unknown-3a/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-pep-7a-2022",
@@ -39,9 +57,15 @@
       "resourceType": "textbook",
       "assetKey": "book-pep-7a-2022/v1",
       "localManifestRelativePath": "library/books/book-pep-7a-2022/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_review",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 1,
+      "coverAssetKey": "books/book-pep-7a-2022/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 1,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-pep-7a-2022/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-pep-9a-2022",
@@ -49,9 +73,15 @@
       "resourceType": "textbook",
       "assetKey": "book-pep-9a-2022/v1",
       "localManifestRelativePath": "library/books/book-pep-9a-2022/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_ocr",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 1,
+      "coverAssetKey": "books/book-pep-9a-2022/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 1,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-pep-9a-2022/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-pep-8a-2025",
@@ -59,9 +89,15 @@
       "resourceType": "textbook",
       "assetKey": "book-pep-8a-2025/v1",
       "localManifestRelativePath": "library/books/book-pep-8a-2025/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_review",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
-      "cloudFileId": null
+      "cloudFileId": null,
+      "pageAssetCount": 1,
+      "coverAssetKey": "books/book-pep-8a-2025/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 1,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-pep-8a-2025/v1/thumbnails/page-0001.jpg"
     },
     {
       "resourceId": "book-pep-4a",
@@ -69,7 +105,235 @@
       "resourceType": "textbook",
       "assetKey": "book-pep-4a/v1",
       "localManifestRelativePath": "library/books/book-pep-4a/v1/manifest.json",
-      "deliveryStatus": "awaiting_cloud_upload",
+      "processingStatus": "needs_review",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null,
+      "pageAssetCount": 3,
+      "coverAssetKey": "books/book-pep-4a/v1/pages/page-0001.jpg",
+      "thumbnailAssetCount": 3,
+      "mediaAssetCount": 0,
+      "coverThumbnailAssetKey": "books/book-pep-4a/v1/thumbnails/page-0001.jpg"
+    }
+  ],
+  "uploadAssets": [
+    {
+      "resourceId": "book-join-in-5a-2026",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-join-in-5a-2026/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-join-in-5a-2026/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-5a-2026",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-join-in-5a-2026/v1/pages/page-0002.jpg",
+      "localRelativePath": "library/books/book-join-in-5a-2026/v1/pages/page-0002.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-5a-2026",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-join-in-5a-2026/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-join-in-5a-2026/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-5a-2026",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-join-in-5a-2026/v1/thumbnails/page-0002.jpg",
+      "localRelativePath": "library/books/book-join-in-5a-2026/v1/thumbnails/page-0002.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-6a-2026",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-join-in-6a-2026/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-join-in-6a-2026/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-6a-2026",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-join-in-6a-2026/v1/pages/page-0002.jpg",
+      "localRelativePath": "library/books/book-join-in-6a-2026/v1/pages/page-0002.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-6a-2026",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-join-in-6a-2026/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-join-in-6a-2026/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-join-in-6a-2026",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-join-in-6a-2026/v1/thumbnails/page-0002.jpg",
+      "localRelativePath": "library/books/book-join-in-6a-2026/v1/thumbnails/page-0002.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-unknown-3a",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-unknown-3a/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-unknown-3a/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-unknown-3a",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-unknown-3a/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-unknown-3a/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-7a-2022",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-7a-2022/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-7a-2022/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-7a-2022",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-7a-2022/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-7a-2022/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-9a-2022",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-9a-2022/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-9a-2022/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-9a-2022",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-9a-2022/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-9a-2022/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-8a-2025",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-8a-2025/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-8a-2025/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-8a-2025",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-8a-2025/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-8a-2025/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-4a/v1/pages/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/pages/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-4a/v1/pages/page-0013.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/pages/page-0013.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page",
+      "assetKey": "books/book-pep-4a/v1/pages/page-0084.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/pages/page-0084.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-4a/v1/thumbnails/page-0001.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/thumbnails/page-0001.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-4a/v1/thumbnails/page-0013.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/thumbnails/page-0013.jpg",
+      "deliveryStatus": "blocked_review",
+      "deliveryUrl": null,
+      "cloudFileId": null
+    },
+    {
+      "resourceId": "book-pep-4a",
+      "version": 1,
+      "kind": "textbook_page_thumbnail",
+      "assetKey": "books/book-pep-4a/v1/thumbnails/page-0084.jpg",
+      "localRelativePath": "library/books/book-pep-4a/v1/thumbnails/page-0084.jpg",
+      "deliveryStatus": "blocked_review",
       "deliveryUrl": null,
       "cloudFileId": null
     }

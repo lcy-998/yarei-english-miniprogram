@@ -1,0 +1,133 @@
+@import "../../../styles/m1-pages.less";
+@import "../../../styles/m1-alignment-fixes.less";
+.reading-detail { padding-bottom: 24px; }.detail-head { display: flex; align-items: center; justify-content: space-between; }.detail-head text { display: block; }.book-name { color: @yr-text-primary; font-size: 20px; font-weight: 900; }.page-meta { margin-top: 6px; color: @yr-text-secondary; font-size: 13px; }.detail-favorite { margin: 0; padding: 0 12px; min-height: 40px; border: 1px solid @yr-brand-primary; border-radius: 20px; background: #fff; color: @yr-text-secondary; font-size: 13px; font-weight: 800; }.detail-favorite::after { border: 0; }.detail-favorite.active { color: @yr-warning; }.progress-card > view:first-child { display: flex; justify-content: space-between; margin-bottom: 9px; color: @yr-text-primary; font-weight: 800; }.progress-card > view:first-child text:last-child { color: @yr-brand-primary; font-size: 20px; }.page-frame { position: relative; min-height: 410px; padding: 8px; overflow: hidden; border: 7px solid #fff; border-radius: 25px; background: #dbeaf7; box-shadow: @yr-card-shadow-strong; }.reading-page-image { display: block; width: 100%; border-radius: 16px; }.page-loading,.page-error { position: absolute; z-index: 2; inset: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 16px; background: #e7f1f8; color: @yr-text-secondary; text-align: center; }.page-error text { margin-top: 7px; }.page-error button { margin-top: 16px; color: @yr-brand-primary; }.zoom-hint { position: absolute; right: 18px; bottom: 18px; padding: 7px 10px; border-radius: 14px; background: rgba(7,30,73,.72); color: #fff; font-size: 11px; }.page-actions { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }.autosave { display: block; margin-top: 12px; color: @yr-success; text-align: center; font-size: 12px; font-weight: 800; }
+/* User review: high-contrast favorite state and breathing room between paging actions. */
+.detail-favorite.active { border-color: @yr-warning; background: @yr-warning; color: #fff; font-size: 16px; font-weight: 900; box-shadow: 0 6px 14px rgba(243,185,28,.28); }
+.page-actions { gap: 16px; padding: 0 8px; }
+.page-actions .page-action g0-button { transform: scale(.94); transform-origin: center; }
+/* Center the two paging actions within the content column. */
+.page-actions { width: 100%; box-sizing: border-box; padding: 0; gap: 12px; }
+.page-actions .page-action g0-button { transform: none; }
+
+/* Paging actions are two equal-width controls with explicit directional labels. */
+.page-actions { margin-top: 18px; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; align-items: stretch; }
+.page-actions g0-button { display: block; width: 100%; min-width: 0; }
+.reading-page-thumbnail { display: block; width: 100%; border-radius: 16px; }
+.reading-page-image { position: absolute; inset: 8px; width: calc(100% - 16px); }
+.page-loading { background: rgba(231, 241, 248, .88); }
+.page-error { inset: auto 16px 18px; padding: 14px; background: rgba(255, 249, 240, .96); box-shadow: @yr-card-shadow; }
+.page-error text { margin: 0; font-size: 13px; font-weight: 700; }
+.page-error button { margin: 8px 0 0; min-height: 36px; border-radius: 12px; background: @yr-surface-blue; }
+.reading-save-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: @yr-surface-blue; color: @yr-text-primary; font-size: 13px; }
+.reading-save-error button { flex: 0 0 auto; margin: 0; min-height: 36px; border-radius: 12px; background: @yr-brand-primary; color: #fff; font-size: 13px; }
+.page-error-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.task-reading-context { border-left: 4px solid @yr-brand-primary; }
+.task-reading-context text { display: block; color: @yr-text-primary; font-weight: 800; }
+.task-reading-context text + text { margin-top: 5px; color: @yr-text-secondary; font-size: 12px; font-weight: 600; }
+
+.reading-fullscreen {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: stretch;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 14px calc(8px + env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: rgba(7, 30, 73, .95);
+}
+.reading-fullscreen-stage { position: relative; flex: 1 1 0%; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0; overflow: hidden; }
+.reading-fullscreen-image-frame { position: relative; flex: none; max-width: 100%; max-height: 100%; overflow: hidden; }
+.reading-fullscreen-image { display: block; width: 100%; height: 100%; }
+.reading-fullscreen-hotspot-layer { position: absolute; inset: 0; }
+.reading-fullscreen-hotspot-layer .reading-hotspot { touch-action: manipulation; }
+.reading-fullscreen-subtitles { position: relative; z-index: 2; flex: none; width: 100%; max-height: 104px; box-sizing: border-box; overflow-y: auto; padding: 12px 14px; border-radius: 18px; background: #eaf3fc; color: @yr-text-primary; text-align: center; }
+.reading-fullscreen-caption { color: @yr-text-primary; font-size: 18px; font-weight: 800; line-height: 1.5; }
+.reading-fullscreen-caption + .reading-fullscreen-caption { margin-top: 3px; }
+@media (orientation: landscape) {
+  .reading-fullscreen { gap: 4px; padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .reading-fullscreen-subtitles { max-height: 52px; padding: 4px 12px; }
+  .reading-fullscreen-caption { font-size: 13px; }
+}
+
+.reading-audio-section { margin-top: 12px; }
+.reading-audio-tools { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 8px; }
+.reading-audio-tools button { flex: 0 1 auto; min-width: 0; min-height: 34px; margin: 0; padding: 0 11px; box-sizing: border-box; border: 1px solid rgba(23,100,216,.18); border-radius: 17px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.reading-audio-tools button::after { border: 0; }
+.reading-audio-tools .reading-ear-entry { border-color: @yr-brand-primary; background: @yr-brand-primary; color: #fff; }
+.reading-audio-status { display: block; margin-top: 6px; color: @yr-text-secondary; font-size: 12px; text-align: center; }
+.reading-image-stage { position: relative; width: 100%; }
+.reading-image-stage .reading-page-image { inset: 0; width: 100%; }
+.reading-hotspot-layer { position: absolute; z-index: 3; inset: 0; }
+.reading-hotspot { position: absolute; box-sizing: border-box; border: 2px solid rgba(20, 109, 223, .58); border-radius: 8px; background: rgba(67, 159, 255, .10); }
+.reading-hotspot--active { border-color: @yr-brand-primary; background: rgba(19, 112, 230, .25); box-shadow: 0 0 0 3px rgba(255,255,255,.75); }
+.reading-audio-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: @yr-danger; font-size: 13px; }
+.reading-audio-error text { min-width: 0; }
+.reading-audio-error button { flex: 0 0 auto; min-height: 36px; margin: 0; padding: 0 12px; border-radius: 18px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; }
+.reading-audio-error button::after { border: 0; }
+.reading-audio-note { display: block; margin-top: 9px; color: @yr-text-secondary; font-size: 12px; }
+.reading-segment-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.reading-segment { padding: 13px 15px; border: @yr-card-border; border-radius: 17px; background: @yr-surface-warm; }
+.reading-segment__label { display: block; color: @yr-text-primary; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.reading-segment__actions { display: flex; gap: 10px; margin-top: 9px; }
+.reading-segment__actions button { flex: 1; margin: 0; min-height: 40px; border: 1px solid @yr-brand-primary; border-radius: 20px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.reading-segment__actions button::after { border: 0; }
+.page-frame--ear .reading-page-thumbnail,.page-frame--ear .reading-page-image,.page-frame--ear .zoom-hint { opacity: 0; }
+.reading-ear-cover { position: absolute; z-index: 3; inset: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; background: @yr-surface-blue; color: @yr-brand-primary; text-align: center; }
+.reading-ear-cover > text:first-child { font-size: 20px; font-weight: 900; }
+.reading-ear-cover > text:nth-child(2) { padding: 0 18px; font-size: 13px; line-height: 1.5; }
+.reading-ear-seek { width: 82%; margin: 18px 0 0; }
+.reading-ear-times { display: flex; justify-content: space-between; width: 82%; color: @yr-text-secondary; font-size: 12px; }
+.reading-ear-actions { display: flex; justify-content: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 0 12px; margin-top: 18px; }
+.reading-ear-cover button { flex: 1 1 0%; min-width: 0; min-height: 42px; margin: 0; padding: 0 8px; border-radius: 21px; background: @yr-brand-primary; color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.reading-ear-actions button:last-child { background: #fff; color: @yr-brand-primary; }
+.reading-ear-cover button::after { border: 0; }
+.page-frame--ear .page-error { z-index: 4; }
+
+@media (orientation: landscape) {
+  .reading-detail .page-frame { min-height: 270px; }
+}
+
+/* The opened book uses the same hero and content-card rhythm as a student task. */
+.reading-detail .reading-task-content { display: flex; flex-direction: column; gap: 14px; }
+.reading-task-hero { padding: 18px 20px; background: linear-gradient(125deg,#e4f4ff,#fff9f0 78%); }
+.reading-task-eyebrow { display: block; margin-bottom: 8px; color: @yr-brand-primary; font-size: 12px; font-weight: 900; }
+.reading-task-hero .detail-head { gap: 12px; }
+.reading-task-hero .detail-head > view { min-width: 0; }
+.reading-task-hero .book-name { font-size: 22px; line-height: 1.3; overflow-wrap: anywhere; }
+.reading-task-hero .progress-card { margin-top: 16px; }
+.reading-task-hero .progress-card > view:first-child { margin-bottom: 8px; font-size: 12px; }
+.reading-task-hero .progress-card > view:first-child text:last-child { font-size: 17px; }
+.reading-task-section { padding: 16px; }
+.reading-task-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; color: @yr-text-primary; }
+.reading-task-section-head text:first-child { font-size: 18px; font-weight: 900; }
+.reading-task-section-head text:last-child { flex: none; color: @yr-text-secondary; font-size: 12px; font-weight: 700; }
+.reading-task-section .page-frame { box-sizing: border-box; width: 100%; min-height: 340px; border-width: 4px; border-radius: 20px; box-shadow: none; }
+.reading-task-section .reading-audio-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid @yr-border-subtle; }
+.reading-task-section .reading-segment-heading { margin-top: 16px; color: @yr-text-primary; font-size: 17px; font-weight: 900; }
+.reading-task-section .reading-segment { background: #fff; }
+.reading-detail .pointread-jump { display: flex; margin-top: 16px; }
+.reading-detail .pointread-jump g0-button { flex: 1 1 0%; min-width: 0; }
+.reading-detail .page-actions { margin-top: 0; }
+.reading-detail .autosave { margin-top: 0; }
+.reading-detail { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.reading-detail .reading-page-navigation { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; box-sizing: border-box; display: flex; gap: 24px; width: 100%; padding: 10px 28px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid @yr-border-subtle; background: rgba(255,249,240,.98); }
+.reading-detail .reading-nav-button { flex: 1 1 0%; box-sizing: border-box; width: 0; min-width: 0; max-width: none; height: 46px; min-height: 46px; margin: 0; padding: 0 10px; display: flex; align-items: center; justify-content: center; border-radius: 23px; font-size: 15px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.reading-detail .reading-nav-button--previous { border: 1px solid @yr-brand-primary; background: @yr-surface-warm; color: @yr-brand-primary; }
+.reading-detail .reading-nav-button--next { border: 1px solid @yr-brand-primary; background: @yr-gradient-primary; color: #fff; box-shadow: @yr-action-shadow; }
+.reading-detail .reading-nav-button[disabled] { border-color: @yr-border-subtle; background: @yr-track-muted; color: @yr-text-secondary; box-shadow: none; }
+.reading-detail .reading-nav-button::after { border: 0; }
+.reading-segment pronunciation-panel { display: block; margin-top: 12px; }
+@media (orientation: landscape) {
+  .reading-detail .reading-task-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .reading-detail .task-reading-context,.reading-detail .reading-task-hero,.reading-detail .reading-task-section,.reading-detail .pointread-jump,.reading-detail .reading-page-navigation,.reading-detail .autosave,.reading-detail .reading-save-error { grid-column: 1 / -1; }
+}
+

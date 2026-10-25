@@ -1,6 +1,7 @@
 import type { JsonObject, JsonValue } from '../shared/protocol';
 
-export type LearningResourceType = 'reading' | 'vocabulary' | 'exercise' | 'recording';
+export type LearningResourceType = 'reading' | 'vocabulary' | 'exercise' | 'recording'
+  | 'listening' | 'video' | 'dubbing';
 
 export interface LearningResourceRecord {
   readonly id: string;
@@ -9,6 +10,7 @@ export interface LearningResourceRecord {
   readonly title: string;
   readonly contentVersion: number;
   readonly status: 'draft' | 'published' | 'offline';
+  readonly copyrightStatus?: 'demo' | 'verified';
   readonly visibility: 'organization' | 'classes';
   readonly allowedClassIds: readonly string[];
   readonly payload: JsonObject;
@@ -43,6 +45,8 @@ export interface FrozenTaskItem {
   readonly completionRule: JsonObject;
   readonly scoringRule: JsonObject;
   readonly order: number;
+  /** Server-frozen M3 media source. Student projections must strip private paths and answer keys. */
+  readonly mediaSnapshot?: import('../teacher-media/publish-gate').FrozenTeacherMediaSnapshot;
 }
 
 export interface LatePolicy {
@@ -169,6 +173,11 @@ export interface ReviewFeedbackRecord {
   readonly originalAutomaticScore?: number | null;
   readonly overrideReason?: string | null;
   readonly textComment: string | null;
+  readonly aiAssistance?: Readonly<{ suggestionId: string; modelVersion: string;
+    promptVersion: string; generationNumber: number; teacherEditedText: boolean }>;
+  readonly voiceComment?: Readonly<{ recordingId: string; fileId: string;
+    sha256: string; durationMs: number; sizeBytes: number; mediaVersion: number;
+    mediaDeletedAt?: string | null }>;
   readonly returnReason: string | null;
   readonly publishedAt: string;
   readonly source: 'manual';
@@ -206,7 +215,10 @@ export interface ParentTaskResultView {
   readonly taskId: string;
   readonly title: string;
   readonly studentId: string;
+  readonly assignmentId?: string;
   readonly assignmentStatus: AssignmentStatus;
+  readonly itemSummaries?: readonly Readonly<{ itemId: string; title: string; type: string; order: number;
+    pronunciationAvailable?: boolean }>[];
   readonly automaticScore?: number | null;
   readonly submission: Readonly<{
     id: string;
@@ -216,12 +228,30 @@ export interface ParentTaskResultView {
   }> | null;
   readonly feedback: Readonly<{
     id: string;
+    teacherName?: string;
+    voiceComment?: Readonly<{ available: boolean; durationMs: number | null }>;
     decision: 'approved' | 'returned';
     score: number | null;
     textComment: string | null;
     returnReason: string | null;
     publishedAt: string;
   }> | null;
+  readonly submissionHistory?: readonly Readonly<{
+    id: string;
+    version: number;
+    submittedAt: string;
+    answers: readonly SubmissionAnswer[];
+    feedback: Readonly<{
+      id: string;
+      teacherName?: string;
+      voiceComment?: Readonly<{ available: boolean; durationMs: number | null }>;
+      decision: 'approved' | 'returned';
+      score: number | null;
+      textComment: string | null;
+      returnReason: string | null;
+      publishedAt: string;
+    }> | null;
+  }>[];
 }
 
 export interface TeacherSubmissionReviewView {

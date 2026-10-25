@@ -26,8 +26,17 @@
     "esbuild": "0.28.2"
   },
   "dependencies": {
+    "@audio/encode-mp3": "2.0.1",
     "@cloudbase/js-sdk": "3.9.3",
     "@cloudbase/node-sdk": "3.18.3",
-    "music-metadata": "11.16.1"
+    "music-metadata": "11.16.1",
+    "opus-decoder": "0.7.12",
+    "prism-media": "1.3.5",
+    "tencentcloud-sdk-nodejs-tcb": "4.1.321"
+  },
+  "overrides": {
+    "tencentcloud-sdk-nodejs-common": {
+      "uuid": "11.1.1"
+    }
   }
 }

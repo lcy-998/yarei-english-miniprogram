@@ -26,6 +26,21 @@ const submission: SubmissionRecord = { id: 'submission_demo', organizationId: ta
   ], isLate: false, submittedAt: '2026-09-27T09:00:00+08:00', supersedesSubmissionId: null };
 
 describe('M2 weighted teacher scoring for mixed content', () => {
+  it('provides a trusted automatic score for a completed vocabulary task', () => {
+    const vocabularyTask: TaskRecord = { ...task, items: [{ ...task.items[0]!, id: 'words',
+      resourceSnapshot: { title: '虚构单词', type: 'vocabulary', payload: {} },
+      completionRule: { kind: 'vocabulary_words', requiredWordCount: 4 } }] };
+    const vocabularySubmission: SubmissionRecord = { ...submission, answers: [
+      { itemId: 'words', value: { kind: 'vocabulary', completedWordCount: 4, correctWordCount: 3 } },
+    ] };
+    expect(automaticTaskScore(vocabularyTask, vocabularySubmission)).toBe(75);
+    expect(taskScoringItems(vocabularyTask, vocabularySubmission)).toEqual([
+      { itemId: 'words', weightPercent: 100, automaticScore: 75,
+        teacherScoreRequired: false, complete: true },
+    ]);
+    expect(automaticTaskScore(vocabularyTask, { ...vocabularySubmission, answers: [] })).toBeNull();
+  });
+
   it('scores manual recording alongside automatic reading using the published weights', () => {
     expect(automaticTaskScore(task, submission)).toBeNull();
     expect(manualTaskItemIds(task, submission)).toEqual(['record']);

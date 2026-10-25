@@ -385,16 +385,95 @@ describe('基础阅读和单词授权查询', () => {
     expect(serialized).not.toContain('bodyBlocks');
   });
 
-  it('教师内容访问同时要求 actor permission、scope 和当前班级 grant', async () => {
+  it('跟读句段只从当前版本且明确审核的阅读资源开放', async () => {
+    const source = { reviewStatus: 'approved' as const, sourceVersion: 'demo-v1',
+      approvedAt: NOW, approvedBy: ADMIN_ID,
+      segments: [{ id: 'segment_1', text: 'A tiger is at the zoo.', translationText: '动物园里有一只老虎。', pageNumber: 1,
+        demonstrationAudioAssetKey: 'cloud://demo/segment-1.mp3' }] };
+    const repository = new InMemoryOrgContentRepository(baseFixture({ resources: [
+      { ...publishedReading, id: 'read_unverified', pronunciation: source },
+      { ...publishedReading, id: 'read_old', copyrightStatus: 'verified', pronunciation: { ...source, sourceVersion: 'old-v1' } },
+      { ...publishedReading, id: 'read_ready', copyrightStatus: 'verified', pronunciation: source },
+    ] }));
+    const service = new ContentQueryService(repository);
+    const student = actor(STUDENT_ID, 'student', ['content.read'], [STUDENT_ID]);
+    expect((await service.getReadingPronunciationSegments(student, 'read_unverified')).segments).toEqual([]);
+    expect((await service.getReadingPronunciationSegments(student, 'read_old')).segments).toEqual([]);
+    expect(await service.getReadingPronunciationSegments(student, 'read_ready')).toMatchObject({
+      sourceVersion: 'demo-v1', segments: [{ id: 'segment_1', text: 'A tiger is at the zoo.',
+        translationText: '动物园里有一只老虎。', pageNumber: 1 }],
+    });
+    await expect(service.getReadingPronunciationSegments(
+      actor(TEACHER_ID, 'teacher', ['content.read'], [OTHER_CLASS_ID]), 'read_ready'))
+      .resolves.toMatchObject({ resourceId: 'read_ready', segments: [{ id: 'segment_1' }] });
+  });
+
+  it('页图点读只读取同版本审核音频、已知页与合法坐标', async () => {
+    const readingAudio = { reviewStatus: 'approved' as const, sourceVersion: 'demo-v1',
+      approvedAt: NOW, approvedBy: ADMIN_ID,
+      chapters: [{ chapterId: 'chapter_1', audioAssetKey: 'cloud://demo/chapter.mp3',
+        durationMs: 5000, segments: [{ id: 'segment_page_1', pageId: 'page_1', pageNumber: 1,
+          text: 'A tiger is at the zoo.', rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.1 },
+          startMs: 1000, endMs: 3000 }] }] };
+    const resources: ReadingResourceEntity[] = [
+      { ...publishedReading, id: 'read_audio_demo', copyrightStatus: 'demo', readingAudio },
+      { ...publishedReading, id: 'read_audio_ready', copyrightStatus: 'verified', readingAudio },
+      { ...publishedReading, id: 'read_audio_bad', copyrightStatus: 'verified', readingAudio: {
+        ...readingAudio, chapters: [{ ...readingAudio.chapters[0]!, segments: [{ ...readingAudio.chapters[0]!.segments[0]!,
+          rect: { x: 0.9, y: 0.9, width: 0.3, height: 0.3 } }] }],
+      } },
+    ];
+    const service = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({ resources })));
+    const student = actor(STUDENT_ID, 'student', ['content.read'], [STUDENT_ID]);
+    expect(await service.getReadingAudioMap(student, 'read_audio_demo', 'chapter_1'))
+      .toMatchObject({ audioAssetKey: null, segments: [] });
+    expect(await service.getReadingAudioMap(student, 'read_audio_ready', 'chapter_1'))
+      .toMatchObject({ durationMs: 5000, audioAssetKey: 'cloud://demo/chapter.mp3',
+        segments: [{ pageId: 'page_1', startMs: 1000, endMs: 3000 }] });
+    const pageClip = { ...readingAudio, chapters: [{ ...readingAudio.chapters[0]!,
+      segments: [{ ...readingAudio.chapters[0]!.segments[0]!, startMs: 0, endMs: 2400,
+        clipAudioAssetKey: 'cloud://demo/page-01.mp3', clipDurationMs: 2500 }] }] };
+    const clipService = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({ resources: [
+      { ...publishedReading, id: 'read_page_audio', copyrightStatus: 'verified', readingAudio: pageClip },
+    ] })));
+    expect(await clipService.getReadingAudioMap(student, 'read_page_audio', 'chapter_1'))
+      .toMatchObject({ segments: [{ clipAudioAssetKey: 'cloud://demo/page-01.mp3', clipDurationMs: 2500 }] });
+    await expect(new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({ resources: [
+      { ...publishedReading, id: 'read_bad_page_audio', copyrightStatus: 'verified', readingAudio: {
+        ...pageClip, chapters: [{ ...pageClip.chapters[0]!, segments: [{ ...pageClip.chapters[0]!.segments[0]!,
+          endMs: 2600 }] }],
+      } },
+    ] }))).getReadingAudioMap(student, 'read_bad_page_audio', 'chapter_1'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    await expect(service.getReadingAudioMap(student, 'read_audio_bad', 'chapter_1'))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    await expect(service.getReadingAudioMap(student, 'read_audio_ready', 'wrong_chapter'))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('已登录教师读取普通素材不受班级范围和内容权限名单限制', async () => {
     const repository = new InMemoryOrgContentRepository(baseFixture({ resources: [publishedReading, vocabulary] }));
     const service = new ContentQueryService(repository);
     const teacher = actor(TEACHER_ID, 'teacher', ['content.read'], [CLASS_ID]);
     expect(await service.getVocabularyPack(teacher, 'vocab_animals')).toMatchObject({ title: 'Unit 3 Animals' });
 
     await expect(service.getReadingResource(actor(TEACHER_ID, 'teacher', [], [CLASS_ID]), 'read_zoo'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+      .resolves.toMatchObject({ id: 'read_zoo' });
     await expect(service.getReadingResource(actor(TEACHER_ID, 'teacher', ['content.read'], [OTHER_CLASS_ID]), 'read_zoo'))
-      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+      .resolves.toMatchObject({ id: 'read_zoo' });
+  });
+
+  it('四种已登录角色都可读取同组织素材，跨组织与下架仍拒绝', async () => {
+    const service = new ContentQueryService(new InMemoryOrgContentRepository(baseFixture({
+      resources: [publishedReading, { ...publishedReading, id: 'read_offline', status: 'offline' }],
+    })));
+    for (const role of ['student', 'parent', 'teacher', 'admin'] as const) {
+      const caller = actor(`${role}_demo_material`, role, [], []);
+      await expect(service.getReadingResource(caller, 'read_zoo')).resolves.toMatchObject({ id: 'read_zoo' });
+      await expect(service.getReadingResource(caller, 'read_offline')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(service.getReadingResource({ ...caller, organizationId: 'org_other' }, 'read_zoo'))
+        .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
   });
 });
 

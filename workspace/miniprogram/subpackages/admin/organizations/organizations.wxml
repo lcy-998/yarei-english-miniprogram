@@ -1,0 +1,57 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"/>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有学校与班级管理权限，请返回“我的”。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"/>
+    <block wx:else>
+      <view class="native-admin__hero"><text class="native-admin__hero-title">学校与班级</text><text class="native-admin__hero-note">修改学校资料、维护班级和分配教师</text><text class="native-admin__scope">管理范围　{{scopeLabel}}</text></view>
+      <view class="native-admin__card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">{{organization.name || '当前学校'}}</text><button wx:if="{{organization && access.scope.organizationWide}}" bindtap="openOrganizationEdit">修改名称</button></view>
+        <text class="native-admin__module-note">{{organization ? (organization.status === 'active' ? '学校启用中' : '学校已停用') : '正在读取学校资料'}}</text>
+        <text wx:if="{{organizationError}}" class="native-admin__notice">{{organizationError}}</text>
+        <button wx:if="{{!organization && organizationError}}" class="native-admin__secondary" bindtap="reload">重新读取学校资料</button>
+      </view>
+      <view wx:if="{{organizationDraft}}" id="admin-organization-form" class="native-admin__card native-admin__form-card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">修改学校名称</text><button disabled="{{organizationBusy}}" bindtap="closeOrganizationDraft">关闭</button></view>
+        <input class="native-admin__field" maxlength="50" disabled="{{organizationBusy}}" value="{{organizationDraft.name}}" data-field="name" bindinput="onOrganizationField" placeholder="学校名称（必填）"/>
+        <textarea class="native-admin__field" maxlength="200" disabled="{{organizationBusy}}" value="{{organizationDraft.reason}}" data-field="reason" bindinput="onOrganizationField" placeholder="修改原因（必填）"/>
+        <text wx:if="{{organizationError}}" class="native-admin__notice">{{organizationError}}；输入已保留。</text>
+        <view class="native-admin__form-actions"><button loading="{{organizationBusy}}" disabled="{{organizationBusy}}" bindtap="requestOrganizationSave">保存学校资料</button></view>
+      </view>
+      <view class="native-admin__search"><input maxlength="100" value="{{keyword}}" placeholder="搜索班级、年级或学期" confirm-type="search" bindinput="onKeyword" bindconfirm="applyFilters"/><button disabled="{{dataLoading}}" bindtap="applyFilters">搜索</button></view>
+      <view class="native-admin__card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">班级</text><button wx:if="{{access.scope.organizationWide}}" disabled="{{dataLoading || dataError}}" bindtap="openCreateClass">新建班级</button></view>
+        <text wx:if="{{dataLoading}}" class="native-admin__module-note">正在读取班级…</text>
+        <view wx:if="{{dataError}}" class="native-admin__notice">{{dataError}}<button class="native-admin__secondary" bindtap="applyFilters">重试</button></view>
+        <view wx:for="{{classRows}}" wx:key="id" class="native-admin__module native-admin__module--class">
+          <view class="native-admin__icon">班</view>
+          <view class="native-admin__module-copy"><text class="native-admin__module-title">{{item.name}}</text><text class="native-admin__module-note">{{item.grade}} · {{item.term}} · {{item.status === 'active' ? '启用' : '停用'}}</text><text class="native-admin__module-note">{{item.studentCount === null ? '学员人数未记录' : item.studentCount + ' 名学员'}} · {{item.teacherIds.length}} 位教师</text></view>
+          <view class="native-admin__row-actions">
+            <button data-id="{{item.id}}" bindtap="openEditClass">编辑班级</button><button wx:if="{{item.status === 'active'}}" data-id="{{item.id}}" bindtap="openAssignTeacher">分配教师</button><button wx:if="{{item.status === 'active'}}" data-id="{{item.id}}" bindtap="openClassArchive">迁移学员 / 停用</button>
+            <block wx:for="{{item.teacherAssignments}}" wx:for-item="teacher" wx:key="teacherId"><button wx:if="{{item.status === 'active'}}" data-id="{{item.id}}" data-teacher-id="{{teacher.teacherId}}" bindtap="openAssignTeacher">{{teacher.status === 'active' ? '调整' : '恢复'}} {{teacher.teacherId}} 权限</button></block>
+          </view>
+        </view>
+        <text wx:if="{{!dataLoading && !dataError && !classRows.length}}" class="native-admin__module-note">没有符合条件的班级</text>
+        <button wx:if="{{nextOffset !== null}}" class="native-admin__secondary" loading="{{dataLoading}}" disabled="{{dataLoading}}" bindtap="loadMore">加载更多班级</button>
+      </view>
+      <view wx:if="{{classArchiveDraft}}" id="admin-class-archive-form" class="native-admin__card native-admin__form-card"><view class="native-admin__form-heading"><text class="native-admin__card-title">迁移并停用 {{classArchiveDraft.name}}</text><button bindtap="closeClassArchive">关闭</button></view><text class="native-admin__module-note">{{classArchiveDraft.studentCount === null ? '当前学员人数未记录。' : '当前 ' + classArchiveDraft.studentCount + ' 名学员。'}}选择目标班级后将按现有学员关系迁移；不会删除学员或提交记录。</text><text class="native-admin__module-note">迁移目标班级（人数为零时可不选）：</text><view class="native-admin__class-chips"><button wx:for="{{classRows}}" wx:key="id" wx:if="{{item.status === 'active' && item.id !== classArchiveDraft.classId}}" data-id="{{item.id}}" bindtap="chooseArchiveDestination" class="{{classArchiveDraft.destinationClassId === item.id ? 'active' : ''}}">{{item.name}}</button></view><text wx:if="{{(classArchiveDraft.studentCount === null || classArchiveDraft.studentCount > 0) && !classArchiveDraft.destinationClassId}}" class="native-admin__module-note">先选择一个有剩余名额且在你授权范围内的班级。</text><textarea class="native-admin__field" maxlength="200" disabled="{{classArchiveBusy}}" value="{{classArchiveDraft.reason}}" bindinput="onClassArchiveReason" placeholder="填写停用原因"/><text wx:if="{{classArchiveError}}" class="native-admin__notice">{{classArchiveError}}；内容已保留。</text><view class="native-admin__form-actions"><button loading="{{classArchiveBusy}}" disabled="{{classArchiveBusy || (classArchiveDraft.studentCount === null || classArchiveDraft.studentCount > 0) && !classArchiveDraft.destinationClassId}}" class="native-admin__action-danger" bindtap="requestClassArchive">确认迁移并停用</button></view></view>      <view wx:if="{{classDraft}}" id="admin-class-form" class="native-admin__card native-admin__form-card"><view class="native-admin__form-heading"><text class="native-admin__card-title">{{classDraft.classId ? '编辑班级' : '新建班级'}}</text><button bindtap="closeClassDraft">关闭</button></view><input class="native-admin__field" maxlength="50" disabled="{{classBusy}}" value="{{classDraft.name}}" data-field="name" bindinput="onClassField" placeholder="班级名称"/><input class="native-admin__field" type="number" maxlength="2" disabled="{{classBusy}}" value="{{classDraft.gradeText}}" data-field="gradeText" bindinput="onClassField" placeholder="年级 1—12"/><input class="native-admin__field" maxlength="60" disabled="{{classBusy}}" value="{{classDraft.term}}" data-field="term" bindinput="onClassField" placeholder="学期"/><textarea class="native-admin__field" maxlength="200" disabled="{{classBusy}}" value="{{classDraft.reason}}" data-field="reason" bindinput="onClassField" placeholder="填写操作原因"/><text wx:if="{{classError}}" class="native-admin__notice">{{classError}}；输入已保留。</text><view class="native-admin__form-actions"><button loading="{{classBusy}}" disabled="{{classBusy}}" bindtap="requestClassSave">确认保存</button></view></view>
+      <view wx:if="{{assignmentDraft}}" id="admin-assignment-form" class="native-admin__card native-admin__form-card"><view class="native-admin__form-heading"><text class="native-admin__card-title">{{assignmentDraft.expectedVersion > 0 ? '编辑教师分配' : '分配教师'}}</text><button bindtap="closeAssignmentDraft">关闭</button></view><text class="native-admin__record-id">班级编号：{{assignmentDraft.classId}}</text><button wx:if="{{assignmentDraft.expectedVersion === 0}}" class="native-admin__choice-trigger" data-kind="teacher_for_class" data-target="assignmentTeacher" bindtap="openAdminOptionPicker">{{assignmentDraft.teacherId ? selectionLabels.assignmentTeacher || assignmentDraft.teacherId : '选择教师（必填）'}}</button><input wx:if="{{selectionOptionsUnavailable && assignmentDraft.expectedVersion === 0}}" class="native-admin__field" maxlength="128" disabled="{{assignmentBusy}}" value="{{assignmentDraft.teacherId}}" data-field="teacherId" bindinput="onAssignmentField" placeholder="候选名单不可用时输入教师账号编号"/><text wx:if="{{assignmentDraft.expectedVersion > 0}}" class="native-admin__module-note">教师：{{assignmentDraft.teacherId}}</text><view class="native-admin__class-chips"><button wx:for="{{teacherClassOptions}}" wx:key="value" data-permission="{{item.value}}" bindtap="toggleTeacherClassPermission" class="{{item.selected ? 'active' : ''}}">{{item.label}}</button></view><textarea class="native-admin__field" maxlength="200" disabled="{{assignmentBusy}}" value="{{assignmentDraft.reason}}" data-field="reason" bindinput="onAssignmentField" placeholder="填写分配原因"/><text wx:if="{{assignmentError}}" class="native-admin__notice">{{assignmentError}}；输入已保留。</text><view class="native-admin__form-actions"><button loading="{{assignmentBusy}}" disabled="{{assignmentBusy}}" bindtap="requestTeacherAssignment">{{assignmentDraft.expectedVersion > 0 ? '保存权限' : '确认分配'}}</button><button wx:if="{{assignmentDraft.status === 'active'}}" loading="{{assignmentBusy}}" disabled="{{assignmentBusy}}" class="native-admin__action-danger" bindtap="requestTeacherRevocation">撤销班级权限</button></view></view>
+
+      <view wx:if="{{optionPickerKind && optionPickerTarget === 'assignmentTeacher'}}" id="admin-option-picker" class="native-admin__card native-admin__option-picker">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">选择教师</text><button bindtap="closeAdminOptionPicker">关闭</button></view>
+        <view class="native-admin__search native-admin__option-search"><input value="{{optionPickerQuery}}" bindinput="onAdminOptionQuery" placeholder="搜索姓名或账号编号" confirm-type="search" bindconfirm="applyAdminOptionSearch"/><button bindtap="applyAdminOptionSearch">搜索</button></view>
+        <text wx:if="{{optionPickerLoading}}" class="native-admin__module-note">正在查找教师…</text>
+        <text wx:if="{{optionPickerError}}" class="native-admin__notice">{{optionPickerError}}</text>
+        <view aria-role="button" wx:for="{{optionPickerRows}}" wx:key="id" class="native-admin__option-row" data-id="{{item.id}}" bindtap="chooseAdminOption"><text>{{item.label}}</text><text>{{item.detail}}</text></view>
+        <text wx:if="{{!optionPickerLoading && !optionPickerError && !optionPickerRows.length}}" class="native-admin__module-note">没有符合条件的教师</text>
+        <button wx:if="{{optionPickerNextOffset !== null}}" class="native-admin__secondary" loading="{{optionPickerLoading}}" bindtap="loadMoreAdminOptions">加载更多</button>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"/>
+</g0-page-shell>
+
+
+
+

@@ -1,0 +1,307 @@
+{
+  "capturedAt": "2026-10-16T06:09:28.3209577Z",
+  "environmentId": "cloud1-d8ggzrwwedb786e41",
+  "functionCount": 50,
+  "functions": [
+    {
+      "name": "activity-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:41:40"
+    },
+    {
+      "name": "activity-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:41:20"
+    },
+    {
+      "name": "admin-session",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:35:45"
+    },
+    {
+      "name": "admin-task-activity-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 21:41:42"
+    },
+    {
+      "name": "admin-task-activity-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 21:41:37"
+    },
+    {
+      "name": "auth-session",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:35:40"
+    },
+    {
+      "name": "content-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-16 14:04:00"
+    },
+    {
+      "name": "learning-progress-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-05 17:56:59"
+    },
+    {
+      "name": "learning-progress-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-02 16:54:00"
+    },
+    {
+      "name": "learning-stats-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-28 11:06:08"
+    },
+    {
+      "name": "maintenance-timer",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-13 10:16:49"
+    },
+    {
+      "name": "native-admin-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-08 13:41:27"
+    },
+    {
+      "name": "native-admin-management-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-10 13:39:56"
+    },
+    {
+      "name": "native-admin-media-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-08 13:43:27"
+    },
+    {
+      "name": "native-admin-operations-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-08 13:42:52"
+    },
+    {
+      "name": "native-admin-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-14 20:27:30"
+    },
+    {
+      "name": "notification-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-30 21:31:57"
+    },
+    {
+      "name": "notification-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-30 21:11:44"
+    },
+    {
+      "name": "organization-admin",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:36:36"
+    },
+    {
+      "name": "parent-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:40:45"
+    },
+    {
+      "name": "phonics-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:37"
+    },
+    {
+      "name": "phonics-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:32"
+    },
+    {
+      "name": "pronunciation-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:54:20"
+    },
+    {
+      "name": "pronunciation-inference",
+      "status": "Active",
+      "runtime": "Python3.11",
+      "modifiedAt": "2026-10-09 21:32:45"
+    },
+    {
+      "name": "pronunciation-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:39:59"
+    },
+    {
+      "name": "pronunciation-worker",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-09 21:24:21"
+    },
+    {
+      "name": "relationship-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:36:25"
+    },
+    {
+      "name": "review-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 16:06:35"
+    },
+    {
+      "name": "review-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-05 15:01:10"
+    },
+    {
+      "name": "student-task-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-07 21:09:02"
+    },
+    {
+      "name": "student-work-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:41:38"
+    },
+    {
+      "name": "student-work-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:39:08"
+    },
+    {
+      "name": "submission-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 16:10:44"
+    },
+    {
+      "name": "task-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-15 18:21:37"
+    },
+    {
+      "name": "task-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-03 23:10:31"
+    },
+    {
+      "name": "task-recording-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:53:31"
+    },
+    {
+      "name": "task-recording-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 18:37:15"
+    },
+    {
+      "name": "task-template-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:57"
+    },
+    {
+      "name": "task-template-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:42"
+    },
+    {
+      "name": "teacher-student-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:36:56"
+    },
+    {
+      "name": "teacher-student-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-28 09:23:29"
+    },
+    {
+      "name": "teacher-suggestion-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 16:10:18"
+    },
+    {
+      "name": "teacher-suggestion-inference-trial",
+      "status": "Active",
+      "runtime": "Python3.11",
+      "modifiedAt": "2026-10-12 15:55:27"
+    },
+    {
+      "name": "teacher-suggestion-worker",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-12 16:10:41"
+    },
+    {
+      "name": "teacher-textbook-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-28 09:58:39"
+    },
+    {
+      "name": "teacher-textbook-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-10-16 14:04:03"
+    },
+    {
+      "name": "textbook-admin-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-29 19:27:21"
+    },
+    {
+      "name": "textbook-admin-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-29 19:26:43"
+    },
+    {
+      "name": "vocabulary-evidence-command",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:16"
+    },
+    {
+      "name": "vocabulary-evidence-query",
+      "status": "Active",
+      "runtime": "Nodejs20.19",
+      "modifiedAt": "2026-09-27 19:37:11"
+    }
+  ]
+}

@@ -101,6 +101,17 @@ describe('M2 autonomous student work service', () => {
       .rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('rejects sealing an abandoned dubbing draft at its 180-day limit', async () => {
+    const { service, inspectAndSeal, setNow } = fixture();
+    const draft = await service.beginDraft(actor, 'material_animals', 'operation_work_begin_old');
+    setNow(new Date(Date.parse(draft.createdAt) + 180 * 86400000).toISOString());
+    await expect(service.submit(actor, { workId: draft.id,
+      stagingFileId: `cloud://demo/${draft.stagingPath}`, note: '' }, 1, 'operation_work_submit_old'))
+      .rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(inspectAndSeal).not.toHaveBeenCalled();
+    expect(await service.listMine(actor)).toEqual([]);
+  });
+
   it('keeps the submitted work visible but stops playback at 180 days before physical cleanup', async () => {
     const { service, setNow } = fixture();
     const draft = await service.beginDraft(actor, 'material_animals', 'operation_work_begin_retention');

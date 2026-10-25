@@ -6,6 +6,7 @@ Component({
     backIntercept: { type: Boolean, value: false },
     showBell: { type: Boolean, value: false },
     bellCount: { type: Number, value: 0 },
+    adminCompact: { type: Boolean, value: false },
   },
   data: { topInset: 72, headerHeight: 116 },
   lifetimes: {
@@ -22,6 +23,6 @@ Component({
       if (this.properties.backUrl) { wx.reLaunch({ url: this.properties.backUrl }); return }
       wx.navigateBack()
     },
-    onBell() { wx.navigateTo({ url: '/pages/notifications/notifications' }) },
+    onBell() { wx.navigateTo({ url: '/subpackages/common/notifications/notifications' }) },
   },
 })

@@ -9,7 +9,7 @@ describe('T-06 scoring weight submission gate', () => {
       buildCommand = definition.methods.buildCommand
     })
     vi.stubGlobal('wx', { getStorageSync: () => ({ user: { id: 'teacher_demo' } }) })
-    await import('../../miniprogram/pages/teacher/publish-task/publish-task')
+    await import('../../miniprogram/subpackages/teacher/publish-task/publish-task')
     if (buildCommand === null) throw new Error('Publish handler was not registered')
     const context = { data: {
       loading: false, optionsLoading: false, editingStatus: '', requestedStudentId: '',

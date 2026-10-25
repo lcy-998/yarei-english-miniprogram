@@ -17,12 +17,15 @@ import {
   type ReadingListItemView,
   type ReadingResourceEntity,
   type ReadingResourceView,
+  type ReadingPronunciationSourceView,
+  type ReadingAudioSourceView,
   type StudentCatalogFilters,
   type StudentCatalogFacetView,
   type StudentCatalogItemView,
   type StudentCatalogPageView,
   type StudentClassView,
   type VocabularyPackView,
+  type VocabularyPackSourceView,
   type VocabularyResourceEntity,
 } from './types';
 
@@ -41,6 +44,7 @@ function isExercise(resource: LearningResourceEntity): resource is ExerciseResou
 function schoolQuestionListItem(resource: ExerciseResourceEntity): SchoolQuestionListItemView {
   return {
     id: resource.id,
+    ...(resource.exercisePackId === undefined ? {} : { exercisePackId: resource.exercisePackId }),
     title: resource.title,
     grade: resource.grade,
     ...(resource.textbook === undefined ? {} : { textbook: resource.textbook }),
@@ -92,11 +96,86 @@ function studentCatalogItem(resource: ReadingResourceEntity | VocabularyResource
     ...(resource.theme === undefined ? {} : { theme: resource.theme }),
     contentVersion: resource.contentVersion,
     itemCount: resource.chapters.reduce((count, chapter) => count + chapter.pages.length, 0),
+    audioPointreadReady: hasReviewedReadingAudio(resource),
+    audioPointreadPending: hasPendingUserAcceptanceReadingAudio(resource),
+    pronunciationReady: hasReviewedPronunciation(resource),
   } : {
     id: resource.id, type: 'vocabulary', title: resource.title, grade: resource.grade,
     ...(resource.textbook === undefined ? {} : { textbook: resource.textbook }),
     unit: resource.unit, contentVersion: resource.contentVersion, itemCount: resource.words.length,
   };
+}
+
+function hasReviewedReadingAudio(resource: ReadingResourceEntity): boolean {
+  return hasValidReadingAudio(resource, 'approved');
+}
+
+function hasPendingUserAcceptanceReadingAudio(resource: ReadingResourceEntity): boolean {
+  return resource.testOnly === true && resource.acceptanceStatus === 'pending_user_acceptance'
+    && hasValidReadingAudio(resource, 'pending_user_acceptance');
+}
+
+function hasValidReadingAudio(resource: ReadingResourceEntity,
+  reviewStatus: 'approved' | 'pending_user_acceptance'): boolean {
+  const media = resource.readingAudio;
+  if (resource.copyrightStatus !== 'verified' || media?.reviewStatus !== reviewStatus
+    || media.sourceVersion !== resource.contentVersion
+    || (reviewStatus === 'approved' && (!media.approvedBy?.trim()
+      || !media.approvedAt || !Number.isFinite(Date.parse(media.approvedAt))))
+    || media.chapters.length !== resource.chapters.length || resource.chapters.length === 0) return false;
+  const maps = new Map(media.chapters.map(chapter => [chapter.chapterId, chapter]));
+  if (maps.size !== media.chapters.length) return false;
+  return resource.chapters.every(chapter => {
+    const audio = maps.get(chapter.id);
+    if (!audio || !audio.audioAssetKey.startsWith('cloud://')
+      || !Number.isSafeInteger(audio.durationMs) || audio.durationMs < 1000
+      || audio.segments.length === 0) return false;
+    const pages = new Map(chapter.pages.map(page => [page.id, page.pageNumber]));
+    return audio.segments.every(segment => {
+      const rect = segment.rect;
+      const clipDurationMs = segment.clipDurationMs;
+      return pages.get(segment.pageId) === segment.pageNumber
+        && !!segment.text.trim() && Number.isSafeInteger(segment.startMs)
+        && Number.isSafeInteger(segment.endMs) && segment.startMs >= 0
+        && segment.startMs < segment.endMs
+        && (segment.clipAudioAssetKey === undefined
+          ? clipDurationMs === undefined && segment.endMs <= audio.durationMs
+          : segment.clipAudioAssetKey.startsWith('cloud://')
+            && Number.isSafeInteger(clipDurationMs) && (clipDurationMs ?? 0) >= 1000
+            && segment.endMs <= (clipDurationMs ?? 0))
+        && [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
+        && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0
+        && rect.x + rect.width <= 1 && rect.y + rect.height <= 1;
+    });
+  });
+}
+
+function hasReviewedPronunciation(resource: ReadingResourceEntity): boolean {
+  if (!hasReviewedReadingAudio(resource)) return false;
+  const source = resource.pronunciation;
+  if (resource.copyrightStatus !== 'verified' || source?.reviewStatus !== 'approved'
+    || source.sourceVersion !== resource.contentVersion || !source.approvedBy?.trim()
+    || !source.approvedAt || !Number.isFinite(Date.parse(source.approvedAt)) || source.segments.length === 0) return false;
+  const pageNumbers = new Set(resource.chapters.flatMap(chapter => chapter.pages.map(page => page.pageNumber)));
+  const ids = new Set<string>();
+  const audioSegments = resource.readingAudio?.reviewStatus === 'approved'
+    && resource.readingAudio.sourceVersion === resource.contentVersion
+    ? resource.readingAudio.chapters.flatMap(chapter => chapter.segments
+      .filter(segment => typeof segment.clipAudioAssetKey === 'string')
+      .map(segment => ({ pageNumber: segment.pageNumber, text: segment.text,
+        audioAssetKey: segment.clipAudioAssetKey }))) : [];
+  if (audioSegments.length === 0 || source.segments.length !== audioSegments.length) return false;
+  const audioByPageAndText = new Map(audioSegments.map(segment =>
+    [`${segment.pageNumber}\u0000${segment.text.trim()}`, segment.audioAssetKey]));
+  return source.segments.every(segment => {
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(segment.id) || ids.has(segment.id)
+      || !segment.text.trim() || segment.text.length > 300
+      || !segment.demonstrationAudioAssetKey.startsWith('cloud://')
+      || segment.pageNumber === undefined || !pageNumbers.has(segment.pageNumber)
+      || audioByPageAndText.get(`${segment.pageNumber}\u0000${segment.text.trim()}`) !== segment.demonstrationAudioAssetKey) return false;
+    ids.add(segment.id);
+    return true;
+  });
 }
 
 function readingDetail(resource: ReadingResourceEntity): ReadingResourceView {
@@ -122,7 +201,7 @@ function readingDetail(resource: ReadingResourceEntity): ReadingResourceView {
   };
 }
 
-function vocabularyView(resource: VocabularyResourceEntity): VocabularyPackView {
+function vocabularyView(resource: VocabularyResourceEntity): VocabularyPackSourceView {
   return {
     id: resource.id,
     title: resource.title,
@@ -138,10 +217,8 @@ export class ContentQueryService {
   public constructor(private readonly repository: OrgContentRepository) {}
 
   private async studentClassIds(actor: Actor): Promise<readonly string[]> {
-    if (actor.actorRole !== 'student' || !actor.permissions.includes('content.read')) throw new OrgContentError('FORBIDDEN');
-    const memberships = await this.repository.listActiveMembershipsForStudent(actor.organizationId, actor.actorUserId);
-    if (!memberships.length) throw new OrgContentError('FORBIDDEN');
-    return memberships.map((membership) => membership.classId);
+    if (!['student', 'parent', 'teacher', 'admin'].includes(actor.actorRole)) throw new OrgContentError('FORBIDDEN');
+    return [];
   }
 
   private async scanStudentCatalog(actor: Actor, type: StudentCatalogFilters['type'],
@@ -278,6 +355,7 @@ export class ContentQueryService {
     actor: Actor,
     type: TaskCatalogFilters['type'],
     targetClassIds?: readonly string[],
+    category?: ReadingResourceEntity['category'],
   ): Promise<readonly TaskCatalogFacet[]> {
     if (type !== 'reading' && type !== 'vocabulary') throw new OrgContentError('VALIDATION_ERROR');
     const classIds = await this.authorizedQuestionClasses(actor, targetClassIds);
@@ -287,7 +365,8 @@ export class ContentQueryService {
       const batch = await this.repository.listTaskCatalogResourcePage(actor.organizationId, type, {}, { limit: 50, offset });
       if (!batch.items.length) return [...facets.values()];
       for (const resource of batch.items) {
-        if (resource === null || !resourceVisibleForQuery(resource, classIds, targetClassIds)) continue;
+        if (resource === null || !resourceVisibleForQuery(resource, classIds, targetClassIds)
+          || (category !== undefined && (resource.type !== 'reading' || resource.category !== category))) continue;
         const projected = taskCatalogListItem(resource);
         if (projected.requiredCount < 1) continue;
         const facet: TaskCatalogFacet = { source: projected.source, grade: projected.grade,
@@ -385,6 +464,10 @@ export class ContentQueryService {
     resourceId: string,
     targetClassIds?: readonly string[],
   ): Promise<SchoolQuestionDetailView> {
+    if (actor.actorRole !== 'teacher' || !actor.permissions.includes('content.read')) throw new OrgContentError('FORBIDDEN');
+    const grants = await this.repository.listActiveTeacherGrants(actor.organizationId, actor.actorUserId);
+    if (!grants.some(grant => grant.permissions.includes('content.read')
+      && actor.scopeIds.includes(grant.classId))) throw new OrgContentError('FORBIDDEN');
     const classIds = await this.authorizedQuestionClasses(actor, targetClassIds);
     const resource = await this.getPublishedAuthorizedResource(actor, resourceId);
     if (!isExercise(resource) || !resourceVisibleForQuery(resource, classIds, targetClassIds)) throw new OrgContentError('NOT_FOUND');
@@ -394,17 +477,17 @@ export class ContentQueryService {
       options: [...resource.options],
       correctAnswer: resource.correctAnswer,
       explanation: resource.explanation,
+      ...(resource.exerciseSection === undefined ? {} : { exerciseSection: resource.exerciseSection }),
+      ...(resource.acceptedAnswers === undefined ? {} : { acceptedAnswers: [...resource.acceptedAnswers] }),
+      ...(resource.rubric === undefined ? {} : { rubric: resource.rubric.map(row => ({ ...row })) }),
     };
   }
 
   private async authorizedQuestionClasses(actor: Actor, targetClassIds?: readonly string[]): Promise<readonly string[]> {
-    if (actor.actorRole !== 'teacher' || !actor.permissions.includes('content.read')) throw new OrgContentError('FORBIDDEN');
-    const grants = await this.repository.listActiveTeacherGrants(actor.organizationId, actor.actorUserId);
-    const allowed = grants.filter((grant) => grant.permissions.includes('content.read') && actor.scopeIds.includes(grant.classId))
-      .map((grant) => grant.classId);
-    if (!allowed.length || (targetClassIds !== undefined && (!targetClassIds.length
-      || targetClassIds.some((classId) => !allowed.includes(classId))))) throw new OrgContentError('FORBIDDEN');
-    return targetClassIds ?? allowed;
+    if (!['student', 'parent', 'teacher', 'admin'].includes(actor.actorRole)) throw new OrgContentError('FORBIDDEN');
+    if (targetClassIds !== undefined && (!targetClassIds.length || targetClassIds.length > 20
+      || new Set(targetClassIds).size !== targetClassIds.length)) throw new OrgContentError('VALIDATION_ERROR');
+    return targetClassIds ?? [];
   }
 
   public async listReadingResources(actor: Actor): Promise<readonly ReadingListItemView[]> {
@@ -425,7 +508,85 @@ export class ContentQueryService {
     return readingDetail(resource);
   }
 
-  public async listVocabularyPacks(actor: Actor): Promise<readonly VocabularyPackView[]> {
+  public async getReadingPronunciationSegments(actor: Actor, resourceId: string): Promise<ReadingPronunciationSourceView> {
+    const resource = await this.getPublishedAuthorizedResource(actor, resourceId);
+    if (!isReading(resource)) throw new OrgContentError('NOT_FOUND');
+    const source = resource.pronunciation;
+    if (resource.copyrightStatus !== 'verified' || source?.reviewStatus !== 'approved'
+      || source.sourceVersion !== resource.contentVersion || !source.approvedAt || !source.approvedBy) {
+      return { resourceId, sourceVersion: resource.contentVersion, segments: [] };
+    }
+    const pageNumbers = new Set(resource.chapters.flatMap(chapter => chapter.pages.map(page => page.pageNumber)));
+    const ids = new Set<string>();
+    const segments: ReadingPronunciationSourceView['segments'][number][] = [];
+    for (const segment of source.segments) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(segment.id) || ids.has(segment.id)
+        || segment.text.trim().length < 1 || segment.text.length > 300
+        || segment.translationText !== undefined
+          && (typeof segment.translationText !== 'string' || segment.translationText.trim().length > 500)
+        || !segment.demonstrationAudioAssetKey.startsWith('cloud://')
+        || (segment.pageNumber !== undefined && !pageNumbers.has(segment.pageNumber))) {
+        return { resourceId, sourceVersion: resource.contentVersion, segments: [] };
+      }
+      ids.add(segment.id);
+      segments.push({ id: segment.id, text: segment.text.trim(),
+        ...(segment.translationText?.trim() ? { translationText: segment.translationText.trim() } : {}),
+        ...(segment.pageNumber === undefined ? {} : { pageNumber: segment.pageNumber }),
+        demonstrationAudioAssetKey: segment.demonstrationAudioAssetKey });
+    }
+    return { resourceId, sourceVersion: source.sourceVersion, segments };
+  }
+
+  public async getReadingAudioMap(actor: Actor, resourceId: string,
+    chapterId: string): Promise<ReadingAudioSourceView> {
+    const resource = await this.getPublishedAuthorizedResource(actor, resourceId);
+    if (!isReading(resource)) throw new OrgContentError('NOT_FOUND');
+    const chapter = resource.chapters.find(item => item.id === chapterId);
+    if (!chapter) throw new OrgContentError('NOT_FOUND');
+    const empty: ReadingAudioSourceView = { resourceId, sourceVersion: resource.contentVersion,
+      chapterId, durationMs: null, audioAssetKey: null, segments: [] };
+    const media = resource.readingAudio;
+    const approved = media?.reviewStatus === 'approved' && !!media.approvedBy
+      && !!media.approvedAt && Number.isFinite(Date.parse(media.approvedAt));
+    const pending = resource.testOnly === true && resource.acceptanceStatus === 'pending_user_acceptance'
+      && media?.reviewStatus === 'pending_user_acceptance';
+    if (resource.copyrightStatus !== 'verified' || (!approved && !pending)
+      || media?.sourceVersion !== resource.contentVersion) return empty;
+    if (new Set(media.chapters.map(item => item.chapterId)).size !== media.chapters.length) {
+      throw new OrgContentError('SERVICE_UNAVAILABLE');
+    }
+    const audio = media.chapters.find(item => item.chapterId === chapterId);
+    if (!audio) return empty;
+    if (!audio.audioAssetKey.startsWith('cloud://') || !Number.isSafeInteger(audio.durationMs)
+      || audio.durationMs < 1000) throw new OrgContentError('SERVICE_UNAVAILABLE');
+    const pageById = new Map(chapter.pages.map(page => [page.id, page.pageNumber]));
+    const ids = new Set<string>();
+    for (const segment of audio.segments) {
+      const rect = segment.rect;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(segment.id) || ids.has(segment.id)
+        || pageById.get(segment.pageId) !== segment.pageNumber
+        || !segment.text.trim() || segment.text.length > 300
+        || !Number.isSafeInteger(segment.startMs) || !Number.isSafeInteger(segment.endMs)
+        || segment.startMs < 0 || segment.startMs >= segment.endMs
+        || (segment.clipAudioAssetKey === undefined
+          ? segment.endMs > audio.durationMs
+          : !segment.clipAudioAssetKey.startsWith('cloud://')
+            || !Number.isSafeInteger(segment.clipDurationMs) || (segment.clipDurationMs ?? 0) < 1000
+            || segment.endMs > (segment.clipDurationMs ?? 0))
+        || ((segment.clipAudioAssetKey === undefined) !== (segment.clipDurationMs === undefined))
+        || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
+        || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0
+        || rect.x + rect.width > 1 || rect.y + rect.height > 1) {
+        throw new OrgContentError('SERVICE_UNAVAILABLE');
+      }
+      ids.add(segment.id);
+    }
+    return { resourceId, sourceVersion: media.sourceVersion, chapterId,
+      audioAssetKey: audio.audioAssetKey, durationMs: audio.durationMs,
+      segments: audio.segments.map(segment => ({ ...segment, rect: { ...segment.rect } })) };
+  }
+
+  public async listVocabularyPacks(actor: Actor): Promise<readonly VocabularyPackSourceView[]> {
     const resources = await this.repository.listLearningResources(actor.organizationId, 'vocabulary');
     const visible: VocabularyPackView[] = [];
     for (const resource of resources) {
@@ -437,7 +598,7 @@ export class ContentQueryService {
     return visible;
   }
 
-  public async getVocabularyPack(actor: Actor, resourceId: string): Promise<VocabularyPackView> {
+  public async getVocabularyPack(actor: Actor, resourceId: string): Promise<VocabularyPackSourceView> {
     const resource = await this.getPublishedAuthorizedResource(actor, resourceId);
     if (!isVocabulary(resource)) throw new OrgContentError('NOT_FOUND');
     return vocabularyView(resource);
@@ -452,18 +613,14 @@ export class ContentQueryService {
   }
 }
 
-function resourceVisibleToClasses(resource: LearningResourceEntity, classIds: readonly string[]): boolean {
-  return resource.visibility.type === 'organization'
-    || classIds.every((classId) => resource.visibility.type === 'classes' && resource.visibility.classIds.includes(classId));
-}
-
 function resourceVisibleForQuery(resource: LearningResourceEntity, classIds: readonly string[],
   targetClassIds?: readonly string[]): boolean {
-  return targetClassIds === undefined ? studentResourceVisible(resource, classIds)
-    : resourceVisibleToClasses(resource, classIds);
+  void classIds;
+  void targetClassIds;
+  return resource.status === 'published';
 }
 
 function studentResourceVisible(resource: LearningResourceEntity, classIds: readonly string[]): boolean {
-  return resource.status === 'published' && (resource.visibility.type === 'organization'
-    || classIds.some((classId) => resource.visibility.type === 'classes' && resource.visibility.classIds.includes(classId)));
+  void classIds;
+  return resource.status === 'published';
 }

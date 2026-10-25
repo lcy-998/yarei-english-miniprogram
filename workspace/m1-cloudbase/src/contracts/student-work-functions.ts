@@ -4,20 +4,27 @@ import { parseExactObject } from '../shared/strict-object';
 type Validation<T> = { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly fieldErrors: Readonly<Record<string, string>> };
 
-export const STUDENT_WORK_COMMAND_ACTIONS = ['beginDraft', 'submitWork', 'deleteDraft'] as const;
-export const STUDENT_WORK_QUERY_ACTIONS = ['listMaterials', 'searchMaterials', 'listMaterialFacets', 'getMaterial', 'listMine', 'getPlayback', 'getMaterialPlayback'] as const;
+export const STUDENT_WORK_COMMAND_ACTIONS = ['beginDraft', 'submitWork', 'deleteDraft',
+  'beginTaskDubbingWork', 'sealTaskDubbingWork'] as const;
+export const STUDENT_WORK_QUERY_ACTIONS = ['listMaterials', 'searchMaterials', 'listMaterialFacets', 'getMaterial', 'listMine', 'getPlayback', 'getMaterialPlayback',
+  'listMyTaskDubbingWorks', 'getTaskDubbingPlayback'] as const;
 export type StudentWorkCommandAction = (typeof STUDENT_WORK_COMMAND_ACTIONS)[number];
 export type StudentWorkQueryAction = (typeof STUDENT_WORK_QUERY_ACTIONS)[number];
 export type StudentWorkCommandInput = Readonly<{ action: 'beginDraft'; materialId: string; operationId: string }>
   | Readonly<{ action: 'submitWork'; workId: string; stagingFileId: string; note: string;
     expectedVersion: number; operationId: string }>
-  | Readonly<{ action: 'deleteDraft'; workId: string; expectedVersion: number; operationId: string }>;
+  | Readonly<{ action: 'deleteDraft'; workId: string; expectedVersion: number; operationId: string }>
+  | Readonly<{ action: 'beginTaskDubbingWork'; taskId: string; itemId: string; operationId: string }>
+  | Readonly<{ action: 'sealTaskDubbingWork'; workId: string; stagingFileId: string;
+    expectedVersion: number; operationId: string }>;
 export type StudentWorkQueryInput = Readonly<{ action: 'listMaterials' | 'listMaterialFacets' | 'listMine' }>
   | Readonly<{ action: 'searchMaterials'; keyword: string; offset: number; limit: number;
     grade?: string; textbook?: string; unit?: string }>
   | Readonly<{ action: 'getMaterial'; materialId: string }>
   | Readonly<{ action: 'getPlayback'; workId: string }>
-  | Readonly<{ action: 'getMaterialPlayback'; materialId: string }>;
+  | Readonly<{ action: 'getTaskDubbingPlayback'; workId: string }>
+  | Readonly<{ action: 'getMaterialPlayback'; materialId: string }>
+  | Readonly<{ action: 'listMyTaskDubbingWorks'; offset: number; limit: number }>;
 
 function invalid<T>(field: string, message: string): Validation<T> {
   return { ok: false, fieldErrors: { [field]: message } };
@@ -28,6 +35,28 @@ export function validateStudentWorkCommandRequest(
   request: FunctionRequest<StudentWorkCommandAction, JsonObject>,
 ): Validation<StudentWorkCommandInput> {
   if (request.operationId === undefined) return invalid('operationId', '作品写入必须提供操作标识。');
+  if (request.action === 'beginTaskDubbingWork') {
+    if (request.expectedVersion !== 0) return invalid('expectedVersion', '新任务作品版本必须为零。');
+    const exact = parseExactObject(request.payload, ['taskId', 'itemId']);
+    if (!exact.ok) return exact;
+    return id(exact.value.taskId) && id(exact.value.itemId)
+      ? { ok: true, value: { action: request.action, taskId: exact.value.taskId,
+        itemId: exact.value.itemId, operationId: request.operationId } }
+      : invalid('taskId', '任务或内容项标识无效。');
+  }
+  if (request.action === 'sealTaskDubbingWork') {
+    if (request.expectedVersion === undefined || !Number.isSafeInteger(request.expectedVersion)
+      || request.expectedVersion < 1) return invalid('expectedVersion', '任务作品版本无效。');
+    const exact = parseExactObject(request.payload, ['workId', 'stagingFileId']);
+    if (!exact.ok) return exact;
+    if (!id(exact.value.workId) || typeof exact.value.stagingFileId !== 'string'
+      || !exact.value.stagingFileId.startsWith('cloud://') || exact.value.stagingFileId.length > 600) {
+      return invalid('stagingFileId', '任务配音暂存文件无效。');
+    }
+    return { ok: true, value: { action: request.action, workId: exact.value.workId,
+      stagingFileId: exact.value.stagingFileId, expectedVersion: request.expectedVersion,
+      operationId: request.operationId } };
+  }
   if (request.action === 'beginDraft') {
     if (request.expectedVersion !== 0) return invalid('expectedVersion', '新作品版本必须为零。');
     const exact = parseExactObject(request.payload, ['materialId']);
@@ -63,6 +92,23 @@ export function validateStudentWorkQueryRequest(
 ): Validation<StudentWorkQueryInput> {
   if (request.operationId !== undefined) return invalid('operationId', '查询不接受写操作标识。');
   if (request.expectedVersion !== undefined) return invalid('expectedVersion', '查询不接受写操作版本。');
+  if (request.action === 'listMyTaskDubbingWorks') {
+    const exactPage = parseExactObject(request.payload, ['offset', 'limit']);
+    if (!exactPage.ok) return exactPage;
+    if (!Number.isSafeInteger(exactPage.value.offset) || (exactPage.value.offset as number) < 0
+      || (exactPage.value.offset as number) > 10000
+      || !Number.isSafeInteger(exactPage.value.limit) || (exactPage.value.limit as number) < 1
+      || (exactPage.value.limit as number) > 50) return invalid('page', '任务作品分页无效。');
+    return { ok: true, value: { action: request.action,
+      offset: exactPage.value.offset as number, limit: exactPage.value.limit as number } };
+  }
+  if (request.action === 'getTaskDubbingPlayback') {
+    const exactWork = parseExactObject(request.payload, ['workId']);
+    if (!exactWork.ok) return exactWork;
+    return id(exactWork.value.workId)
+      ? { ok: true, value: { action: request.action, workId: exactWork.value.workId } }
+      : invalid('workId', '任务作品标识无效。');
+  }
   if (request.action === 'getPlayback') {
     const exactPlayback = parseExactObject(request.payload, ['workId']);
     if (!exactPlayback.ok) return exactPlayback;

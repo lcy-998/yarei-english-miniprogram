@@ -1,0 +1,89 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "version": "2.0",
+  "envId": "{{env.TCB_ENV_ID}}",
+  "region": "ap-shanghai",
+  "functionRoot": "./dist/native-admin-review/functions",
+  "functions": [
+    {
+      "name": "native-admin-query",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "native-admin-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "native-admin-management-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "native-admin-operations-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    },
+    {
+      "name": "native-admin-media-command",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YAREI_SUBJECT_PEPPER": "{{env.YAREI_SUBJECT_PEPPER}}",
+        "YAREI_QUERY_CURSOR_SIGNING_KEY": "{{env.YAREI_QUERY_CURSOR_SIGNING_KEY}}",
+        "YAREI_BATCH_REVIEW_SIGNING_KEY": "{{env.YAREI_BATCH_REVIEW_SIGNING_KEY}}",
+        "YAREI_BUSINESS_SESSION_ENCRYPTION_KEY": "{{env.YAREI_BUSINESS_SESSION_ENCRYPTION_KEY}}",
+        "YAREI_BINDING_CODE_DERIVATION_KEY": "{{env.YAREI_BINDING_CODE_DERIVATION_KEY}}",
+        "YAREI_BINDING_CODE_PEPPER": "{{env.YAREI_BINDING_CODE_PEPPER}}"
+      }
+    }
+  ]
+}

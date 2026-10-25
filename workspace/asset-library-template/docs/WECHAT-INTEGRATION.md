@@ -48,14 +48,15 @@
 - `deliveryStatus`
 - `deliveryUrl`
 
-首次生成时 `deliveryStatus=awaiting_cloud_upload`、`deliveryUrl=null`。上传工具完成云存储上传后回填 HTTPS 地址或 CloudBase fileID，再由后台执行审核和上架。
+通过复核且含媒体时 `deliveryStatus=awaiting_cloud_upload`、`deliveryUrl=null`；纯文本题目等无上传文件的内容为 `ready_for_database_staging`；未通过者为 `blocked_review`。上传工具完成云存储上传后回填 HTTPS 地址或 CloudBase fileID，再由后台执行审核和上架。
+
+未完成内容复核的资源状态为 `blocked_review`，不得按索引自行上传并上架。通用阅读、词包和题目包只在复核通过后列出各自明确引用的页图或音频；生成的数据库模板是草稿，图片/音频字段中的 `$assetKey` 对象必须物化为私有 fileID。组织、班级和学员授权只能由服务端按当前关系生成，不能从源资产推断。
 
 ## 4. 小程序读取方式
 
 - 页面不得直接拼接文件名或本机路径。
 - 页面通过 service/repository 查询资源 ID 和版本。
 - 教材阅读先加载 `thumbnails/` 中的 320px 轻量缩略图，再按页加载 `pages/` 中的 1600px 主图和点读映射。
-- S-04 的可见阅读主体是绘本/教材页图，页图占据主要内容区域；OCR/结构化文本不在页图外另行渲染，只用于搜索、点读映射、跟读、无障碍和校验。
 - 音频播放器读取统一媒体对象，支持五档倍速、磨耳朵、续播及任务模式连续进度。
 - 听力题读取已经审核的 `startMs/endMs`；缺失或越界时禁止布置和提交。
 - 三、四年级根据年级策略只展示音节字段，不展示 IPA。

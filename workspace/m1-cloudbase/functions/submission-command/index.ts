@@ -13,5 +13,10 @@ const unavailable = createUnconfiguredFunction('submission-command', SUBMISSION_
 export const main = createDefaultCloudBaseTaskCoreFunction(
   'submission-command',
   unavailable,
-  (_capabilities, infrastructure) => createSubmissionCommandFunction(infrastructure),
+  (capabilities, infrastructure) => createSubmissionCommandFunction({ ...infrastructure,
+    ...(capabilities.teacherSuggestion?.dispatcher
+      ? { queueTeacherSuggestion: (organizationId: string, submissionId: string) =>
+        capabilities.teacherSuggestion!.dispatcher!.dispatch({ organizationId, submissionId }) }
+      : {}),
+  }),
 );

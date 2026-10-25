@@ -64,6 +64,22 @@ describe('M2 saved exercise evidence for check-in', () => {
     expect(evidence({ feedback: { ...feedback, decision: 'returned' } })).toBeNull();
     expect(evidence({ feedback: { ...feedback, organizationId: 'org_other' } })).toBeNull();
   });
+
+  it('uses the published item score for a subjective question in a mixed task', () => {
+    const subjectiveTask: TaskRecord = { ...task, items: [
+      { ...task.items[0]!, resourceSnapshot: { ...task.items[0]!.resourceSnapshot,
+        payload: { ...task.items[0]!.resourceSnapshot.payload, questionType: 'subjective', options: [],
+          correctAnswer: 'Birds can fly.' } } },
+      { ...task.items[0]!, id: 'item_other', resourceId: 'question_other' },
+    ] };
+    const subjectiveSubmission: SubmissionRecord = { ...submission, answers: [{ itemId: 'item_bird',
+      value: { kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: resourceId, response: 'A bird can fly.' }] } }] };
+    expect(evidence({ task: subjectiveTask, submission: subjectiveSubmission })).toBeNull();
+    expect(evidence({ task: subjectiveTask, submission: subjectiveSubmission,
+      feedback: { ...feedback, score: 80, itemScores: [{ itemId: 'item_bird', score: 75 }] } }))
+      .toEqual({ kind: 'exercise', resourceId, score: 75, submittedAt: submission.submittedAt });
+  });
 });
 
 describe('M2 frozen reading pages for a school-local check-in day', () => {
@@ -94,7 +110,7 @@ describe('M2 frozen reading pages for a school-local check-in day', () => {
   });
 });
 
-describe('M2 daily word count from immutable first spelling attempts', () => {
+describe('Daily word count from distinct same-day practice', () => {
   const snapshot = { kind: 'vocabulary' as const, resourceId: 'pack_animals', contentVersion: 'demo-v1',
     wordIds: ['word_tiger', 'word_lion'] };
   const first = (wordId: string, attemptedAt: string): VocabularyAttemptRecord => ({
@@ -105,7 +121,7 @@ describe('M2 daily word count from immutable first spelling attempts', () => {
   const args = { snapshot, organizationId, studentId, date: '2026-09-27', schoolTimeZone: 'Asia/Shanghai',
     publishedAt: '2026-09-27T08:00:00+08:00', requiredWordCount: 2 };
 
-  it('counts two different words even if the first spelling is wrong, without counting a retry', () => {
+  it('counts two different words even if the first spelling is wrong, without double-counting a retry', () => {
     const tiger = first('word_tiger', '2026-09-27T09:00:00+08:00');
     const lion = first('word_lion', '2026-09-27T09:05:00+08:00');
     expect(vocabularyEvidenceFromAttempts({ ...args, attempts: [tiger,
@@ -122,8 +138,18 @@ describe('M2 daily word count from immutable first spelling attempts', () => {
       { ...lion, attemptedAt: '2026-09-28T00:05:00+08:00' },
       { ...lion, contentVersion: 'demo-v2' },
       { ...lion, studentId: 'student_other' },
-      { ...lion, firstAttempt: false, attemptNumber: 2 },
     ]) expect(vocabularyEvidenceFromAttempts({ ...args, attempts: [tiger, altered] })).toBeNull();
+  });
+
+  it('counts a later-day review of a previously learned word once for that day', () => {
+    const earlier = first('word_tiger', '2026-09-26T09:00:00+08:00');
+    const review = { ...earlier, id: 'review_tiger', firstAttempt: false, attemptNumber: 2,
+      attemptedAt: '2026-09-27T09:00:00+08:00' };
+    const lion = first('word_lion', '2026-09-27T09:05:00+08:00');
+    expect(vocabularyEvidenceFromAttempts({ ...args, attempts: [earlier, review, lion,
+      { ...review, id: 'retry_review_tiger', attemptNumber: 3 }] }))
+      .toEqual({ kind: 'vocabulary', resourceId: snapshot.resourceId, completedWordCount: 2,
+        submittedAt: lion.attemptedAt });
   });
 });
 

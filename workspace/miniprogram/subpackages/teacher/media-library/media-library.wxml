@@ -1,0 +1,42 @@
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="media-library-page" bindtap="closeFilter">
+  <app-header title="音视频材料库" back="{{true}}"></app-header>
+  <view class="media-library-content">
+    <view class="my-videos-row"><button class="my-videos-entry" bindtap="openMyVideos" disabled="{{!myVideosReady}}">{{myVideosReady ? '我的视频 · 录制或上传' : '我的视频 · 暂未开放'}}</button></view>
+    <view class="media-kind-tabs"><view wx:for="{{kinds}}" wx:key="value" class="media-kind-tab {{kind === item.value ? 'active' : ''}}" data-kind="{{item.value}}" bindtap="chooseKind">{{item.label}}</view></view>
+    <view class="media-search"><input value="{{keyword}}" placeholder="搜索当前类型的素材" bindinput="onKeyword" confirm-type="search" bindconfirm="search"/><button bindtap="search" disabled="{{loading}}">查找</button></view>
+    <view class="media-filters">
+      <view class="media-filter-control"><button class="media-filter-tab {{grade ? 'active' : ''}}" data-key="grade" bindtap="toggleFilter" disabled="{{facetLoading}}"><text>{{grade || '全部年级'}}</text><text class="media-filter-chevron {{filterOpen === 'grade' ? 'open' : ''}}"></text></button><view wx:if="{{filterOpen === 'grade'}}" class="media-filter-menu"><view wx:for="{{filterOptions.grades}}" wx:key="value" class="media-filter-option {{grade === item.value ? 'selected' : ''}}" data-key="grade" data-value="{{item.value}}" bindtap="chooseFilter">{{item.label}}</view></view></view>
+      <view class="media-filter-control"><button class="media-filter-tab {{textbook ? 'active' : ''}}" data-key="textbook" bindtap="toggleFilter" disabled="{{facetLoading}}"><text>{{textbook === '__unlabeled_textbook__' ? '未标注教材' : textbook || '全部教材'}}</text><text class="media-filter-chevron {{filterOpen === 'textbook' ? 'open' : ''}}"></text></button><view wx:if="{{filterOpen === 'textbook'}}" class="media-filter-menu"><view wx:for="{{filterOptions.textbooks}}" wx:key="value" class="media-filter-option {{textbook === item.value ? 'selected' : ''}}" data-key="textbook" data-value="{{item.value}}" bindtap="chooseFilter">{{item.label}}</view></view></view>
+      <view class="media-filter-control"><button class="media-filter-tab {{unit ? 'active' : ''}}" data-key="unit" bindtap="toggleFilter" disabled="{{facetLoading}}"><text>{{unit === '__unlabeled_unit__' ? '未标注单元' : unit || '全部单元'}}</text><text class="media-filter-chevron {{filterOpen === 'unit' ? 'open' : ''}}"></text></button><view wx:if="{{filterOpen === 'unit'}}" class="media-filter-menu"><view wx:for="{{filterOptions.units}}" wx:key="value" class="media-filter-option {{unit === item.value ? 'selected' : ''}}" data-key="unit" data-value="{{item.value}}" bindtap="chooseFilter">{{item.label}}</view></view></view>
+    </view>
+    <view wx:if="{{facetError}}" class="media-facet-warning"><text>筛选选项暂不可用，仍可使用关键词查找。</text><button bindtap="retryFilterOptions">重试选项</button></view>
+    <view wx:if="{{kind === 'video'}}" class="private-video-section">
+      <view class="private-video-heading"><text>我的视频</text><text>校验通过后可直接加入当前任务</text></view>
+      <state-panel wx:if="{{privateVideosLoading}}" state="loading" message="正在读取我的视频"></state-panel>
+      <view wx:elif="{{privateVideosError}}" class="private-video-error"><text>{{privateVideosError}}</text><button bindtap="loadPrivateVideos">重试</button></view>
+      <view wx:else>
+        <view wx:for="{{privateVideos}}" wx:key="id" class="media-card private-video-card">
+          <text class="media-card-kind">教师自制视频 · {{item.questionCount}} 题 · {{item.durationLabel}}</text>
+          <text class="media-card-title">{{item.title}}</text>
+          <text class="media-card-meta">仅本人可用；学生通过已发布任务访问</text>
+          <view class="media-card-actions"><button class="primary" data-id="{{item.id}}" bindtap="usePrivateVideo">{{fromTask ? (item.selected ? '已选择 · 返回任务' : '加入当前任务') : '选择并布置任务'}}</button></view>
+        </view>
+        <text wx:if="{{!privateVideos.length}}" class="private-video-empty">还没有校验通过且可布置的自制视频。</text>
+      </view>
+    </view>
+    <state-panel wx:if="{{loading}}" state="loading" message="正在查找授权素材"></state-panel>
+    <state-panel wx:elif="{{error && !items.length}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else>
+      <text wx:if="{{error}}" class="media-error">{{error}}</text>
+      <view wx:for="{{items}}" wx:key="id" class="media-card">
+        <text class="media-card-kind">{{item.kind === 'listening' ? '听力' : item.kind === 'video' ? '看视频' : '视频配音'}} · 版本 {{item.contentVersion}}{{item.acceptanceStatus ? ' · 待用户验收' : ''}}</text>
+        <text class="media-card-title">{{item.title}}</text>
+        <text class="media-card-meta">{{item.grade}}{{item.textbook ? ' · ' + item.textbook : ''}}{{item.unit ? ' · ' + item.unit : ''}} · {{item.durationLabel}} · {{item.questionLabel}}</text>
+        <text class="media-card-meta">来源：后台统一资产库</text>
+        <view class="media-card-actions"><button data-id="{{item.id}}" bindtap="preview">预览</button><button class="primary" data-id="{{item.id}}" bindtap="useAsset">{{fromTask ? (item.selected ? '保留并返回任务' : '加入当前任务') : '布置任务'}}</button></view>
+      </view>
+      <view wx:if="{{!items.length && nextOffset === null}}" class="media-empty">当前没有可布置的授权音视频内容，可调整筛选条件后重试。</view>
+      <button wx:if="{{nextOffset !== null}}" class="media-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loadingMore}}">加载更多</button>
+    </view>
+  </view>
+</view></g0-page-shell>

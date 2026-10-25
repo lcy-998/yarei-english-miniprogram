@@ -1,0 +1,11 @@
+{
+  "authorizationScope": "m3_native_admin_account_nonproduction",
+  "approved": false,
+  "operation": "create_account_operations_collection",
+  "environmentId": "REPLACE_WITH_REVIEWED_NONPRODUCTION_ENVIRONMENT",
+  "expiresAt": "REPLACE_WITH_APPROVED_EXPIRY_ISO_8601",
+  "expectedExistingCount": 0,
+  "rollback": {
+    "action": "preserve_collection_and_audit"
+  }
+}

@@ -34,7 +34,7 @@ export const M1_CLOUDBASE_ACTION_COVERAGE = {
 } as const
 
 const ERROR_CODES: ReadonlySet<ServiceError['code']> = new Set([
-  'VALIDATION_ERROR', 'UNAUTHENTICATED', 'FORBIDDEN', 'NOT_FOUND', 'CONFLICT', 'RESOURCE_OFFLINE',
+  'VALIDATION_ERROR', 'UNAUTHENTICATED', 'FORBIDDEN', 'NOT_FOUND', 'CONFLICT', 'RESOURCE_OFFLINE', 'ACTIVITY_PENDING_REVIEW',
   'TASK_NOT_SUBMITTABLE', 'REDO_LIMIT_REACHED', 'DUPLICATE_OPERATION', 'NETWORK_ERROR',
   'SERVICE_UNAVAILABLE', 'INTERNAL_ERROR',
 ])
@@ -100,6 +100,7 @@ function mapVocabularyPack(raw: JsonRecord): WordPracticeView {
     wordId: word.id as string,
     word: word.word as string,
     syllables: (word.syllables as string[]).join('-'),
+    syllableParts: [...(word.syllables as string[])],
     meaning,
     example: isString(word.example) ? word.example : '',
     options,
@@ -322,13 +323,18 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
     return { ok: true, data: updated, meta: result.meta }
   }
 
-  async getReadingProgress(userId: string, bookId: string): Promise<ServiceResult<ReadingProgressView>> {
-    const resource = await this.invokeRaw('content-query', request('getReadingResource', { resourceId: bookId }))
-    if (!resource.ok) return resource
-    if (!isRawReadingResource(resource.data)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
-    const pages = readingPageReferences(resource.data)
+  async getReadingProgress(userId: string, bookId: string,
+    task?: Readonly<{ taskId: string; itemId: string }>): Promise<ServiceResult<ReadingProgressView>> {
+    const response = task
+      ? await this.invokeRaw('content-query', request('getHistoricalTaskLearning', task))
+      : await this.invokeRaw('content-query', request('getReadingResource', { resourceId: bookId }))
+    if (!response.ok) return response
+    const resource = task && isRecord(response.data) && response.data.resourceId === bookId
+      ? response.data.reading : task ? null : response.data
+    if (!isRawReadingResource(resource)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
+    const pages = readingPageReferences(resource)
     if (pages === null) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
-    this.resourceVersions.set(bookId, resource.data.contentVersion as number)
+    this.resourceVersions.set(bookId, resource.contentVersion as number)
     this.readingPageReferences.set(bookId, pages)
     const progress = await this.invokeRaw('learning-progress-query', request('getReadingProgress', { resourceId: bookId }))
     if (!progress.ok) return progress
@@ -336,7 +342,7 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
     if (progressData !== null && !isRawReadingProgress(progressData)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
     const saved = progressData === null ? null : progressData
     const pageNumber = saved?.pageNumber ?? this.readingPages.get(userId + ':' + bookId) ?? 1
-    const result = mapReadingResource(resource.data, pageNumber, saved?.favorite ?? false)
+    const result = mapReadingResource(resource, pageNumber, saved?.favorite ?? false)
     if (saved) {
       this.progressVersions.set(bookId, saved.version)
       this.favoriteVersions.set(bookId, saved.version)
@@ -345,7 +351,7 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
     this.readingPages.set(userId + ':' + bookId, view.pageNumber)
     this.readingViews.set(bookId, view)
     this.readingBooks.set(bookId, view.book)
-    return { ok: true, data: view, meta: resource.meta }
+    return { ok: true, data: view, meta: response.meta }
   }
 
   async setReadingPage(userId: string, bookId: string, pageNumber: number): Promise<ServiceResult<ReadingProgressView>> {

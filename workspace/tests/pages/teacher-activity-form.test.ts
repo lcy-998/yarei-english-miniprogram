@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { activityDraftFromForm, cycleEndsOn, defaultActivityPeriod, inferRestWeekdays, mergeActivityConditions,
-  restDatesForWeekdays, shiftActivityDate, weekdaysInActivityRange } from '../../miniprogram/pages/teacher/checkin-activities/activity-form'
+  restDatesForWeekdays, shiftActivityDate, weekdaysInActivityRange } from '../../miniprogram/subpackages/teacher/checkin-activities/activity-form'
 
 const form = { title: '动物阅读打卡', description: '', classId: 'cls_demo', startsOn: '2026-09-27', endsOn: '2026-10-03',
   restDates: ['2026-09-30'], conditions: [{ resourceId: 'res_reading', title: '动物绘本', kind: 'reading' as const, threshold: '' }] }
@@ -22,6 +22,10 @@ describe('T-09 activity form', () => {
     expect(cycleEndsOn('2026-09-27', 7)).toBe('2026-10-03')
     expect(activityDraftFromForm(form)).toMatchObject({ ok: true, draft: { conditions: [{ kind: 'reading', resourceId: 'res_reading' }] } })
     expect(activityDraftFromForm({ ...form, restDates: ['2026-09-30', '2026-09-30'] })).toMatchObject({ ok: false })
+    expect(activityDraftFromForm({ ...form, restDates: [
+      '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30',
+      '2026-10-01', '2026-10-02', '2026-10-03',
+    ] })).toMatchObject({ ok: false, message: '请至少保留一个有效打卡日' })
     expect(activityDraftFromForm({ ...form, conditions: [{ resourceId: 'res_words', title: '词包', kind: 'vocabulary', threshold: '1.5' }] }))
       .toMatchObject({ ok: false })
     expect(activityDraftFromForm({ ...form, conditions: [{ resourceId: 'res_question', title: '习题', kind: 'exercise', threshold: '101' }] }))

@@ -1,4 +1,7 @@
 import { ACTOR_ROLES, type TrustedActorContext } from '../auth/trusted-actor';
+import { hasActivePublicQuestionSource } from '../question-admin/public-question-source';
+import { hasActivePublicLearningSource } from '../org-content/public-learning-source';
+import { hasActiveLegacyGlobalSource } from '../global-assets/legacy-global-source';
 import type { OrgContentIdempotencyBoundary } from '../org-content/idempotency';
 import type { OrgContentRepository, OrgContentTransaction } from '../org-content/repository';
 import {
@@ -330,7 +333,10 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
       status: 'published',
       deletedAt: null,
     });
-    return documents.map((document) => decodeLearningResource(document, organizationId))
+    return (await Promise.all(documents.map(async document =>
+      await hasActivePublicLearningSource(this.database, document)
+        && await hasActiveLegacyGlobalSource(this.database, document)
+        ? decodeLearningResource(document, organizationId) : null)))
       .filter((item): item is LearningResourceEntity => item !== null && item.type === type);
   }
 
@@ -343,10 +349,12 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
     for (const [key, value] of Object.entries(filters)) if (value !== undefined) criteria[key] = value;
     const result = await this.database.findPage(ORG_CONTENT_COLLECTIONS.resources, criteria, page);
     return {
-      items: result.items.map((document) => {
+      items: await Promise.all(result.items.map(async (document) => {
+        if (!await hasActivePublicQuestionSource(this.database, document)
+          || !await hasActiveLegacyGlobalSource(this.database, document)) return null;
         const resource = decodeLearningResource(document, organizationId);
         return resource?.type === 'exercise' ? resource : null;
-      }),
+      })),
       hasMore: result.hasMore,
     };
   }
@@ -361,10 +369,12 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
     for (const [key, value] of Object.entries(filters)) if (value !== undefined) criteria[key] = value;
     const result = await this.database.findPage(ORG_CONTENT_COLLECTIONS.resources, criteria, page);
     return {
-      items: result.items.map((document) => {
+      items: await Promise.all(result.items.map(async (document) => {
+        if (!await hasActivePublicLearningSource(this.database, document)
+          || !await hasActiveLegacyGlobalSource(this.database, document)) return null;
         const resource = decodeLearningResource(document, organizationId);
         return resource?.type === type ? resource : null;
-      }),
+      })),
       hasMore: result.hasMore,
     };
   }
@@ -373,11 +383,32 @@ export class OrgContentDocumentRepository implements OrgContentRepository {
     organizationId: string,
     resourceId: string,
   ): Promise<LearningResourceEntity | null> {
-    const resource = decodeLearningResource(
-      await this.database.get(ORG_CONTENT_COLLECTIONS.resources, resourceId),
-      organizationId,
-    );
+    const document = await this.database.get(ORG_CONTENT_COLLECTIONS.resources, resourceId);
+    if (document?.type === 'exercise'
+      && !await hasActivePublicQuestionSource(this.database, document)) return null;
+    if (document && !await hasActivePublicLearningSource(this.database, document)) return null;
+    if (document && !await hasActiveLegacyGlobalSource(this.database, document)) return null;
+    const resource = decodeLearningResource(document, organizationId);
     return resource?.status === 'published' ? resource : null;
+  }
+
+  public async hasStudentTaskResource(organizationId: string, studentId: string,
+    resourceId: string): Promise<boolean> {
+    const assignments = await this.database.find('task_assignments', {
+      organizationId, studentId, deletedAt: null,
+    });
+    if (assignments.length > 1000) throw new OrgContentError('SERVICE_UNAVAILABLE');
+    for (const assignment of assignments) {
+      if (!isScopedVisible(assignment, organizationId)
+        || typeof assignment.taskId !== 'string') continue;
+      const task = await this.database.get('tasks', assignment.taskId);
+      if (!isScopedVisible(task, organizationId) || task.status === 'draft'
+        || task.status === 'withdrawn' || task.visibility !== 'visible'
+        || typeof task.publishedAt !== 'string') continue;
+      const items = Array.isArray(task.items) ? task.items : [];
+      if (items.some(item => isJsonObject(item) && item.resourceId === resourceId)) return true;
+    }
+    return false;
   }
 
   public async transaction<T>(work: (transaction: OrgContentTransaction) => Promise<T>): Promise<T> {
@@ -1497,6 +1528,12 @@ function decodeLearningResource(
     const theme = readOptionalStringFrom(document, payload, 'theme');
     const chapters = decodeChapters(field(document, payload, 'chapters')) ?? legacyChapters;
     const searchText = readOptionalStringFrom(document, payload, 'searchText');
+    const testOnly = document.testOnly === true;
+    const teacherCatalogOnly = document.teacherCatalogOnly === true;
+    const acceptanceStatus = document.acceptanceStatus === 'pending_user_acceptance'
+      ? 'pending_user_acceptance' as const : undefined;
+    const pronunciation = decodeReadingPronunciation(field(document, payload, 'pronunciation'));
+    const readingAudio = decodeReadingAudio(field(document, payload, 'readingAudio'));
     if (category === null || grade === null || term === false || textbook === false || unit === false
       || difficulty === null || theme === false || chapters === null || searchText === false) return null;
     return {
@@ -1508,6 +1545,9 @@ function decodeLearningResource(
       status: 'published',
       visibility,
       copyrightStatus,
+      ...(testOnly ? { testOnly: true } : {}),
+      ...(teacherCatalogOnly ? { teacherCatalogOnly: true } : {}),
+      ...(acceptanceStatus === undefined ? {} : { acceptanceStatus }),
       category,
       grade,
       ...(term === undefined ? {} : { term }),
@@ -1518,6 +1558,8 @@ function decodeLearningResource(
       chapters,
       ...(legacyChapters === null ? {} : { taskOnly: true }),
       ...(searchText === undefined ? {} : { searchText }),
+      ...(pronunciation === undefined ? {} : { pronunciation }),
+      ...(readingAudio === undefined ? {} : { readingAudio }),
     };
   }
 
@@ -1527,6 +1569,7 @@ function decodeLearningResource(
     const textbook = readOptionalStringFrom(document, payload, 'textbook');
     const unit = readStringFrom(document, payload, 'unit');
     const words = decodeWords(field(document, payload, 'words'));
+    const teacherCatalogOnly = document.teacherCatalogOnly === true;
     if (grade === null || term === false || textbook === false || unit === null || words === null) return null;
     return {
       id: document._id,
@@ -1537,6 +1580,7 @@ function decodeLearningResource(
       status: 'published',
       visibility,
       copyrightStatus,
+      ...(teacherCatalogOnly ? { teacherCatalogOnly: true } : {}),
       grade,
       ...(term === undefined ? {} : { term }),
       ...(textbook === undefined ? {} : { textbook }),
@@ -1559,6 +1603,44 @@ function decodeLearningResource(
     const options = readStringArray(payload, 'options');
     const explanation = readStringFrom(document, payload, 'explanation');
     const correctAnswer = field(document, payload, 'correctAnswer');
+    const teacherCatalogOnly = document.teacherCatalogOnly === true;
+    const assetLibrary = isJsonObject(payload.assetLibrary) ? payload.assetLibrary : null;
+    const exercisePackId = typeof assetLibrary?.exercisePackId === 'string'
+      && /^[A-Za-z0-9_-]{1,128}$/.test(assetLibrary.exercisePackId)
+      ? assetLibrary.exercisePackId : undefined;
+    const section = payload.exerciseSection;
+    if (section !== undefined && (!isJsonObject(section)
+      || typeof section.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(section.id)
+      || typeof section.title !== 'string' || !section.title.trim()
+      || typeof section.instruction !== 'string' || !section.instruction.trim()
+      || typeof section.studentMaterial !== 'string'
+      || typeof section.order !== 'number' || !Number.isSafeInteger(section.order) || section.order < 1
+      || typeof section.questionOrder !== 'number' || !Number.isSafeInteger(section.questionOrder)
+      || section.questionOrder < 1
+      || typeof section.points !== 'number' || !Number.isSafeInteger(section.points) || section.points < 1)) return null;
+    const exerciseSection = isJsonObject(section) ? {
+      id: section.id as string, title: section.title as string,
+      instruction: section.instruction as string,
+      studentMaterial: section.studentMaterial as string,
+      order: section.order as number, questionOrder: section.questionOrder as number,
+      points: section.points as number,
+    } : undefined;
+    const accepted = payload.acceptedAnswers;
+    if (accepted !== undefined && (questionType !== 'fill' || !Array.isArray(accepted)
+      || !accepted.length || accepted.some(value => typeof value !== 'string' || !value.trim())
+      || typeof correctAnswer !== 'string' || !accepted.includes(correctAnswer))) return null;
+    const rubricRaw = payload.rubric;
+    if (rubricRaw !== undefined && (questionType !== 'subjective' || !Array.isArray(rubricRaw)
+      || rubricRaw.length < 2 || rubricRaw.some(row => !isJsonObject(row)
+        || typeof row.criterion !== 'string' || !row.criterion.trim()
+        || typeof row.points !== 'number' || !Number.isSafeInteger(row.points) || row.points < 1)
+      || exerciseSection === undefined
+      || rubricRaw.reduce((sum, row) => sum + Number((row as Record<string, unknown>).points), 0)
+        !== exerciseSection.points)) return null;
+    const rubric = Array.isArray(rubricRaw) ? rubricRaw.map(row => ({
+      criterion: (row as Record<string, unknown>).criterion as string,
+      points: (row as Record<string, unknown>).points as number,
+    })) : undefined;
     if (grade === null || textbook === false || unit === false || knowledgePoint === false || difficulty === false
       || questionType === null || stem === null || options === null || explanation === null || correctAnswer === undefined
       || !Array.isArray(payload.questionIds) || payload.questionIds.length !== 1 || payload.questionIds[0] !== document._id
@@ -1569,6 +1651,11 @@ function decodeLearningResource(
     return {
       id: document._id, organizationId, type: 'exercise', title, contentVersion, status: 'published', visibility,
       copyrightStatus, grade, questionType, stem, options, explanation, correctAnswer,
+      ...(exercisePackId === undefined ? {} : { exercisePackId }),
+      ...(exerciseSection === undefined ? {} : { exerciseSection }),
+      ...(Array.isArray(accepted) ? { acceptedAnswers: accepted as string[] } : {}),
+      ...(rubric === undefined ? {} : { rubric }),
+      ...(teacherCatalogOnly ? { teacherCatalogOnly: true } : {}),
       ...(textbook === undefined ? {} : { textbook }),
       ...(unit === undefined ? {} : { unit }),
       ...(knowledgePoint === undefined ? {} : { knowledgePoint }),
@@ -1577,6 +1664,65 @@ function decodeLearningResource(
   }
 
   return null;
+}
+
+function decodeReadingPronunciation(value: JsonValue | undefined): ReadingResourceEntity['pronunciation'] | undefined {
+  if (!isJsonObject(value) || !['draft', 'approved', 'rejected'].includes(String(value.reviewStatus))
+    || typeof value.sourceVersion !== 'string' || !Array.isArray(value.segments)) return undefined;
+  const segments: NonNullable<ReadingResourceEntity['pronunciation']>['segments'][number][] = [];
+  for (const raw of value.segments) {
+    if (!isJsonObject(raw) || typeof raw.id !== 'string' || typeof raw.text !== 'string'
+      || typeof raw.demonstrationAudioAssetKey !== 'string'
+      || (raw.translationText !== undefined && (typeof raw.translationText !== 'string'
+        || raw.translationText.trim().length > 500))
+      || (raw.pageNumber !== undefined && (!Number.isSafeInteger(raw.pageNumber) || Number(raw.pageNumber) < 1))) {
+      return undefined;
+    }
+    segments.push({ id: raw.id, text: raw.text,
+      ...(typeof raw.translationText === 'string' ? { translationText: raw.translationText } : {}),
+      ...(raw.pageNumber === undefined ? {} : { pageNumber: Number(raw.pageNumber) }),
+      demonstrationAudioAssetKey: raw.demonstrationAudioAssetKey });
+  }
+  return { reviewStatus: value.reviewStatus as 'draft' | 'approved' | 'rejected',
+    sourceVersion: value.sourceVersion,
+    ...(typeof value.approvedAt === 'string' ? { approvedAt: value.approvedAt } : {}),
+    ...(typeof value.approvedBy === 'string' ? { approvedBy: value.approvedBy } : {}),
+    segments };
+}
+
+function decodeReadingAudio(value: JsonValue | undefined): ReadingResourceEntity['readingAudio'] | undefined {
+  if (!isJsonObject(value) || !['draft', 'approved', 'rejected', 'pending_user_acceptance'].includes(String(value.reviewStatus))
+    || typeof value.sourceVersion !== 'string' || !Array.isArray(value.chapters)) return undefined;
+  const chapters: NonNullable<ReadingResourceEntity['readingAudio']>['chapters'][number][] = [];
+  for (const rawChapter of value.chapters) {
+    if (!isJsonObject(rawChapter) || typeof rawChapter.chapterId !== 'string'
+      || typeof rawChapter.audioAssetKey !== 'string' || !Number.isSafeInteger(rawChapter.durationMs)
+      || !Array.isArray(rawChapter.segments)) return undefined;
+    const segments: NonNullable<ReadingResourceEntity['readingAudio']>['chapters'][number]['segments'][number][] = [];
+    for (const raw of rawChapter.segments) {
+      if (!isJsonObject(raw) || typeof raw.id !== 'string' || typeof raw.pageId !== 'string'
+        || !Number.isSafeInteger(raw.pageNumber) || typeof raw.text !== 'string'
+        || !isJsonObject(raw.rect) || ![raw.rect.x, raw.rect.y, raw.rect.width, raw.rect.height]
+          .every(value => typeof value === 'number' && Number.isFinite(value))
+        || !Number.isSafeInteger(raw.startMs) || !Number.isSafeInteger(raw.endMs)
+        || (raw.clipAudioAssetKey !== undefined && typeof raw.clipAudioAssetKey !== 'string')
+        || (raw.clipDurationMs !== undefined && !Number.isSafeInteger(raw.clipDurationMs))
+        || ((raw.clipAudioAssetKey === undefined) !== (raw.clipDurationMs === undefined))) return undefined;
+      segments.push({ id: raw.id, pageId: raw.pageId, pageNumber: Number(raw.pageNumber),
+        text: raw.text, rect: { x: Number(raw.rect.x), y: Number(raw.rect.y),
+          width: Number(raw.rect.width), height: Number(raw.rect.height) },
+        startMs: Number(raw.startMs), endMs: Number(raw.endMs),
+        ...(raw.clipAudioAssetKey === undefined ? {} : { clipAudioAssetKey: raw.clipAudioAssetKey as string,
+          clipDurationMs: Number(raw.clipDurationMs) }) });
+    }
+    chapters.push({ chapterId: rawChapter.chapterId, audioAssetKey: rawChapter.audioAssetKey,
+      durationMs: Number(rawChapter.durationMs), segments });
+  }
+  return { reviewStatus: value.reviewStatus as 'draft' | 'approved' | 'rejected' | 'pending_user_acceptance',
+    sourceVersion: value.sourceVersion,
+    ...(typeof value.approvedAt === 'string' ? { approvedAt: value.approvedAt } : {}),
+    ...(typeof value.approvedBy === 'string' ? { approvedBy: value.approvedBy } : {}),
+    chapters };
 }
 
 function decodeVisibility(document: VersionedDocument): ResourceVisibility | null {
@@ -1669,8 +1815,14 @@ function decodeWords(value: JsonValue | undefined): readonly VocabularyWordEntit
     const meaning = readString(item, 'meaning');
     const example = readString(item, 'example');
     const syllables = readStringArray(item, 'syllables');
-    if (id === null || word === null || meaning === null || example === null || syllables === null) return null;
-    words.push({ id, word, meaning, example, syllables });
+    const ipa = readOptionalString(item, 'ipa');
+    const audioAssetKey = readOptionalString(item, 'audioAssetKey');
+    if (id === null || word === null || meaning === null || example === null || syllables === null
+      || ipa === false || (ipa !== undefined && (!/^\/[^/]{1,120}\/$/u.test(ipa)))
+      || audioAssetKey === false || (audioAssetKey !== undefined && !audioAssetKey.startsWith('cloud://'))) return null;
+    words.push({ id, word, meaning, example, syllables,
+      ...(ipa === undefined ? {} : { ipa }),
+      ...(audioAssetKey === undefined ? {} : { audioAssetKey }) });
   }
   return words;
 }

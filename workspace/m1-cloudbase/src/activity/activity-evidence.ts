@@ -36,7 +36,7 @@ export function readingEvidenceFromPageEvents(input: Readonly<{
   return { kind: 'reading', resourceId: snapshot.resourceId, completed: true, submittedAt: lastVisit };
 }
 
-/** Counts distinct words first attempted after publication on one school-local day. */
+/** Counts distinct words practiced on one school-local day, including a new day's review. */
 export function vocabularyEvidenceFromAttempts(input: Readonly<{
   snapshot: ActivityConditionSnapshot;
   attempts: readonly VocabularyAttemptRecord[];
@@ -54,23 +54,23 @@ export function vocabularyEvidenceFromAttempts(input: Readonly<{
     || !Number.isSafeInteger(requiredWordCount) || requiredWordCount < 1 || requiredWordCount > required.length
     || !Number.isFinite(Date.parse(publishedAt))) return null;
   const allowed = new Set(required);
-  const firstByWord = new Map<string, VocabularyAttemptRecord>();
+  const firstByWordToday = new Map<string, VocabularyAttemptRecord>();
   for (const attempt of attempts) {
     if (attempt.organizationId !== organizationId || attempt.studentId !== studentId
       || attempt.packId !== snapshot.resourceId || attempt.contentVersion !== snapshot.contentVersion
-      || !allowed.has(attempt.wordId) || !attempt.firstAttempt || attempt.attemptNumber !== 1
+      || !allowed.has(attempt.wordId)
       || !Number.isFinite(Date.parse(attempt.attemptedAt))
       || Date.parse(attempt.attemptedAt) < Date.parse(publishedAt)
       || localDateAt(attempt.attemptedAt, schoolTimeZone) !== date) continue;
-    const previous = firstByWord.get(attempt.wordId);
+    const previous = firstByWordToday.get(attempt.wordId);
     if (!previous || Date.parse(attempt.attemptedAt) < Date.parse(previous.attemptedAt)) {
-      firstByWord.set(attempt.wordId, attempt);
+      firstByWordToday.set(attempt.wordId, attempt);
     }
   }
-  if (firstByWord.size < requiredWordCount) return null;
-  const sorted = [...firstByWord.values()].sort((left, right) =>
+  if (firstByWordToday.size < requiredWordCount) return null;
+  const sorted = [...firstByWordToday.values()].sort((left, right) =>
     Date.parse(left.attemptedAt) - Date.parse(right.attemptedAt));
-  return { kind: 'vocabulary', resourceId: snapshot.resourceId, completedWordCount: firstByWord.size,
+  return { kind: 'vocabulary', resourceId: snapshot.resourceId, completedWordCount: firstByWordToday.size,
     submittedAt: sorted[requiredWordCount - 1]!.attemptedAt };
 }
 
@@ -142,8 +142,61 @@ export function exerciseEvidenceFromSubmission(input: Readonly<{
     questionResponses: [{ questionId: raw.questionId, response: raw.response }] });
   if (!evaluation.complete) return null;
   let score = evaluation.automaticScore;
-  if (task.items.length === 1 && feedback?.decision === 'approved' && feedback.score !== null
-    && Number.isFinite(feedback.score) && feedback.score >= 0 && feedback.score <= 100) score = feedback.score;
+  if (feedback?.decision === 'approved') {
+    const itemScores = feedback.itemScores?.filter(entry => entry.itemId === item.id) ?? [];
+    if (itemScores.length > 1) return null;
+    const publishedItemScore = itemScores[0]?.score;
+    if (publishedItemScore !== undefined) {
+      if (!Number.isFinite(publishedItemScore) || publishedItemScore < 0 || publishedItemScore > 100) return null;
+      score = publishedItemScore;
+    } else if (task.items.length === 1 && feedback.score !== null
+      && Number.isFinite(feedback.score) && feedback.score >= 0 && feedback.score <= 100) {
+      score = feedback.score;
+    }
+  }
   if (score === null) return null;
   return { kind: 'exercise', resourceId, score, submittedAt: submission.submittedAt };
+}
+
+/** A submitted subjective item keeps the final board open until its item score is published. */
+export function exerciseSubmissionNeedsReview(input: Readonly<{
+  task: TaskRecord;
+  assignment: TaskAssignmentRecord;
+  submission: SubmissionRecord;
+  feedback?: ReviewFeedbackRecord | null;
+  resourceId: string;
+  requiredContentVersion: string;
+  studentId: string;
+  classId: string;
+}>): boolean {
+  const { task, assignment, submission, feedback, resourceId, requiredContentVersion, studentId, classId } = input;
+  if (task.id !== assignment.taskId || task.id !== submission.taskId
+    || task.organizationId !== assignment.organizationId || task.organizationId !== submission.organizationId
+    || assignment.id !== submission.assignmentId || assignment.studentId !== studentId
+    || submission.studentId !== studentId || assignment.classId !== classId
+    || assignment.latestSubmissionId !== submission.id
+    || assignment.latestSubmissionVersion !== submission.submissionVersion
+    || assignment.status !== 'awaiting_review' || submission.status !== 'submitted'
+    || !submission.submittedAt) return false;
+  const items = task.items.filter(item => item.resourceId === resourceId
+    && item.resourceSnapshot.type === 'exercise'
+    && String(item.resourceVersion) === requiredContentVersion);
+  if (items.length !== 1) return false;
+  const item = items[0]!;
+  const snapshot = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
+  const answers = submission.answers.filter(answer => answer.itemId === item.id);
+  if (!snapshot || answers.length !== 1 || !isObject(answers[0]?.value)
+    || answers[0].value.kind !== 'exercise' || !Array.isArray(answers[0].value.questionResponses)
+    || answers[0].value.questionResponses.length !== 1
+    || !isObject(answers[0].value.questionResponses[0])) return false;
+  const response = answers[0].value.questionResponses[0];
+  const evaluation = evaluateExerciseSubmission(snapshot, { kind: 'exercise', answeredQuestionCount: 1,
+    questionResponses: [{ questionId: response.questionId, response: response.response }] });
+  if (!evaluation.complete || evaluation.automaticScore !== null) return false;
+  if (!feedback) return true;
+  if (feedback.decision === 'returned') return false;
+  return !feedback.itemScores?.some(score => score.itemId === item.id
+    && Number.isFinite(score.score) && score.score >= 0 && score.score <= 100)
+    && !(task.items.length === 1 && feedback.score !== null
+      && Number.isFinite(feedback.score) && feedback.score >= 0 && feedback.score <= 100);
 }

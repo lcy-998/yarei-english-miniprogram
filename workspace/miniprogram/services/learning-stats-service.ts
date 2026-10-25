@@ -82,13 +82,16 @@ function view(filters: StatsFilters, classes: StatsView['classes'], students: St
   details: StatsTaskDetail[], canExport: boolean): StatsView {
   const completedCount = details.filter(item => item.status === 'completed' || item.status === 'awaiting_review').length
   const scores = details.map(item => item.score).filter((item): item is number => item !== null)
-  return { filters, periodBasis: 'taskDueDate', classes, students, details, canExport,
+  return { filters, periodBasis: 'taskDueDate', learningPeriodBasis: 'eventSchoolDate',
+    classes, students, details, learningEvents: [], canExport,
     summary: { assignedCount: details.length, completedCount,
       completionRate: details.length ? Math.round(completedCount * 100 / details.length) : null,
       overdueCount: details.filter(item => item.isLate || item.status === 'overdue').length,
       taskSubmissionCount: details.reduce((total, item) => total + item.submissionCount, 0),
       averageScore: scores.length ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length) : null,
-      learningMinutes: null, practiceAccuracy: null, dubbingCount: null, shadowingCount: null } }
+      learningMinutes: null, phonicsPracticeCount: null, practiceAccuracy: null,
+      checkinCompletedDays: null, checkinEvidenceStatus: 'unavailable',
+      dubbingCount: null, shadowingCount: null } }
 }
 
 function validFilters(filters: StatsFilters): boolean {

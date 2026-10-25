@@ -8,6 +8,7 @@ export interface TaskQueryRepository {
   listTasks(organizationId: string): Promise<readonly TaskRecord[]>;
   findTask(organizationId: string, taskId: string): Promise<TaskRecord | null>;
   listAssignments(organizationId: string): Promise<readonly TaskAssignmentRecord[]>;
+  listStudentAssignments(organizationId: string, studentId: string): Promise<readonly TaskAssignmentRecord[]>;
   findAssignment(organizationId: string, taskId: string, studentId: string): Promise<TaskAssignmentRecord | null>;
   findAssignmentById(organizationId: string, assignmentId: string): Promise<TaskAssignmentRecord | null>;
   listSubmissions(organizationId: string): Promise<readonly SubmissionRecord[]>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { templateItemRefsFromDraft } from '../../miniprogram/pages/teacher/publish-task/template-item-refs'
+import { templateItemRefsFromDraft } from '../../miniprogram/subpackages/teacher/publish-task/template-item-refs'
 
 describe('T-06 save-as-template item rules', () => {
   it('preserves selected reading pages, recording upload and explicit weights', () => {
@@ -18,5 +18,12 @@ describe('T-06 save-as-template item rules', () => {
     ])
     source[0]!.pageIds.push('page_4')
     expect(refs[0]?.completionRule).toMatchObject({ pageIds: ['page_2', 'page_3'] })
+  })
+
+  it('lets the server freeze media completion rules from the current asset version', () => {
+    const refs = templateItemRefsFromDraft([{ id: 'video', resourceId: 'video_real',
+      type: 'video', requiredCount: 1, maxScore: 100, scoringKind: 'completion_only' }])
+    expect(refs[0]).toMatchObject({ resourceId: 'video_real', scoringRule: { kind: 'completion_only' } })
+    expect(refs[0]).not.toHaveProperty('completionRule')
   })
 })

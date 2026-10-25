@@ -49,6 +49,94 @@ const input = { title: '动物主题打卡', description: '完成阅读与单词
     { kind: 'vocabulary' as const, resourceId: 'vocab_animals_demo', requiredWordCount: 3 }] };
 
 describe('M2 activity draft and participant snapshot', () => {
+  it('rejects an activity whose calendar consists only of rest days', async () => {
+    const service = new ActivityService(fixture(), clock, ids);
+    await expect(service.saveDraft(teacher, { ...input, startsOn: '2026-09-27',
+      endsOn: '2026-09-27', restDates: ['2026-09-27'] }, 0, 'operation_all_rest_days'))
+      .rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+  it('M3 未发布活动草稿可按当前授权彻底删除，历史操作幂等且已发布活动拒绝', async () => {
+    const repository = fixture();
+    const service = new ActivityService(repository, clock, ids);
+    const draft = await service.saveDraft(teacher, input, 0, 'operation_activity_delete_draft_save');
+    const removed = await service.deleteDraft(teacher, draft.id, draft.version,
+      '清理未发布活动草稿', 'operation_activity_delete_draft');
+    expect(removed.id).toBe(draft.id);
+    expect(repository.snapshot().activities).toHaveLength(0);
+    expect(await service.deleteDraft(teacher, draft.id, draft.version,
+      '清理未发布活动草稿', 'operation_activity_delete_draft')).toEqual(removed);
+    expect(repository.snapshot().audits).toMatchObject([{ action: 'checkin.draft.deleted',
+      metadata: { reason: '清理未发布活动草稿' } }]);
+    await expect(service.deleteDraft({ ...teacher, scopeIds: [] }, draft.id, draft.version,
+      '越权重放', 'operation_activity_delete_draft')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const fresh = await service.saveDraft(teacher, input, 0, 'operation_activity_delete_published_save');
+    const published = await service.publish(teacher, fresh.id, fresh.version,
+      'operation_activity_delete_published_publish');
+    await expect(service.deleteDraft(teacher, fresh.id, published.version,
+      '误删已发布活动', 'operation_activity_delete_published'))
+      .rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(repository.snapshot().activities.find(item => item.id === fresh.id)?.status).toBe('published');
+  });
+  it('T-09 教师逐人记录与提前关闭使用同一有效证据并锁定历史榜单', async () => {
+    const repository = fixture();
+    const setup = new ActivityService(repository, clock, ids);
+    const draft = await setup.saveDraft(teacher, { ...input, conditions: [input.conditions[0]!] },
+      0, 'operation_progress_draft');
+    const published = await setup.publish(teacher, draft.id, 1, 'operation_progress_publish');
+    const service = new ActivityService(repository, { nowIso: () => '2026-09-28T10:00:00+08:00' }, ids);
+    await service.setOverride(teacher, { activityId: draft.id, studentId: student.actorUserId,
+      date: '2026-09-27', active: true, reason: '核对阅读记录后补记' }, 0, 'operation_progress_override');
+    const progress = await service.getTeacherProgress(teacher, draft.id, '2026-09-27',
+      { limit: 20, offset: 0 });
+    expect(progress).toMatchObject({ evidenceStatus: 'available', completedCount: 1, participantCount: 2 });
+    expect(progress.rows.find(row => row.studentId === student.actorUserId))
+      .toMatchObject({ complete: true, supplemented: true, completedDays: 1, consecutiveDays: 1 });
+    expect(progress.rows.find(row => row.studentId === 'student_lingke_demo'))
+      .toMatchObject({ complete: false, missingConditions: ['reading'] });
+    expect(await service.getTeacherProgress(teacher, draft.id, '2026-09-27',
+      { limit: 1, offset: 0 }, '', 'incomplete')).toMatchObject({ rows: [{ complete: false }] });
+    await expect(service.getTeacherProgress({ ...teacher, scopeIds: [] }, draft.id,
+      '2026-09-27', { limit: 20, offset: 0 })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(service.recycle(teacher, draft.id, published.version,
+      '进行中错误回收', 'operation_progress_recycle_early')).rejects.toMatchObject({ code: 'CONFLICT' });
+    const closed = await service.close(teacher, draft.id, published.version,
+      '教学安排提前结束', 'operation_progress_close');
+    expect(closed).toMatchObject({ status: 'closed', version: published.version + 1 });
+    expect(await service.close(teacher, draft.id, published.version,
+      '教学安排提前结束', 'operation_progress_close')).toEqual(closed);
+    expect(repository.snapshot().finalSnapshots[0]).toMatchObject({ leaderboard: {
+      finalized: true, effectiveDayCount: 2, ranks: [{ completedDays: 1 }, { completedDays: 0 }],
+    }, conditionDetailComplete: true });
+    expect((await service.getTeacherProgress(teacher, draft.id, '2026-09-27',
+      { limit: 20, offset: 0 })).rows.find(row => row.studentId === 'student_lingke_demo'))
+      .toMatchObject({ complete: false, evidenceDetailAvailable: true,
+        missingConditions: ['reading'] });
+    expect(repository.snapshot().audits).toMatchObject([{ action: 'checkin.close',
+      metadata: { reason: '教学安排提前结束' } }]);
+    expect(await service.getLeaderboard(teacher, draft.id)).toMatchObject({ evidenceStatus: 'available',
+      leaderboard: { finalized: true } });
+    expect(await service.getMyDay(student, draft.id, '2026-09-27'))
+      .toMatchObject({ complete: true, supplemented: true });
+    await expect(service.getMyDay(student, draft.id, '2026-09-30'))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(service.close({ ...teacher, scopeIds: [] }, draft.id, published.version,
+      '伪造关闭', 'operation_progress_wrong')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const recycled = await service.recycle(teacher, draft.id, closed.version,
+      '历史活动软回收', 'operation_progress_recycle');
+    expect(recycled).toMatchObject({ visibility: 'recycled', status: 'closed',
+      recycleReason: '历史活动软回收' });
+    expect(await service.recycle(teacher, draft.id, closed.version,
+      '历史活动软回收', 'operation_progress_recycle')).toEqual(recycled);
+    expect((await service.listForTeacher(teacher)).find(item => item.id === draft.id)).toBeUndefined();
+    expect((await service.listForStudent(student)).find(item => item.id === draft.id))
+      .toMatchObject({ visibility: 'recycled' });
+    await expect(service.getForStudent({ ...student, actorUserId: 'student_lingke_demo' }, draft.id))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(repository.snapshot().finalSnapshots).toHaveLength(1);
+    expect(await service.getLeaderboard(teacher, draft.id)).toMatchObject({ leaderboard: { finalized: true } });
+    expect(repository.snapshot().audits.map(item => item.action)).toEqual(['checkin.close', 'checkin.recycle']);
+  });
   it('adds only a future rest day with a versioned reason and preserves completed evidence', async () => {
     const repository = fixture();
     const publishService = new ActivityService(repository, clock, ids);
@@ -376,14 +464,14 @@ describe('M2 activity draft and participant snapshot', () => {
   it('counts only a current, version-matched exercise submission above the daily threshold', async () => {
     const resourceId = 'exercise_bird_demo';
     const initial = fixture().snapshot();
-    const repository = new InMemoryActivityRepository({ ...initial, resources: [...initial.resources,
+    const initialRepository = new InMemoryActivityRepository({ ...initial, resources: [...initial.resources,
       { id: resourceId, organizationId, type: 'exercise', status: 'published', contentVersion: '1',
         questionIds: [resourceId], visibility: { type: 'classes', classIds: [classId] } }],
     });
-    const service = new ActivityService(repository, clock, ids);
-    const draft = await service.saveDraft(teacher, { ...input, conditions: [{ kind: 'exercise', resourceId, minimumScore: 60 }] },
+    const initialService = new ActivityService(initialRepository, clock, ids);
+    const draft = await initialService.saveDraft(teacher, { ...input, endsOn: '2026-09-27', restDates: [],
+      conditions: [{ kind: 'exercise', resourceId, minimumScore: 60 }] },
       0, 'operation_exercise_day_draft');
-    await service.publish(teacher, draft.id, 1, 'operation_exercise_day_publish');
     const task: TaskRecord = { id: 'task_exercise', organizationId, creatorTeacherId: teacherId, title: '鸟类练习',
       deliveryType: 'classroom', status: 'active', targetType: 'classes', targetClassIds: [classId], targetStudentIds: [],
       startsAt: '2026-09-27T00:00:00+08:00', dueAt: '2026-09-28T00:00:00+08:00',
@@ -405,6 +493,28 @@ describe('M2 activity draft and participant snapshot', () => {
       status: 'submitted', answers: [{ itemId: 'item_bird', value: { kind: 'exercise', answeredQuestionCount: 1,
         questionResponses: [{ questionId: resourceId, response: 'bird', isCorrect: true }], correctQuestionCount: 1 } }],
       isLate: false, submittedAt: '2026-09-27T09:00:00+08:00', supersedesSubmissionId: null };
+    const readyAssignment: TaskAssignmentRecord = { ...assignment, status: 'not_started',
+      latestSubmissionId: null, latestSubmissionVersion: 0, submittedAt: null };
+    const repository = new InMemoryActivityRepository({ ...initialRepository.snapshot(), tasks: [task],
+      assignments: [readyAssignment, { ...readyAssignment, id: 'assignment_lingke', studentId: 'student_lingke_demo' }] });
+    const service = new ActivityService(repository, clock, ids);
+    const twoDayDraft = await service.saveDraft(teacher, { ...input, endsOn: '2026-09-28', restDates: [],
+      conditions: [{ kind: 'exercise', resourceId, minimumScore: 60 }] },
+    0, 'operation_exercise_two_day_draft');
+    await expect(service.publish(teacher, twoDayDraft.id, 1, 'operation_exercise_two_day_publish'))
+      .rejects.toMatchObject({ code: 'RESOURCE_OFFLINE' });
+    const secondTask: TaskRecord = { ...task, id: 'task_exercise_second_day',
+      startsAt: '2026-09-28T00:00:00+08:00', dueAt: '2026-09-29T00:00:00+08:00' };
+    const secondDayRepository = new InMemoryActivityRepository({ ...repository.snapshot(),
+      tasks: [task, secondTask], assignments: [
+        ...repository.snapshot().assignments,
+        { ...readyAssignment, id: 'assignment_second_xiaoyu', taskId: secondTask.id },
+        { ...readyAssignment, id: 'assignment_second_lingke', taskId: secondTask.id,
+          studentId: 'student_lingke_demo' },
+      ] });
+    expect(await new ActivityService(secondDayRepository, clock, ids).publish(teacher,
+      twoDayDraft.id, 1, 'operation_exercise_two_day_publish')).toMatchObject({ status: 'published' });
+    await service.publish(teacher, draft.id, 1, 'operation_exercise_day_publish');
     const source = repository.snapshot();
     const withSubmission = (nextTask: TaskRecord, nextAssignment: TaskAssignmentRecord, nextSubmission: SubmissionRecord) =>
       new ActivityService(new InMemoryActivityRepository({ ...source, tasks: [nextTask], assignments: [nextAssignment],
@@ -415,6 +525,31 @@ describe('M2 activity draft and participant snapshot', () => {
       .toMatchObject({ complete: false, verifiedConditions: 0 });
     expect(await withSubmission({ ...task, items: [{ ...task.items[0]!, resourceVersion: 2 }] }, assignment, submission)
       .getMyDay(student, draft.id, '2026-09-27')).toMatchObject({ complete: false, verifiedConditions: 0 });
+    const subjectiveTask: TaskRecord = { ...task, items: [{ ...task.items[0]!,
+      resourceSnapshot: { ...task.items[0]!.resourceSnapshot,
+        payload: { ...task.items[0]!.resourceSnapshot.payload, questionType: 'subjective', options: [],
+          correctAnswer: 'Birds can fly.' } } }] };
+    const subjectiveSubmission: SubmissionRecord = { ...submission, answers: [{ itemId: 'item_bird',
+      value: { kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: resourceId, response: 'A bird can fly.' }] } }] };
+    const pending = new InMemoryActivityRepository({ ...source, tasks: [subjectiveTask],
+      assignments: [assignment, ...source.assignments.filter(item => item.studentId !== student.actorUserId)],
+      submissions: [subjectiveSubmission] });
+    const afterEnd = { nowIso: () => '2026-09-28T10:00:00+08:00' };
+    await expect(new ActivityService(pending, afterEnd, ids).finalizeActivity(organizationId, draft.id))
+      .rejects.toMatchObject({ code: 'ACTIVITY_PENDING_REVIEW' });
+    await expect(new ActivityService(pending, afterEnd, ids).close(teacher, draft.id, 2,
+      '验收结束', 'operation_close_pending_exercise'))
+      .rejects.toMatchObject({ code: 'ACTIVITY_PENDING_REVIEW' });
+    const graded = new InMemoryActivityRepository({ ...pending.snapshot(), feedback: [{
+      id: 'feedback_subjective', organizationId, taskId: task.id, assignmentId: assignment.id,
+      submissionId: submission.id, submissionVersion: 1, teacherId, decision: 'approved',
+      score: 75, itemScores: [{ itemId: 'item_bird', score: 75 }], textComment: null,
+      returnReason: null, publishedAt: '2026-09-28T09:00:00+08:00', source: 'manual',
+    }] });
+    expect(await new ActivityService(graded, afterEnd, ids).finalizeActivity(organizationId, draft.id))
+      .toMatchObject({ leaderboard: { finalized: true, ranks: [{ studentId: student.actorUserId,
+        completedDays: 1 }, { studentId: 'student_lingke_demo', completedDays: 0 }] } });
   });
 
   it('records teacher supplements and revocations with versioned reasons and recomputes the student day', async () => {
@@ -496,8 +631,6 @@ describe('M2 activity draft and participant snapshot', () => {
     expect((await boardService.getLeaderboard(student, draft.id)).leaderboard?.ranks.map(item => item.rank)).toEqual([1, 2]);
     const tooEarly = new ActivityService(boardRepository, { nowIso: () => '2026-09-30T23:59:00+08:00' }, ids);
     await expect(tooEarly.finalizeActivity(organizationId, draft.id)).rejects.toMatchObject({ code: 'CONFLICT' });
-    const tooLate = new ActivityService(boardRepository, { nowIso: () => '2026-10-01T00:06:00+08:00' }, ids);
-    await expect(tooLate.finalizeActivity(organizationId, draft.id)).rejects.toMatchObject({ code: 'CONFLICT' });
     const locked = new ActivityService(boardRepository, { nowIso: () => '2026-10-01T00:00:00+08:00' }, ids);
     expect(await locked.getLeaderboard(student, draft.id)).toMatchObject({ evidenceStatus: 'not_available', leaderboard: null });
     const final = await locked.finalizeActivity(organizationId, draft.id);

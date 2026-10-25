@@ -1,0 +1,32 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"></state-panel>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有管理工作区授权。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"></state-panel>
+    <block wx:else>
+      <view class="native-admin__hero">
+        <text class="native-admin__hero-note">{{subtitle}}</text>
+        <text class="native-admin__scope">管理范围　{{scopeLabel}}</text>
+      </view>
+      <view class="native-admin__search">
+        <input value="{{keyword}}" placeholder="{{filterPlaceholder}}" confirm-type="search" bindinput="onKeyword"/>
+      </view>
+      <view class="native-admin__card">
+        <text class="native-admin__card-title">可用功能</text>
+        <view wx:for="{{filteredModules}}" wx:key="id" class="native-admin__module" data-id="{{item.id}}" bindtap="openModule" aria-role="button" aria-label="{{item.title}}">
+          <view class="native-admin__icon">▣</view>
+          <view class="native-admin__module-copy">
+            <text class="native-admin__module-title">{{item.title}}</text>
+            <text class="native-admin__module-note">{{item.description}}</text>
+          </view>
+          <text class="native-admin__chevron">›</text>
+        </view>
+        <text wx:if="{{!filteredModules.length}}" class="native-admin__module-note">当前没有可用的管理功能</text>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"></g0-tab-bar>
+</g0-page-shell>
+
+

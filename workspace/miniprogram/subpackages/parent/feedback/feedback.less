@@ -1,0 +1,23 @@
+.page { min-height: 100vh; background: @yr-page-work; position: relative; }
+.page-bg { position: fixed; z-index: 0; left: 0; top: 0; width: 100vw; height: 100vh; opacity: @yr-environment-parent-detail; }
+.feedback-content { position: relative; z-index: 1; padding: 18px 20px 34px; }
+.card { margin-bottom: 12px; padding: 20px; border: @yr-card-border; border-radius: @yr-radius-role-card; background: @yr-surface-warm; box-shadow: @yr-card-shadow; }
+.task-title { display: block; color: @yr-text-primary; font-size: 22px; font-weight: 900; line-height: 1.35; overflow-wrap: anywhere; }
+.child-meta { display: block; margin-top: 8px; color: @yr-text-secondary; font-size: 13px; font-weight: 700; }
+.submission-meta,.feedback-time { display: block; margin-top: 8px; color: @yr-text-secondary; font-size: 13px; }
+.decision { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 15px; background: @yr-surface-green; color: @yr-success; font-size: 13px; font-weight: 800; }
+.decision.returned { background: @yr-surface-warning; color: @yr-urgent; }
+.score-card { display: flex; align-items: center; gap: 16px; background: linear-gradient(120deg,@yr-surface-green,@yr-surface-warm); }
+.score { flex: 0 0 auto; color: @yr-success; font-size: 52px; font-weight: 900; }
+.score-label { color: @yr-text-secondary; font-size: 14px; font-weight: 800; }
+.section-title { display: block; margin-bottom: 12px; color: @yr-text-primary; font-size: 19px; font-weight: 900; }
+.teacher-name { display: block; color: @yr-text-primary; font-size: 16px; font-weight: 800; }
+.comment { display: block; margin-top: 16px; padding: 14px; border-radius: 15px; background: @yr-surface-purple; color: @yr-text-primary; font-size: 16px; line-height: 1.65; overflow-wrap: anywhere; }
+.voice-button { display: block; width: 100%; min-width: 0; margin: 0; min-height: 50px; border-radius: 25px; background: @yr-brand-primary; color: @yr-white; font-weight: 800; }
+.voice-button::after { border: 0; }
+.voice-message { display: block; margin-top: 10px; color: @yr-text-secondary; font-size: 13px; }
+.waiting-card { color: @yr-text-secondary; line-height: 1.5; }
+.version-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.version-item { padding: 9px 12px; border: 2px solid @yr-brand-primary; border-radius: 15px; color: @yr-brand-primary; font-size: 13px; font-weight: 800; }
+.version-item--selected { background: @yr-brand-primary; color: @yr-white; }
+.readonly { display: block; margin: 4px 8px 0; color: @yr-text-secondary; font-size: 12px; line-height: 1.5; }

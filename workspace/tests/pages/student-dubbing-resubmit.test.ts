@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const appGlobalData: Record<string, unknown> = {}
+
 vi.mock('../../miniprogram/services/app-service', () => ({
   beginWorkDraft: vi.fn(),
   getMaterialPlayback: vi.fn(),
@@ -10,10 +12,20 @@ vi.mock('../../miniprogram/services/app-service', () => ({
   searchWorkMaterials: vi.fn(),
   submitWork: vi.fn(),
 }))
+vi.mock('../../miniprogram/subpackages/student-media/services/app-service', () => ({
+  beginWorkDraft: vi.fn(), getMaterialPlayback: vi.fn(), getWorkMaterial: vi.fn(),
+  listMyWorks: vi.fn(), listWorkMaterialFacets: vi.fn(), listWorkMaterials: vi.fn(),
+  searchWorkMaterials: vi.fn(), submitWork: vi.fn(),
+}))
+vi.mock('../../miniprogram/subpackages/student/services/app-service', () => ({
+  beginWorkDraft: vi.fn(), getMaterialPlayback: vi.fn(), getWorkMaterial: vi.fn(),
+  listMyWorks: vi.fn(), listWorkMaterialFacets: vi.fn(), listWorkMaterials: vi.fn(),
+  searchWorkMaterials: vi.fn(), submitWork: vi.fn(),
+}))
 
 describe('S-07 autonomous dubbing retry', () => {
-  beforeEach(() => vi.resetModules())
-  afterEach(() => vi.unstubAllGlobals())
+  beforeEach(() => { vi.resetModules(); vi.stubGlobal('getApp', () => ({ globalData: appGlobalData })) })
+  afterEach(() => { vi.unstubAllGlobals(); delete appGlobalData.preferredDubbingMaterial })
 
   it('starts a fresh work after a submitted take is explicitly replaced', async () => {
     let definition: { data: Record<string, unknown>; methods: Record<string, (this: unknown) => unknown> } | null = null
@@ -25,7 +37,7 @@ describe('S-07 autonomous dubbing retry', () => {
       cloud: { uploadFile }, showToast: vi.fn(),
       showModal: ({ success }: { success: (result: { confirm: boolean }) => void }) => success({ confirm: true }),
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.beginWorkDraft).mockResolvedValueOnce({ ok: true, data: {
       id: 'work_first', materialId: 'material_demo', materialVersion: 'v1',
       stagingPath: 'student-works/staging/demo/work_first.mp3', status: 'draft',
@@ -44,7 +56,7 @@ describe('S-07 autonomous dubbing retry', () => {
       note: '', version: 2, createdAt: '2026-09-27T09:00:00+08:00',
       submittedAt: '2026-09-27T09:01:00+08:00',
     } }))
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const methods = definition.methods
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
@@ -72,13 +84,13 @@ describe('S-07 autonomous dubbing retry', () => {
       getStorageSync: () => ({ sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } }),
       redirectTo: vi.fn(),
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.searchWorkMaterials).mockResolvedValue({ ok: true,
       data: { items: [], total: 0, nextOffset: null } })
     vi.mocked(services.listWorkMaterialFacets).mockResolvedValue({ ok: true, data: [] })
     vi.mocked(services.getWorkMaterial).mockResolvedValue({ ok: false,
       error: { code: 'NOT_FOUND', message: '素材已不可用', retryable: false } })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const methods = definition.methods
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
@@ -108,7 +120,7 @@ describe('S-07 autonomous dubbing retry', () => {
       cloud: { uploadFile: vi.fn().mockResolvedValue({ fileID: 'cloud://demo/staging/work.mp3' }) },
       showToast: vi.fn(),
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     const draft = { id: 'work_uncertain', materialId: 'material_demo', materialVersion: 'v1',
       stagingPath: 'student-works/staging/demo/work_uncertain.mp3', status: 'draft' as const,
       fileId: null, sizeBytes: null, durationMs: null, note: '', version: 1,
@@ -122,7 +134,7 @@ describe('S-07 autonomous dubbing retry', () => {
     vi.mocked(services.listMyWorks)
       .mockResolvedValueOnce({ ok: false, error: { code: 'SERVICE_UNAVAILABLE', message: '网络暂不可用' } })
       .mockResolvedValueOnce({ ok: true, data: [committed] })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
       selectedMaterial: { id: 'material_demo', title: '虚构配音素材', contentVersion: 'v1', subtitle: '' },
@@ -150,7 +162,7 @@ describe('S-07 autonomous dubbing retry', () => {
       cloud: { uploadFile: vi.fn().mockResolvedValue({ fileID: 'cloud://demo/staging/work.mp3' }) },
       showToast: vi.fn(),
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     const draft = { id: 'work_deleted', materialId: 'material_demo', materialVersion: 'v1',
       stagingPath: 'student-works/staging/demo/work_deleted.mp3', status: 'draft' as const,
       fileId: null, sizeBytes: null, durationMs: null, note: '', version: 1,
@@ -158,7 +170,7 @@ describe('S-07 autonomous dubbing retry', () => {
     vi.mocked(services.submitWork).mockResolvedValue({ ok: false,
       error: { code: 'NOT_FOUND', message: '草稿不存在' } })
     vi.mocked(services.listMyWorks).mockResolvedValue({ ok: true, data: [] })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
       selectedMaterial: { id: 'material_demo', title: '虚构配音素材', contentVersion: 'v1', subtitle: '' },
@@ -182,15 +194,15 @@ describe('S-07 autonomous dubbing retry', () => {
       getStorageSync: () => ({ sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } }),
       navigateTo,
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.searchWorkMaterials).mockResolvedValue({ ok: true, data: { items: [
       { id: 'material_first', title: '虚构素材一', contentVersion: 'v1', subtitle: '' },
     ], total: 2, nextOffset: 1 } })
     vi.mocked(services.listWorkMaterialFacets).mockResolvedValue({ ok: true, data: [] })
     vi.mocked(services.getWorkMaterial).mockResolvedValue({ ok: true,
       data: { id: 'material_second', title: '虚构素材二', contentVersion: 'v1', subtitle: '' } })
-    await import('../../miniprogram/pages/student/my-works/my-works')
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student/my-works/my-works')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     const worksPage = definitions[0]
     const dubbingPage = definitions[1]
     if (!worksPage || !dubbingPage) throw new Error('Student work pages were not registered')
@@ -198,7 +210,7 @@ describe('S-07 autonomous dubbing retry', () => {
       openDubbing: worksPage.methods.openDubbing }
     worksPage.methods.redoWork!.call(worksContext,
       { currentTarget: { dataset: { id: 'work_previous' } } } as unknown as WechatMiniprogram.TouchEvent)
-    expect(navigateTo).toHaveBeenCalledWith({ url: '/pages/student/dubbing/dubbing' })
+    expect(navigateTo).toHaveBeenCalledWith({ url: '/subpackages/student-media/dubbing/dubbing' })
     const dubbingContext = { data: { ...dubbingPage.data },
       setData(change: Record<string, unknown>, callback?: () => void) { Object.assign(this.data, change); callback?.() },
       loadDemonstration: vi.fn() }
@@ -216,13 +228,13 @@ describe('S-07 autonomous dubbing retry', () => {
       getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), stop: vi.fn() }),
       getStorageSync: () => ({ sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } }),
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.searchWorkMaterials).mockReset()
       .mockResolvedValueOnce({ ok: true, data: { items: [{ id: 'material_zoo', title: 'Zoo 配音',
         contentVersion: 'v1', subtitle: '' }], total: 2, nextOffset: 1 } })
       .mockResolvedValueOnce({ ok: true, data: { items: [{ id: 'material_zoo_2', title: 'Zoo 故事',
         contentVersion: 'v1', subtitle: '' }], total: 2, nextOffset: null } })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data, materialKeyword: 'Zoo', hasAuthorizedMaterials: true,
       selectedMaterialId: 'material_previous', selectedMaterial: { id: 'material_previous',
@@ -258,14 +270,14 @@ describe('S-07 autonomous dubbing retry', () => {
         : { sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } },
       setStorageSync,
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.searchWorkMaterials).mockResolvedValue({ ok: true, data: { items: [
       { id: 'material_first', title: '素材一', contentVersion: 'v1', subtitle: '' },
     ], total: 2, nextOffset: 1 } })
     vi.mocked(services.listWorkMaterialFacets).mockResolvedValue({ ok: true, data: [] })
     vi.mocked(services.getWorkMaterial).mockResolvedValue({ ok: true,
       data: { id: 'material_second', title: '素材二', contentVersion: 'v1', subtitle: '' } })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data },
       setData(change: Record<string, unknown>, callback?: () => void) { Object.assign(this.data, change); callback?.() },

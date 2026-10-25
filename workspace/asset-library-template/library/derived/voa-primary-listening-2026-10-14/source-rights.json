@@ -1,0 +1,26 @@
+{
+  "sourceOrganization": "Voice of America (VOA) Learning English",
+  "sourceType": "official_course_audio_and_transcript",
+  "license": "Public Domain",
+  "permittedUse": "VOA states Learning English texts and MP3s may be reprinted for educational and commercial purposes with attribution.",
+  "attribution": "Source: VOA Learning English, Let's Learn English - Level 1. Audio and transcript ©/produced by VOA; reprinted under VOA's stated public-domain terms.",
+  "termsUrl": "https://learningenglish.voanews.com/p/5374.html",
+  "requestOurContentUrl": "https://learningenglish.voanews.com/p/6861.html",
+  "thirdPartyContentExcluded": true,
+  "thirdPartyContentNote": "Only the VOA Learning English course conversation audio and accompanying transcript are used. No AP, Reuters, AFP, or other third-party media is included.",
+  "lessonSources": {
+    "4": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-4/3168920.html",
+    "5": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-5-where-are-you/3168971.html",
+    "6": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-6-where-is-the-gym/3225958.html",
+    "7": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-7-what-are-you-doing/3240468.html",
+    "8": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-8-are-you-busy/3253185.html",
+    "9": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-9-is-it-cold/3261789.html",
+    "10": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-10/3285228.html",
+    "11": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-11-this-is-my-neighborhood/3293986.html",
+    "12": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-12-meet-my-family/3301733.html",
+    "13": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-13-happy-birthday-william-shakespeare/3312239.html"
+  },
+  "contentUse": "Official conversation audio/transcript with newly authored comprehension questions.",
+  "verifiedAt": "2026-10-14T21:42:46+08:00",
+  "verifiedBy": "Codex"
+}

@@ -19,7 +19,7 @@ export function teacherReviewManualScoreRequired(submission: TeacherReviewSubmis
   if (!submission.answers.some(answer => answer.itemId === item.id)) return false
   const scoring = submission.scoringItems?.find(entry => entry.itemId === item.id)
   if (scoring) return scoring.teacherScoreRequired
-  if (item.type === 'recording') return true
+  if (item.type === 'recording' || item.type === 'dubbing') return true
   if (item.type !== 'exercise') return false
   const evidence = submission.exerciseEvidence?.find(entry => entry.itemId === item.id)
   return !evidence || evidence.questionType === 'subjective' && evidence.recorded

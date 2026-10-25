@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const setCurrentTaskId = vi.fn()
-vi.mock('../../miniprogram/session/session', () => ({ setCurrentTaskId, getSession: vi.fn() }))
+vi.mock('../../miniprogram/subpackages/student/session/session', () => ({ setCurrentTaskId, getSession: vi.fn() }))
 
 describe('student home task rows', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); vi.clearAllMocks() })
@@ -12,7 +12,7 @@ describe('student home task rows', () => {
     vi.stubGlobal('Component', (value: typeof definition) => { definition = value })
     const navigateTo = vi.fn()
     vi.stubGlobal('wx', { navigateTo })
-    await import('../../miniprogram/pages/index/index')
+    await import('../../miniprogram/subpackages/student/home/index')
     if (!definition) throw new Error('Student home was not registered')
     const context = { data: { ...definition.data, todayItems: [
       { id: 'task_1', kind: 'task' }, { id: 'activity_1', kind: 'activity' },
@@ -21,8 +21,8 @@ describe('student home task rows', () => {
     definition.methods.openTodayItem!.call(context, { currentTarget: { dataset: { id: 'task_1', kind: 'task' } } })
     definition.methods.openTodayItem!.call(context, { currentTarget: { dataset: { id: 'unknown', kind: 'task' } } })
     expect(navigateTo.mock.calls.map(call => call[0].url)).toEqual([
-      '/pages/student/checkin-detail/checkin-detail?activityId=activity_1',
-      '/pages/student/task-detail/task-detail',
+      '/subpackages/student/checkin-detail/checkin-detail?activityId=activity_1',
+      '/subpackages/student/task-detail/task-detail',
     ])
     expect(setCurrentTaskId).toHaveBeenCalledOnce()
     expect(setCurrentTaskId).toHaveBeenCalledWith('task_1')

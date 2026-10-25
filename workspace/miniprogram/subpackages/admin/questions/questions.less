@@ -1,0 +1,29 @@
+@import "../admin-page.less";
+
+.native-admin__search { min-height: 48px; height: auto; }
+.native-admin__search input { min-width: 0; min-height: 44px; }
+.native-admin__filter-row button { min-height: 40px; padding: 6px 12px; border-radius: 14px; font-size: 14px; line-height: 1.3; white-space: normal; }
+.native-admin__filter-submit { min-height: 44px; padding: 7px 12px; font-size: 14px; line-height: 1.3; white-space: normal; }
+.native-admin__question-list-heading { display: block; margin-bottom: 10px; }
+.native-admin__question-list-heading .native-admin__card-title { margin-bottom: 3px; }
+.native-admin__question-list-heading .native-admin__module-note { color: #4c617d; overflow-wrap: anywhere; }
+.native-admin__batch-actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(132px,1fr)); gap: 10px; margin: 12px 0; }
+.native-admin__batch-actions button { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 7px 12px; border-radius: 12px; background: #eaf3ff; color: #1264ca; font-size: 14px; font-weight: 800; line-height: 1.3; white-space: normal; }
+.native-admin__batch-actions button[data-status="offline"] { background: #fff0e9; color: #ab3f23; }
+.native-admin__question-row { display: grid; grid-template-columns: 48px minmax(0,1fr); align-items: start; gap: 12px; }
+.native-admin__question-select { display: block; width: 48px; height: 48px; min-width: 0; min-height: 48px; box-sizing: border-box; margin: 0; padding: 0; border: 2px solid #93aac7; border-radius: 12px; background: #fff; color: #1764d8; font-size: 21px; font-weight: 800; line-height: 44px; text-align: center; }
+.native-admin__question-select.active { border-color: #1764d8; background: #1764d8; color: #fff; }
+.native-admin__question-copy { min-width: 0; }
+.native-admin__question-title-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 8px; }
+.native-admin__question-title-row .native-admin__module-title { flex: 1 1 142px; min-width: 0; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word; }
+.native-admin__question-status { flex: none; max-width: 100%; padding: 5px 8px; border-radius: 12px; background: #eaf3ff; color: #25527f; font-size: 12px; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
+.native-admin__question-status--published { background: #e8f7ee; color: #136c42; }
+.native-admin__question-status--offline { background: #fff0e9; color: #a94225; }
+.native-admin__question-copy .native-admin__module-note { color: #4c617d; overflow-wrap: anywhere; }
+.native-admin__question-preview-button { width: auto; max-width: 100%; min-width: 0; min-height: 40px; margin: 9px 0 0; padding: 6px 12px; border-radius: 10px; background: #eaf3ff; color: #1264ca; font-size: 14px; font-weight: 800; line-height: 1.3; white-space: normal; }
+.native-admin__question-detail-heading { align-items: flex-start; }
+.native-admin__question-detail-heading .native-admin__card-title { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.native-admin__question-confirm-actions button { min-height: 44px; padding: 7px 12px; line-height: 1.3; white-space: normal; }
+.native-admin__question-confirm-actions button[data-action="offline"] { background: #fff0e9; color: #ab3f23; }
+.native-admin__question-preview { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 12px; padding: 12px; border-radius: 12px; background: #f3f8ff; overflow-wrap: anywhere; font-size: 14px; line-height: 1.5; }
+.native-admin__section-label { margin-top: 8px; color: #315b91; font-size: 13px; font-weight: 800; }

@@ -24,13 +24,13 @@ describe('authentication UI flow', () => {
     const value = session({ user: { id: 'usr_teacher', displayName: '林老师', role: 'teacher' }, availableRoles: ['teacher'], activeRole: null })
 
     expect(defaultRoleSelection(value)).toBe('teacher')
-    expect(postLoginPath(value)).toBe('/pages/teacher/workbench/workbench')
+    expect(postLoginPath(value)).toBe('/subpackages/teacher/workbench/workbench')
   })
 
   it('enters the active role directly when a multi-role session already has one', () => {
     const value = session({ user: { id: 'usr_multi', displayName: '多身份账号', role: 'parent' }, availableRoles: ['student', 'parent'], activeRole: 'parent' })
 
     expect(defaultRoleSelection(value)).toBe('parent')
-    expect(postLoginPath(value)).toBe('/pages/parent/home/home')
+    expect(postLoginPath(value)).toBe('/subpackages/parent/home/home')
   })
 })

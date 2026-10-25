@@ -1,0 +1,72 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"/>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有用户管理权限，请返回“我的”。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"/>
+    <block wx:else>
+      <view class="native-admin__hero"><text class="native-admin__hero-title">账号与家长绑定</text><text class="native-admin__hero-note">修改账号资料、停用账号，维护家长和孩子的关系</text><text class="native-admin__scope">管理范围　{{scopeLabel}}</text></view>
+      <view class="native-admin__search"><input maxlength="100" value="{{keyword}}" placeholder="搜索姓名、学号或账号" confirm-type="search" bindinput="onKeyword" bindconfirm="applyFilters"/><button disabled="{{dataLoading}}" bindtap="applyFilters">搜索</button></view>
+      <view class="native-admin__filter-panel">
+        <view class="native-admin__filter-row"><button data-role="" bindtap="onUserRoleFilter" class="{{!userRoleFilter ? 'active' : ''}}">全部</button><button data-role="student" bindtap="onUserRoleFilter" class="{{userRoleFilter === 'student' ? 'active' : ''}}">学生</button><button data-role="parent" bindtap="onUserRoleFilter" class="{{userRoleFilter === 'parent' ? 'active' : ''}}">家长</button><button data-role="teacher" bindtap="onUserRoleFilter" class="{{userRoleFilter === 'teacher' ? 'active' : ''}}">教师</button><button data-role="admin" bindtap="onUserRoleFilter" class="{{userRoleFilter === 'admin' ? 'active' : ''}}">管理人员</button></view>
+        <view class="native-admin__filter-row native-admin__status-filter"><text class="native-admin__filter-label">账号状态</text><button data-status="all" bindtap="onStatusFilter" class="{{!statusFilter ? 'active' : ''}}">全部</button><button data-status="active" bindtap="onStatusFilter" class="{{statusFilter === 'active' ? 'active' : ''}}">启用</button><button data-status="disabled" bindtap="onStatusFilter" class="{{statusFilter === 'disabled' ? 'active' : ''}}">停用</button></view>
+        <view wx:if="{{access && !access.scope.organizationWide}}" class="native-admin__class-chips"><button wx:for="{{access.scope.classIds}}" wx:key="*this" data-id="{{item}}" bindtap="chooseClass" class="{{selectedClassId === item ? 'active' : ''}}">{{item}}</button></view>
+      </view>
+      <view class="native-admin__card">
+        <text class="native-admin__card-title">账号列表</text><view class="native-admin__toolbar-actions"><button class="native-admin__action-primary" disabled="{{dataLoading || dataError}}" bindtap="openCreateUser">新建账号</button><button disabled="{{dataLoading || dataError}}" bindtap="openCreateBinding">新增家长绑定</button></view>
+        <text wx:if="{{dataLoading}}" class="native-admin__module-note">正在读取账号…</text>
+        <view wx:if="{{dataError}}" class="native-admin__notice">{{dataError}}<button class="native-admin__secondary" bindtap="applyFilters">重试</button></view>
+        <view wx:for="{{userRows}}" wx:key="id" class="native-admin__module native-admin__module--class">
+          <view class="native-admin__icon">人</view>
+          <view class="native-admin__module-copy"><text class="native-admin__module-title">{{item.displayName}} · {{item.roleLabel}}</text><text class="native-admin__module-note">账号 {{item.id}}</text><text class="native-admin__module-note">{{item.mobileMasked || '手机号未记录'}} · {{item.status === 'active' ? '启用' : '停用'}}</text><text wx:if="{{item.studentNumber}}" class="native-admin__module-note">学号 {{item.studentNumber}}</text><text wx:for="{{item.classNames}}" wx:for-item="className" wx:key="*this" class="native-admin__module-note">班级 {{className}}</text><text class="native-admin__module-note">最近登录 {{item.lastLoginAt || '未记录'}}</text></view>
+          <view class="native-admin__row-actions"><button data-id="{{item.id}}" bindtap="openUserEdit">编辑 / 停用</button><button wx:if="{{item.role === 'student' || item.role === 'parent'}}" data-id="{{item.id}}" bindtap="openUserBindings">绑定关系 {{item.bindingCount}} 人</button></view>
+        </view>
+        <text wx:if="{{!dataLoading && !dataError && !userRows.length}}" class="native-admin__module-note">没有符合条件的账号</text>
+        <button wx:if="{{nextOffset !== null}}" class="native-admin__secondary" loading="{{dataLoading}}" disabled="{{dataLoading}}" bindtap="loadMore">加载更多账号</button>
+      </view>
+            <view wx:if="{{bindingUserId}}" id="admin-bindings-panel" class="native-admin__card native-admin__form-card"><view class="native-admin__form-heading"><text class="native-admin__card-title">家长绑定关系</text><button bindtap="closeUserBindings">关闭</button></view><text class="native-admin__record-id">账号编号：{{bindingUserId}}</text><text wx:if="{{bindingBusy}}" class="native-admin__module-note">正在核对绑定关系…</text><text wx:if="{{bindingError}}" class="native-admin__notice">{{bindingError}}</text><view wx:for="{{bindingRows}}" wx:key="id" class="native-admin__module"><view class="native-admin__module-copy"><text class="native-admin__module-title">{{item.parentName}} ↔ {{item.studentName}}</text><text class="native-admin__module-note">{{item.status === 'active' ? '有效绑定' : '已解除'}} · {{item.confirmedAt || '确认时间未记录'}}</text></view><button wx:if="{{item.status === 'active'}}" data-id="{{item.id}}" catchtap="openUnbindDraft">解绑</button></view><text wx:if="{{!bindingBusy && !bindingError && !bindingRows.length}}" class="native-admin__module-note">该账号没有绑定关系</text></view>
+      <view wx:if="{{unbindDraft}}" id="admin-unbind-form" class="native-admin__card native-admin__form-card"><text class="native-admin__card-title">解除绑定</text><text class="native-admin__module-note">{{unbindDraft.parentName}} ↔ {{unbindDraft.studentName}}；历史学习记录保留。</text><textarea class="native-admin__field" maxlength="200" disabled="{{unbindBusy}}" value="{{unbindDraft.reason}}" bindinput="onUnbindReason" placeholder="填写解绑原因"/><text wx:if="{{unbindError}}" class="native-admin__notice">{{unbindError}}；原因已保留。</text><view class="native-admin__form-actions"><button loading="{{unbindBusy}}" disabled="{{unbindBusy}}" class="native-admin__action-danger" bindtap="requestUnbind">确认解绑</button></view></view><view wx:if="{{userDraft}}" id="admin-user-form" class="native-admin__card native-admin__form-card"><view class="native-admin__form-heading"><text class="native-admin__card-title">编辑账号</text><button bindtap="closeUserDraft">关闭</button></view><text class="native-admin__record-id">账号编号：{{userDraft.userId}}</text><input class="native-admin__field" maxlength="50" disabled="{{userBusy}}" value="{{userDraft.displayName}}" data-field="displayName" bindinput="onUserField" placeholder="显示姓名"/><textarea class="native-admin__field" maxlength="200" disabled="{{userBusy}}" value="{{userDraft.reason}}" data-field="reason" bindinput="onUserField" placeholder="填写修改原因"/><text wx:if="{{userError}}" class="native-admin__notice">{{userError}}；输入已保留。</text><view class="native-admin__form-actions"><button loading="{{userBusy}}" disabled="{{userBusy}}" bindtap="requestUserUpdate">确认保存</button><button wx:if="{{userDraft.status === 'active'}}" loading="{{userBusy}}" disabled="{{userBusy}}" class="native-admin__action-danger" bindtap="requestUserDisable">停用账号</button></view></view>
+      <view wx:if="{{createUserDraft}}" id="admin-create-user-form" class="native-admin__card native-admin__form-card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">新建账号</text><button disabled="{{createUserBusy}}" bindtap="closeCreateUser">关闭</button></view>
+        <text class="native-admin__module-note">手机号是登录账号；老师还需选身份，创建学生账号时从名单选班级。本人随后在登录页点击“首次设置或忘记密码”，验证手机号并设置密码；不使用统一初始密码。</text>
+        <input class="native-admin__field" maxlength="50" disabled="{{createUserBusy}}" value="{{createUserDraft.displayName}}" data-field="displayName" bindinput="onCreateUserField" placeholder="姓名（选填）"/>
+        <input class="native-admin__field" type="number" maxlength="11" disabled="{{createUserBusy}}" value="{{createUserDraft.mobile}}" data-field="mobile" bindinput="onCreateUserField" placeholder="手机号（必填）"/>
+        <radio-group class="native-admin__account-roles" data-field="role" bindchange="onCreateUserField">
+          <label><radio value="student" checked="{{createUserDraft.role === 'student'}}" disabled="{{createUserBusy}}"/>学生</label>
+          <label wx:if="{{access.scope.organizationWide}}"><radio value="parent" checked="{{createUserDraft.role === 'parent'}}" disabled="{{createUserBusy}}"/>家长</label>
+          <label wx:if="{{access.scope.organizationWide}}"><radio value="teacher" checked="{{createUserDraft.role === 'teacher'}}" disabled="{{createUserBusy}}"/>教师</label>
+          <label wx:if="{{access.scope.organizationWide}}"><radio value="admin" checked="{{createUserDraft.role === 'admin'}}" disabled="{{createUserBusy}}"/>员工</label>
+        </radio-group>
+        <button wx:if="{{createUserDraft.role === 'student'}}" class="native-admin__choice-trigger" disabled="{{createUserBusy}}" data-kind="class_for_user" data-target="createUserClass" bindtap="openAdminOptionPicker">{{createUserDraft.classId ? selectionLabels.createUserClass || createUserDraft.classId : '选择所属班级（必填）'}}</button><input wx:if="{{selectionOptionsUnavailable && createUserDraft.role === 'student'}}" class="native-admin__field" maxlength="128" disabled="{{createUserBusy}}" value="{{createUserDraft.classId}}" data-field="classId" bindinput="onCreateUserField" placeholder="候选名单不可用时输入班级编号"/>
+        <text wx:if="{{createUserDraft.role === 'teacher' || createUserDraft.role === 'admin'}}" class="native-admin__module-note">创建账号不会自动授予班级教学权限或管理工作区权限，后续须单独分配。</text>
+        <textarea class="native-admin__field" maxlength="200" disabled="{{createUserBusy}}" value="{{createUserDraft.reason}}" data-field="reason" bindinput="onCreateUserField" placeholder="创建原因（必填）"/>
+        <text wx:if="{{createUserError}}" class="native-admin__notice">{{createUserError}}；输入已保留。</text>
+        <view class="native-admin__form-actions"><button loading="{{createUserBusy}}" disabled="{{createUserBusy}}" bindtap="requestCreateUser">创建账号</button></view>
+      </view>
+      <view wx:if="{{bindingCreateDraft}}" id="admin-create-binding-form" class="native-admin__card native-admin__form-card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">新增家长绑定</text><button disabled="{{bindingCreateBusy}}" bindtap="closeCreateBinding">关闭</button></view>
+        <text class="native-admin__module-note">从名单选择已有家长和学生。家长最多绑定 5 个孩子，每名学生最多绑定 3 位家长。</text>
+        <button class="native-admin__choice-trigger" disabled="{{bindingCreateBusy}}" data-kind="parent_for_binding" data-target="bindingParent" bindtap="openAdminOptionPicker">{{bindingCreateDraft.parentId ? selectionLabels.bindingParent || bindingCreateDraft.parentId : '选择家长（必填）'}}</button><input wx:if="{{selectionOptionsUnavailable}}" class="native-admin__field" maxlength="128" disabled="{{bindingCreateBusy}}" value="{{bindingCreateDraft.parentId}}" data-field="parentId" bindinput="onBindingCreateField" placeholder="候选名单不可用时输入家长账号编号"/>
+        <button class="native-admin__choice-trigger" disabled="{{bindingCreateBusy}}" data-kind="student_for_binding" data-target="bindingStudent" bindtap="openAdminOptionPicker">{{bindingCreateDraft.studentId ? selectionLabels.bindingStudent || bindingCreateDraft.studentId : '选择学生（必填）'}}</button><input wx:if="{{selectionOptionsUnavailable}}" class="native-admin__field" maxlength="128" disabled="{{bindingCreateBusy}}" value="{{bindingCreateDraft.studentId}}" data-field="studentId" bindinput="onBindingCreateField" placeholder="候选名单不可用时输入学生账号编号"/>
+        <textarea class="native-admin__field" maxlength="200" disabled="{{bindingCreateBusy}}" value="{{bindingCreateDraft.reason}}" data-field="reason" bindinput="onBindingCreateField" placeholder="绑定原因（必填）"/>
+        <text wx:if="{{bindingCreateError}}" class="native-admin__notice">{{bindingCreateError}}；输入已保留。</text>
+        <view class="native-admin__form-actions"><button loading="{{bindingCreateBusy}}" disabled="{{bindingCreateBusy}}" bindtap="requestCreateBinding">确认绑定</button></view>
+      </view>
+      <view wx:if="{{optionPickerKind && (optionPickerTarget === 'createUserClass' || optionPickerTarget === 'bindingParent' || optionPickerTarget === 'bindingStudent')}}" id="admin-option-picker" class="native-admin__card native-admin__option-picker">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">{{optionPickerTarget === 'createUserClass' ? '选择班级' : optionPickerTarget === 'bindingParent' ? '选择家长' : '选择学生'}}</text><button bindtap="closeAdminOptionPicker">关闭</button></view>
+        <view class="native-admin__search native-admin__option-search"><input value="{{optionPickerQuery}}" bindinput="onAdminOptionQuery" placeholder="搜索姓名或编号" confirm-type="search" bindconfirm="applyAdminOptionSearch"/><button bindtap="applyAdminOptionSearch">搜索</button></view>
+        <text wx:if="{{optionPickerLoading}}" class="native-admin__module-note">正在查找…</text>
+        <text wx:if="{{optionPickerError}}" class="native-admin__notice">{{optionPickerError}}</text>
+        <view aria-role="button" wx:for="{{optionPickerRows}}" wx:key="id" class="native-admin__option-row" data-id="{{item.id}}" bindtap="chooseAdminOption"><text>{{item.label}}</text><text>{{item.detail}}</text></view>
+        <text wx:if="{{!optionPickerLoading && !optionPickerError && !optionPickerRows.length}}" class="native-admin__module-note">没有符合条件的账号或班级</text>
+        <button wx:if="{{optionPickerNextOffset !== null}}" class="native-admin__secondary" loading="{{optionPickerLoading}}" bindtap="loadMoreAdminOptions">加载更多</button>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"/>
+</g0-page-shell>
+
+
+
+
+

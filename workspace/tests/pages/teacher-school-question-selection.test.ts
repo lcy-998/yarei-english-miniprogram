@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { SchoolQuestionSummary } from '../../miniprogram/domain/types'
-import type { TaskDraftOptionsView } from '../../miniprogram/services/app-service'
-import { questionRows, toggleQuestionSelection } from '../../miniprogram/pages/teacher/school-questions/school-question-state'
-import { mergeSelectedQuestionResources } from '../../miniprogram/pages/teacher/publish-task/selected-question-resources'
+import type { SchoolQuestionSummary } from '../../miniprogram/subpackages/teacher/domain/types'
+import type { TaskDraftOptionsView } from '../../miniprogram/subpackages/teacher/services/app-service'
+import { questionPackRows, questionRows, toggleQuestionSelection } from '../../miniprogram/subpackages/teacher/school-questions/school-question-state'
+import { mergeSelectedQuestionResources } from '../../miniprogram/subpackages/teacher/publish-task/selected-question-resources'
 
 const first: SchoolQuestionSummary = {
   id: 'res_exercise_bird_demo', title: '动物选择题', grade: '三年级', questionType: 'single_choice',
@@ -26,6 +26,21 @@ const options: TaskDraftOptionsView = {
 }
 
 describe('T-15 selection and T-06 citation handoff', () => {
+  it('shows a complete related set as one library card', () => {
+    const pack = Array.from({ length: 5 }, (_, index): SchoolQuestionSummary => ({
+      id: `market_question_${index + 1}`, title: `Market story - Question ${index + 1}`,
+      grade: '三年级', textbook: 'Market story', unit: 'Unit 1',
+      exercisePackId: 'market_pack', questionType: 'single_choice',
+      stemSummary: `Question ${index + 1}`, contentVersion: '1',
+    }))
+    expect(questionPackRows(pack, [])).toMatchObject([{
+      id: 'pack:market_pack', title: 'Market story', questionIds: pack.map(item => item.id),
+      stemSummary: '共 5 道相关题目',
+    }])
+    expect(questionPackRows(pack.slice(0, 4), [])).toEqual([])
+    expect(questionPackRows(pack, [], { keyword: 'Question 5' })[0]?.questionIds)
+      .toEqual(pack.map(item => item.id))
+  })
   it('keeps selected questions across result filters and pages', () => {
     const selectedFirst = toggleQuestionSelection([], first)
     expect(questionRows([second], selectedFirst)).toEqual([{ ...second, selected: false, typeLabel: '填空题' }])

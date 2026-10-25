@@ -1,0 +1,63 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin native-admin--media">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"></state-panel>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有素材管理权限。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"></state-panel>
+    <block wx:else>
+      <view class="native-admin__card"><text class="native-admin__module-note">已校验的英语教学素材直接供所有教师查找和布置。此页用于查看、反馈问题和下架。</text></view>
+      <view class="native-admin__search"><input value="{{keyword}}" placeholder="搜索素材名称" confirm-type="search" bindinput="onKeyword" bindconfirm="applyFilters"/></view>
+      <view class="native-admin__filter-panel"><view class="native-admin__filter-row">
+        <button data-status="all" bindtap="onStatusFilter" class="{{statusFilter === '' ? 'active' : ''}}">全部</button>
+        <button data-status="published" bindtap="onStatusFilter" class="{{statusFilter === 'published' ? 'active' : ''}}">可布置</button>
+        <button data-status="offline" bindtap="onStatusFilter" class="{{statusFilter === 'offline' ? 'active' : ''}}">已下架</button>
+      </view><view class="native-admin__filter-row">
+        <button data-kind="all" bindtap="onMediaKindFilter" class="{{mediaKindFilter === '' ? 'active' : ''}}">全部类型</button>
+        <button data-kind="listening" bindtap="onMediaKindFilter" class="{{mediaKindFilter === 'listening' ? 'active' : ''}}">听力</button>
+        <button data-kind="video" bindtap="onMediaKindFilter" class="{{mediaKindFilter === 'video' ? 'active' : ''}}">视频</button>
+        <button data-kind="dubbing" bindtap="onMediaKindFilter" class="{{mediaKindFilter === 'dubbing' ? 'active' : ''}}">配音</button>
+      </view><button class="native-admin__filter-submit" loading="{{dataLoading}}" disabled="{{dataLoading}}" bindtap="applyFilters">搜索</button></view>
+      <view id="adminMediaListAnchor" class="native-admin__card"><text class="native-admin__card-title">素材记录</text>
+        <text wx:if="{{dataError}}" class="native-admin__notice">{{dataError}}</text>
+        <view wx:for="{{recordRows}}" wx:key="id" class="native-admin__module" data-id="{{item.id}}" bindtap="openMediaReview" aria-role="button" aria-label="查看{{item.title}}">
+          <view class="native-admin__icon">媒</view><view class="native-admin__module-copy"><text class="native-admin__module-title">{{item.title}}</text><text class="native-admin__module-note">版本 {{item.version}} · {{item.detail}}</text></view><text class="native-admin__chevron">{{item.statusLabel}} ›</text>
+        </view>
+        <text wx:if="{{!dataLoading && !dataError && !recordRows.length}}" class="native-admin__module-note">暂无素材记录</text>
+        <button wx:if="{{nextOffset !== null}}" loading="{{dataLoading}}" bindtap="loadMore">加载更多</button>
+      </view>
+      <view id="adminMediaDetailAnchor" class="native-admin__detail-anchor"></view>
+      <view wx:if="{{mediaLoading}}" class="native-admin__card">正在读取素材详情…</view>
+      <view wx:if="{{mediaError && !mediaSummary}}" class="native-admin__notice">{{mediaError}}<button bindtap="reload">重试</button></view>
+      <view wx:if="{{mediaSummary}}" class="native-admin__card">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">{{mediaSummary.title}}</text><button bindtap="closeMediaReview">关闭</button></view>
+        <text class="native-admin__module-note">{{mediaSummary.statusLabel}} · 资源版本 {{mediaSummary.recordVersion}} · {{mediaSummary.kind === 'listening' ? '听力' : mediaSummary.kind === 'video' ? '视频' : '配音'}}</text>
+        <view class="native-admin__evidence-row"><text>原文件与成品安全检查</text><text>{{mediaSummary.scanStatus === 'clean' && mediaSummary.sourceScanEvidencePresent && mediaSummary.outputScanEvidencePresent ? '已记录' : '缺项'}}</text></view>
+        <view class="native-admin__evidence-row"><text>转码处理</text><text>{{mediaSummary.transcodeStatus === 'ready' && mediaSummary.transcodeEvidencePresent ? '已记录' : '缺项'}}</text></view>
+        <view class="native-admin__evidence-row"><text>来源资料</text><text>{{mediaSummary.copyrightEvidencePresent ? '已记录' : '缺项'}}</text></view>
+        <view wx:if="{{mediaSummary.kind === 'listening'}}" class="native-admin__evidence-row"><text>听力片段</text><text>{{mediaSummary.questionCount}} 题 / {{mediaSummary.clipCount}} 片段</text></view>
+        <view wx:if="{{mediaSummary.kind !== 'listening'}}" class="native-admin__evidence-row"><text>字幕段数</text><text>{{mediaSummary.subtitleCount}}</text></view>
+        <text class="native-admin__module-note">非生产“待用户验收”表示自动校验通过，不代表人工审核通过。</text>
+        <button wx:if="{{mediaSummary.status === 'published'}}" class="native-admin__preview-trigger" loading="{{mediaPreviewLoading}}" bindtap="openMediaPreview">预览素材</button>
+        <text wx:if="{{mediaPreviewError}}" class="native-admin__notice">{{mediaPreviewError}}</text>
+        <view wx:if="{{mediaPreview}}" class="native-admin__preview">
+          <video wx:if="{{mediaPreview.kind !== 'listening'}}" id="adminMediaVideo" class="native-admin__video" src="{{mediaPreview.temporaryUrl}}" controls="{{true}}" autoplay="{{false}}"></video>
+          <audio wx:else class="native-admin__audio" src="{{mediaPreview.temporaryUrl}}" controls="{{true}}" name="{{mediaSummary.title}}"></audio>
+          <view wx:if="{{mediaPreview.clips.length}}" class="native-admin__clips"><text class="native-admin__card-title">逐题片段</text><view wx:for="{{mediaPreview.clips}}" wx:key="segmentId" class="native-admin__clip-row"><text class="native-admin__clip-label">{{item.questionId}}<text class="native-admin__clip-time">{{item.startMs}}—{{item.endMs}} 毫秒</text></text><button class="native-admin__clip-play" data-start-ms="{{item.startMs}}" data-end-ms="{{item.endMs}}" bindtap="playMediaClip">试听</button></view></view>
+        </view>
+      </view>
+      <view wx:if="{{mediaSummary}}" class="native-admin__card"><text class="native-admin__card-title">反馈素材问题</text>
+        <textarea class="native-admin__field" maxlength="300" value="{{mediaReason}}" bindinput="onMediaReason" placeholder="写清哪里有问题；下架时也使用这条原因"/>
+        <text wx:if="{{mediaError}}" class="native-admin__notice">{{mediaError}}</text>
+        <view class="native-admin__form-actions native-admin__feedback-actions"><button class="native-admin__feedback-submit" loading="{{mediaBusy}}" disabled="{{mediaBusy}}" bindtap="reportMediaIssue">提交问题</button><button wx:if="{{mediaSummary.status === 'published'}}" class="native-admin__feedback-unpublish" data-action="unpublish" loading="{{mediaBusy}}" disabled="{{mediaBusy}}" bindtap="requestMediaAction">下架素材</button></view>
+        <text class="native-admin__module-note">下架后不可新布置；已发布任务继续使用原有内容。</text>
+      </view>
+      <view wx:if="{{mediaSummary}}" class="native-admin__card"><text class="native-admin__card-title">处理记录</text>
+        <view wx:if="{{mediaAuditError}}" class="native-admin__notice">{{mediaAuditError}}<button bindtap="retryMediaAudit">重试</button></view>
+        <view wx:for="{{mediaAuditRows}}" wx:key="id" class="native-admin__evidence-row native-admin__audit-row"><text>{{item.action}} · {{item.occurredAt}}</text><text>{{item.issueReason || item.actorUserId}}</text></view>
+        <text wx:if="{{!mediaAuditLoading && !mediaAuditRows.length}}" class="native-admin__module-note">暂无处理记录</text>
+        <button wx:if="{{mediaAuditNextOffset !== null}}" loading="{{mediaAuditLoading}}" bindtap="loadMoreMediaAudit">加载更多记录</button>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"></g0-tab-bar>
+</g0-page-shell>

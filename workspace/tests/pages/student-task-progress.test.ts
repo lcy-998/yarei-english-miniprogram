@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { taskProgress, type ProgressInput } from '../../miniprogram/pages/student/task-detail/task-progress'
+import { taskProgress, type ProgressInput } from '../../miniprogram/subpackages/student/task-detail/task-progress'
 
 function input(overrides: Partial<ProgressInput> = {}): ProgressInput {
   return { itemId: 'reading', type: 'reading', requiredCount: 2, completedPageCount: '0',

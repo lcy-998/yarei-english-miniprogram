@@ -63,7 +63,8 @@ class DocumentVocabularyEvidenceTransaction implements VocabularyEvidenceTransac
   public async findAutonomousScope(organizationId: string, studentId: string,
     packId: string): Promise<VocabularyEvidenceScope | null> {
     const document = await this.database.get(VOCABULARY_EVIDENCE_COLLECTIONS.resources, packId);
-    if (!visible(document, organizationId) || document.type !== 'vocabulary') return null;
+    if (!visible(document, organizationId) || document.type !== 'vocabulary'
+      || document.teacherCatalogOnly === true) return null;
     const version = contentVersion(document.contentVersion);
     const payload = isRecord(document.payload) ? document.payload : null;
     const wordEntries = words(document.words ?? payload?.words);

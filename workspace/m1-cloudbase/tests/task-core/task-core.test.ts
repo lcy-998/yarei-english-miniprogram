@@ -10,6 +10,10 @@ import type { ParentStudentLinkRecord, TeacherClassGrantRecord } from '../../src
 import type { JsonObject } from '../../src/shared/protocol';
 import type { ReadingPageEventRecord } from '../../src/learning-progress/types';
 import type { LearningResourceType } from '../../src/task-core/types';
+import { TaskMediaSubmissionEvidenceService } from '../../src/task-media/submission-evidence';
+import type { TaskMediaSessionRecord } from '../../src/task-media/playback-service';
+import type { ReviewVoiceCommentService } from '../../src/review-voice/service';
+import type { TeacherSuggestionStore, TeacherSuggestionRecord } from '../../src/teacher-ai/types';
 import type { TaskRecordingRecord } from '../../src/task-recording/types';
 import type { TaskTemplate } from '../../src/task-template/types';
 import type { BatchReviewPreviewCodec } from '../../src/task-core/batch-review-preview';
@@ -21,6 +25,9 @@ const CLASS_ID = 'class_grade3_2';
 const TEACHER_ID = 'user_teacher_lin';
 const STUDENT_ID = 'user_student_xiaoyu';
 const PARENT_ID = 'user_parent_xiaoyu';
+const CENTRAL_MEDIA_ORIGIN = { kind: 'central_asset_library',
+  resourceId: 'resource_demo_exercise', version: 3, manifestSha256: 'c'.repeat(64),
+  reviewId: 'review_demo_media', importedBy: 'asset_editor_demo', reviewStatus: 'approved' };
 
 const teacher: TrustedActorContext = {
   requestId: 'request_teacher',
@@ -76,12 +83,18 @@ function createHarness(options: Readonly<{
   failAudit?: boolean;
   studentCount?: number;
   resourceType?: LearningResourceType;
+  resourceCopyrightStatus?: 'demo' | 'verified';
   resourcePayload?: JsonObject;
   readingPageEvents?: readonly ReadingPageEventRecord[];
   withLearningProgress?: boolean;
   batchReviewPreviewCodec?: BatchReviewPreviewCodec;
+  mediaEvidence?: Pick<TaskMediaSubmissionEvidenceService, 'verify'>;
+  reviewVoice?: Pick<ReviewVoiceCommentService, 'resolveForFeedback'>;
+  teacherSuggestions?: Pick<TeacherSuggestionStore, 'findById'>;
   templates?: readonly TaskTemplate[];
   nowIso?: () => string;
+  exercisePackCount?: number;
+  exercisePackIds?: readonly string[];
 }> = {}): TestHarness {
   const teacherGrants: TeacherClassGrantRecord[] = [{
     _id: 'grant_teacher_class',
@@ -135,10 +148,20 @@ function createHarness(options: Readonly<{
       title: '动物主题虚构练习',
       contentVersion: 3,
       status: 'published',
+      ...(options.resourceCopyrightStatus ? { copyrightStatus: options.resourceCopyrightStatus } : {}),
       visibility: 'classes',
       allowedClassIds: [CLASS_ID],
       payload: options.resourcePayload ?? { promptKey: 'demo_animals_v3', points: 100 },
-    }],
+    }, ...Array.from({ length: options.exercisePackCount ?? 0 }, (_, index) => {
+      const id = `exercise_pack_question_${index + 1}`;
+      return { id, organizationId: ORGANIZATION_ID, type: 'exercise' as const,
+        title: `题组测试题 ${index + 1}`, contentVersion: 1, status: 'published' as const,
+        visibility: 'classes' as const, allowedClassIds: [CLASS_ID], payload: {
+          questionIds: [id], questionType: 'single_choice', stem: `Choose ${index + 1}.`,
+          options: ['A', 'B'], correctAnswer: 'A', explanation: 'Test evidence.',
+          assetLibrary: { exercisePackId: options.exercisePackIds?.[index] ?? 'exercise_pack_test' },
+        } };
+    })],
     memberships: Array.from({ length: options.studentCount ?? 1 }, (_, index) => ({
       id: `membership_${index + 1}`,
       organizationId: ORGANIZATION_ID,
@@ -159,9 +182,41 @@ function createHarness(options: Readonly<{
     ids,
     ids,
     options.batchReviewPreviewCodec,
+    options.mediaEvidence,
+    options.reviewVoice,
+    options.teacherSuggestions,
   );
   return { service, repository, teacherGrants, parentLinks };
 }
+
+describe('习题题组的发布题量', () => {
+  async function publishPack(count: number, exercisePackIds?: readonly string[]) {
+    const harness = createHarness({ exercisePackCount: count, exercisePackIds });
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '五题习题任务',
+      itemRefs: Array.from({ length: count }, (_, index) => ({
+        id: `exercise_item_${index + 1}`, resourceId: `exercise_pack_question_${index + 1}`,
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: index + 1,
+      })),
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, `operation_exercise_pack_save_${count}`);
+    if (!draft.ok) throw new Error('expected exercise pack draft');
+    return harness.service.publishTask(teacher, String(draft.data.taskId), 1,
+      `operation_exercise_pack_publish_${count}`);
+  }
+
+  it('rejects fewer than five distinct questions and publishes a complete five-question task', async () => {
+    await expect(publishPack(4)).resolves.toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    await expect(publishPack(5)).resolves.toMatchObject({ ok: true, data: { status: 'active' } });
+  });
+
+  it('does not combine unrelated partial packs to meet the five-question minimum', async () => {
+    await expect(publishPack(5, ['pack_a', 'pack_a', 'pack_a', 'pack_b', 'pack_b']))
+      .resolves.toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+  });
+});
 
 async function publishSingleStudentTask(
   harness: TestHarness,
@@ -534,6 +589,52 @@ describe('M1 本地任务持久化闭环', () => {
     const result = await harness.service.recycleTask(teacher, draft.data.taskId, '教师删除未发布草稿', 1, 'operation_recycle_draft');
     expect(result).toMatchObject({ ok: true, data: { visibility: 'recycled', version: 2 } });
     expect(harness.repository.debugSnapshot().assignments).toHaveLength(0);
+  });
+
+  it('M3 未发布且无关系的草稿可彻底删除，重试幂等且审计失败会回滚', async () => {
+    const harness = createHarness();
+    const draft = await harness.service.saveTaskDraft(teacher, {
+      title: '待彻底删除虚构草稿',
+      itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_hard_delete_draft_save');
+    if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+    const taskId = draft.data.taskId;
+    await expect(harness.service.deleteDraftTask({ ...teacher, actorUserId: 'other_teacher' },
+      taskId, '越权删除', 1, 'operation_hard_delete_forged'))
+      .resolves.toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    const result = await harness.service.deleteDraftTask(teacher, taskId,
+      '清理未发布虚构草稿', 1, 'operation_hard_delete_draft');
+    expect(result).toMatchObject({ ok: true, data: { taskId, deleted: true } });
+    expect(await harness.repository.findTask(ORGANIZATION_ID, taskId)).toBeNull();
+    expect(await harness.service.deleteDraftTask(teacher, taskId,
+      '清理未发布虚构草稿', 1, 'operation_hard_delete_draft')).toEqual(result);
+    expect(harness.repository.debugSnapshot().operationLogs.filter(entry => entry.action === 'task.draft.deleted'))
+      .toMatchObject([{ targetId: taskId, metadata: { reason: '清理未发布虚构草稿' } }]);
+
+    const rollback = createHarness();
+    const other = await rollback.service.saveTaskDraft(teacher, {
+      title: '审计回滚虚构草稿',
+      itemRefs: [{ id: 'item_exercise', resourceId: 'resource_demo_exercise', order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_hard_delete_rollback_save');
+    if (!other.ok || typeof other.data.taskId !== 'string') throw new Error('draft expected');
+    rollback.repository.failNext('audit.append');
+    await expect(rollback.service.deleteDraftTask(teacher, other.data.taskId,
+      '审计失败回滚', 1, 'operation_hard_delete_rollback'))
+      .rejects.toThrow();
+    expect(await rollback.repository.findTask(ORGANIZATION_ID, other.data.taskId))
+      .toMatchObject({ status: 'draft', version: 1 });
+  });
+
+  it('已发布任务不能走草稿彻底删除路径', async () => {
+    const harness = createHarness();
+    const taskId = await publishSingleStudentTask(harness);
+    expect(await harness.service.deleteDraftTask(teacher, taskId, '伪造草稿删除', 2,
+      'operation_hard_delete_published')).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    expect(await harness.repository.findTask(ORGANIZATION_ID, taskId)).toMatchObject({ status: 'active' });
   });
 
   it('已发布任务严格执行一次延期、开始前撤回和七天软回收并保持幂等审计', async () => {
@@ -1328,6 +1429,359 @@ describe('M1 本地任务持久化闭环', () => {
       .toMatchObject({ ok: true });
   });
 
+  it('拒绝三四年级缺音节的词包进入新课堂任务快照', async () => {
+    const harness = createHarness({ resourceType: 'vocabulary', resourcePayload: {
+      grade: '三年级', unit: 'Unit 3', words: [{ id: 'word_bad', word: 'animal',
+        meaning: '动物', syllables: [] }],
+    } });
+    const result = await harness.service.saveTaskDraft(teacher, {
+      title: '音节门槛示例', itemRefs: [{ id: 'item_vocabulary', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'vocabulary_words', requiredWordCount: 1 },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+      description: '虚构词包', teacherNote: '',
+    }, 0, 'operation_syllable_gate');
+    expect(result.ok).toBe(true);
+    if (!result.ok || typeof result.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await harness.service.publishTask(teacher, result.data.taskId, 1, 'operation_syllable_publish'))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+  });
+
+  it('布置已核验跟读读本时读取资源顶层版权状态并冻结到任务快照', async () => {
+    const payload = { chapters: [{ id: 'chapter_demo', pages: [{ id: 'page_1', pageNumber: 1,
+      imageAssetKey: 'cloud://demo/page.png' }] }], pronunciation: {
+      reviewStatus: 'approved', sourceVersion: '3', approvedAt: '2026-09-16T00:00:00.000Z',
+      approvedBy: 'reviewer_demo', segments: [{ id: 'segment_1', pageNumber: 1,
+        text: 'A rabbit runs.', demonstrationAudioAssetKey: 'cloud://demo/audio.mp3' }],
+    } };
+    const ready = createHarness({ resourceType: 'reading', resourcePayload: payload,
+      resourceCopyrightStatus: 'verified' });
+    await publishSingleStudentTask(ready, { kind: 'reading_pages', requiredPageCount: 1,
+      pageIds: ['page_1'] });
+    expect(ready.repository.debugSnapshot().tasks[0]?.items[0]?.resourceSnapshot.payload)
+      .toMatchObject({ copyrightStatus: 'verified', pronunciation: { sourceVersion: '3' } });
+    const unverified = createHarness({ resourceType: 'reading', resourcePayload: payload,
+      resourceCopyrightStatus: 'demo' });
+    const saved = await unverified.service.saveTaskDraft(teacher, { title: '待核验读本',
+      itemRefs: [{ id: 'item_reading', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'reading_pages', requiredPageCount: 1, pageIds: ['page_1'] }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+    }, 0, 'operation_unverified_reading');
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) throw new Error('draft expected');
+    expect(await unverified.service.publishTask(teacher, saved.data.taskId as string, 1,
+      'operation_unverified_reading_publish')).toMatchObject({ ok: false,
+        error: { code: 'VALIDATION_ERROR' } });
+  });
+
+  it('仅把已审核、逐题对位且可连续播放的听力媒体冻结进新发布任务', async () => {
+    // The canonical resource title is stored at the resource root, not duplicated in teacherMedia.
+    const media = { reviewVersion: 3, reviewedBy: 'reviewer_demo',
+      reviewedAt: '2026-09-16T00:00:00.000Z', copyrightStatus: 'verified',
+      copyrightEvidenceKey: 'cloud://demo/fictional-proof.txt',
+      scanStatus: 'clean', transcodeStatus: 'ready', mediaAssetKey: 'cloud://demo/listening.mp3',
+      sourceScanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+        scannedAt: '2026-09-15T23:58:00.000Z', scannedSha256: 'b'.repeat(64),
+        reportId: 'virtual_source_scan_01' },
+      scanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+        scannedAt: '2026-09-16T00:00:00.000Z', scannedSha256: 'a'.repeat(64), reportId: 'virtual_scan_01' },
+      transcodeEvidence: { engine: 'ffmpeg', engineVersion: 'virtual-unit-v1',
+        transcodedAt: '2026-09-15T23:59:00.000Z', sourceSha256: 'b'.repeat(64),
+        outputSha256: 'a'.repeat(64),
+        outputAssetKey: 'cloud://demo/listening.mp3' },
+      mediaSha256: 'a'.repeat(64), durationMs: 10000, allowedClassIds: [CLASS_ID],
+      questionIds: ['question_1', 'question_2', 'question_3'], questions: [
+        { questionId: 'question_1', questionType: 'single_choice', stem: 'Choose the animal.', options: ['cat', 'dog'] },
+        { questionId: 'question_2', questionType: 'single_choice', stem: 'Choose the color.', options: ['red', 'blue'] },
+        { questionId: 'question_3', questionType: 'single_choice', stem: 'Choose the place.', options: ['home', 'school'] },
+      ], answerKeys: [
+        { questionId: 'question_1', correctAnswer: 'cat', explanation: 'The audio says cat.' },
+        { questionId: 'question_2', correctAnswer: 'red', explanation: 'The audio says red.' },
+        { questionId: 'question_3', correctAnswer: 'home', explanation: 'The audio says home.' },
+      ], clips: [
+        { questionId: 'question_1', segmentId: 'segment_1', startMs: 0, endMs: 3000 },
+        { questionId: 'question_2', segmentId: 'segment_2', startMs: 3000, endMs: 6000 },
+        { questionId: 'question_3', segmentId: 'segment_3', startMs: 6000, endMs: 10000 },
+      ],
+      continuousPlaybackEnforced: true };
+    const harness = createHarness({ resourceType: 'listening', resourcePayload: {
+      assetLibrary: CENTRAL_MEDIA_ORIGIN,
+      teacherMedia: media,
+    } });
+    const saved = await harness.service.saveTaskDraft(teacher, {
+      title: '虚构听力任务', itemRefs: [{ id: 'item_listening', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'listening', questionIds: ['question_1', 'question_2', 'question_3'],
+          segmentIds: ['segment_1', 'segment_2', 'segment_3'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+      description: '听完并回答问题', teacherNote: '',
+    }, 0, 'operation_media_draft');
+    expect(saved.ok).toBe(true);
+    if (!saved.ok || typeof saved.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await harness.service.publishTask(teacher, saved.data.taskId, 1, 'operation_media_publish'))
+      .toMatchObject({ ok: true });
+    const frozen = harness.repository.debugSnapshot().tasks[0]?.items[0]?.mediaSnapshot;
+    expect(frozen).toMatchObject({ mediaId: 'resource_demo_exercise', mediaVersion: 3,
+      questionIds: ['question_1', 'question_2', 'question_3'],
+      clips: [{ segmentId: 'segment_1' }, { segmentId: 'segment_2' }, { segmentId: 'segment_3' }],
+      answerKeys: [{ correctAnswer: 'cat' }, { correctAnswer: 'red' }, { correctAnswer: 'home' }] });
+
+    const bad = createHarness({ resourceType: 'listening', resourcePayload: {
+      assetLibrary: CENTRAL_MEDIA_ORIGIN,
+      teacherMedia: { ...media, clips: [] },
+    } });
+    const badDraft = await bad.service.saveTaskDraft(teacher, {
+      title: '无效映射示例', itemRefs: [{ id: 'item_listening', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'listening', questionIds: ['question_1', 'question_2', 'question_3'],
+          segmentIds: ['segment_1', 'segment_2', 'segment_3'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+      description: '虚构听力', teacherNote: '',
+    }, 0, 'operation_bad_media_draft');
+    if (!badDraft.ok || typeof badDraft.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await bad.service.publishTask(teacher, badDraft.data.taskId, 1, 'operation_bad_media_publish'))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+
+    const teacherOwned = createHarness({ resourceType: 'listening', resourcePayload: { teacherMedia: media } });
+    const oldDraft = await teacherOwned.service.saveTaskDraft(teacher, {
+      title: '旧教师上传素材不可用', itemRefs: [{ id: 'item_listening', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'listening', questionIds: ['question_1', 'question_2', 'question_3'],
+          segmentIds: ['segment_1', 'segment_2', 'segment_3'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+      description: '虚构听力', teacherNote: '',
+    }, 0, 'operation_old_media_draft');
+    if (!oldDraft.ok || typeof oldDraft.data.taskId !== 'string') throw new Error('draft expected');
+    expect(await teacherOwned.service.publishTask(teacher, oldDraft.data.taskId, 1, 'operation_old_media_publish'))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+  });
+
+  it('本地听力主闭环只从服务端会话生成正式提交证据并计算教师/家长同分', async () => {
+    let session: TaskMediaSessionRecord | null = null;
+    const mediaEvidence = new TaskMediaSubmissionEvidenceService({ async findSession() { return session; } },
+      { async findTaskDubbingWork() { return null; } });
+    const harness = createHarness({ resourceType: 'listening', mediaEvidence, resourcePayload: {
+      assetLibrary: CENTRAL_MEDIA_ORIGIN,
+      teacherMedia: { title: '虚构听力素材', reviewVersion: 3, reviewedBy: 'reviewer_demo',
+        reviewedAt: '2026-09-16T00:00:00.000Z', copyrightStatus: 'verified',
+        copyrightEvidenceKey: 'cloud://demo/fictional-proof.txt',
+        scanStatus: 'clean', transcodeStatus: 'ready', mediaAssetKey: 'cloud://demo/listening.mp3',
+        sourceScanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+          scannedAt: '2026-09-15T23:58:00.000Z', scannedSha256: 'b'.repeat(64),
+          reportId: 'virtual_source_scan_01' },
+        scanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+          scannedAt: '2026-09-16T00:00:00.000Z', scannedSha256: 'a'.repeat(64), reportId: 'virtual_scan_01' },
+        transcodeEvidence: { engine: 'ffmpeg', engineVersion: 'virtual-unit-v1',
+          transcodedAt: '2026-09-15T23:59:00.000Z', sourceSha256: 'b'.repeat(64),
+          outputSha256: 'a'.repeat(64),
+          outputAssetKey: 'cloud://demo/listening.mp3' },
+        mediaSha256: 'a'.repeat(64), durationMs: 10000, allowedClassIds: [CLASS_ID],
+        questionIds: ['question_1', 'question_2', 'question_3'], questions: [
+          { questionId: 'question_1', questionType: 'single_choice', stem: 'Choose the animal.', options: ['cat', 'dog'] },
+          { questionId: 'question_2', questionType: 'single_choice', stem: 'Choose the color.', options: ['red', 'blue'] },
+          { questionId: 'question_3', questionType: 'single_choice', stem: 'Choose the place.', options: ['home', 'school'] },
+        ], answerKeys: [
+          { questionId: 'question_1', correctAnswer: 'cat', explanation: 'The audio says cat.' },
+          { questionId: 'question_2', correctAnswer: 'red', explanation: 'The audio says red.' },
+          { questionId: 'question_3', correctAnswer: 'home', explanation: 'The audio says home.' },
+        ], clips: [
+          { questionId: 'question_1', segmentId: 'segment_1', startMs: 0, endMs: 3000 },
+          { questionId: 'question_2', segmentId: 'segment_2', startMs: 3000, endMs: 6000 },
+          { questionId: 'question_3', segmentId: 'segment_3', startMs: 6000, endMs: 10000 },
+        ],
+        continuousPlaybackEnforced: true },
+    } });
+    const saved = await harness.service.saveTaskDraft(teacher, {
+      title: '虚构听力主闭环', itemRefs: [{ id: 'item_listening', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'listening', questionIds: ['question_1', 'question_2', 'question_3'],
+          segmentIds: ['segment_1', 'segment_2', 'segment_3'] },
+        scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1 }],
+      targetClassIds: [CLASS_ID], startsAt: '2026-09-16T00:00:00.000Z',
+      dueAt: '2026-09-16T12:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
+      description: '听力练习', teacherNote: '',
+    }, 0, 'operation_media_loop_draft');
+    if (!saved.ok || typeof saved.data.taskId !== 'string') throw new Error('draft expected');
+    const taskId = saved.data.taskId;
+    expect(await harness.service.publishTask(teacher, taskId, 1, 'operation_media_loop_publish'))
+      .toMatchObject({ ok: true });
+    const assignment = harness.repository.debugSnapshot().assignments[0]!;
+    session = { id: 'media_session_demo', organizationId: ORGANIZATION_ID,
+      studentId: STUDENT_ID, assignmentId: assignment.id, round: 1, taskId,
+      itemId: 'item_listening', mediaId: 'resource_demo_exercise', mediaVersion: 3,
+      confirmedThroughMs: 10000, createdAt: '2026-09-16T01:00:00.000Z',
+      lastHeartbeatAt: '2026-09-16T01:00:10.000Z', expiresAt: '2026-09-16T03:00:00.000Z', version: 2 };
+    const submitted = await harness.service.submit(student, taskId, [{ itemId: 'item_listening',
+      value: { kind: 'listening', mediaSessionId: session.id, questionResponses: [
+        { questionId: 'question_1', response: 'cat' },
+        { questionId: 'question_2', response: 'red' },
+        { questionId: 'question_3', response: 'home' }],
+        verifiedPlayedSegmentIds: ['forged_segment'],
+      } }], 1, undefined, 'operation_media_loop_forged');
+    expect(submitted).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    const accepted = await harness.service.submit(student, taskId, [{ itemId: 'item_listening',
+      value: { kind: 'listening', mediaSessionId: session.id, questionResponses: [
+        { questionId: 'question_1', response: 'cat' },
+        { questionId: 'question_2', response: 'red' },
+        { questionId: 'question_3', response: 'home' }] } }], 1, undefined, 'operation_media_loop_submit');
+    expect(accepted).toMatchObject({ ok: true, data: { submissionVersion: 1 } });
+    const formal = harness.repository.debugSnapshot().submissions.find(row => row.status === 'submitted')!;
+    expect(formal.answers[0]?.value).toMatchObject({ verifiedPlayedSegmentIds: ['segment_1', 'segment_2', 'segment_3'],
+      correctQuestionIds: ['question_1', 'question_2', 'question_3'], mediaSessionId: session.id });
+    expect(await harness.service.getSubmissionForReview(teacher, formal.id))
+      .toMatchObject({ ok: true, data: { answers: [{ itemId: 'item_listening' }] } });
+    expect(await harness.service.publishReview(teacher, { submissionId: formal.id, decision: 'approved',
+      textComment: '完成得很好', expectedSubmissionVersion: 1 }, 2, 'operation_media_loop_review'))
+      .toMatchObject({ ok: true });
+    expect(await harness.service.getParentTaskResult(parent, STUDENT_ID, taskId))
+      .toMatchObject({ ok: true, data: { automaticScore: 100,
+        feedback: { score: 100, textComment: '完成得很好' } } });
+  });
+
+  it('教师本人私有视频可冻结一题任务，其他教师不能借资源 ID 布置', async () => {
+    let mediaSession: TaskMediaSessionRecord | null = null;
+    const mediaEvidence = new TaskMediaSubmissionEvidenceService({
+      async findSession() { return mediaSession; },
+    }, { async findTaskDubbingWork() { return null; } });
+    const media = { reviewVersion: 3, reviewedBy: TEACHER_ID,
+      reviewedAt: '2026-09-16T00:00:00.000Z', copyrightStatus: 'unverified',
+      copyrightEvidenceKey: null, scanStatus: 'pending', transcodeStatus: 'pending',
+      mediaAssetKey: 'cloud://demo/private-video.mp4', mediaSha256: 'a'.repeat(64), durationMs: 10000,
+      allowedClassIds: [CLASS_ID],
+      sourceScanEvidence: null, transcodeEvidence: null, scanEvidence: null,
+      directUploadEvidence: { verifiedAt: '2026-09-16T00:00:00.000Z',
+        mediaSha256: 'a'.repeat(64), mediaAssetKey: 'cloud://demo/private-video.mp4',
+        durationMs: 10000, videoCodec: 'h264', audioCodec: 'aac' },
+      questionIds: ['video_q1'], questions: [{ questionId: 'video_q1',
+        questionType: 'single_choice', stem: 'Which word?', options: ['hello', 'goodbye'] }],
+      answerKeys: [{ questionId: 'video_q1', correctAnswer: 'hello', explanation: 'Spoken in video.' }],
+      clips: [], continuousPlaybackEnforced: true };
+    const harness = createHarness({ resourceType: 'video', mediaEvidence, resourcePayload: {
+      teacherPrivate: { ownerTeacherId: TEACHER_ID }, teacherMedia: media } });
+    const draft = await harness.service.saveTaskDraft(teacher, { title: '本人视频任务',
+      itemRefs: [{ id: 'item_video', resourceId: 'resource_demo_exercise',
+        completionRule: { kind: 'video', durationMs: 10000, questionIds: ['video_q1'] },
+        scoringRule: { kind: 'automatic' }, order: 1 }], targetClassIds: [CLASS_ID],
+      startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+      latePolicy: { allowLate: true, lateDays: 7 }, description: '', teacherNote: '',
+    }, 0, 'operation_private_video_save');
+    expect(draft.ok).toBe(true);
+    if (!draft.ok) return;
+    expect(await harness.service.publishTask(teacher, String(draft.data.taskId), 1,
+      'operation_private_video_publish')).toMatchObject({ ok: true });
+    expect(harness.repository.debugSnapshot().tasks[0]?.items[0]?.mediaSnapshot?.questionIds)
+      .toEqual(['video_q1']);
+    const assignment = harness.repository.debugSnapshot().assignments[0]!;
+    mediaSession = { id: 'private_video_session', organizationId: ORGANIZATION_ID,
+      studentId: STUDENT_ID, assignmentId: assignment.id, round: 1,
+      taskId: String(draft.data.taskId), itemId: 'item_video',
+      mediaId: 'resource_demo_exercise', mediaVersion: 3,
+      confirmedThroughMs: 9000, createdAt: '2026-09-16T01:00:00.000Z',
+      lastHeartbeatAt: '2026-09-16T01:00:10.000Z',
+      expiresAt: '2026-09-16T03:00:00.000Z', version: 2 };
+    expect(await harness.service.submit(student, String(draft.data.taskId), [{ itemId: 'item_video',
+      value: { kind: 'video', mediaSessionId: mediaSession.id } }], 1, undefined,
+    'operation_private_video_missing_answer')).toMatchObject({ ok: false });
+    expect(await harness.service.submit(student, String(draft.data.taskId), [{ itemId: 'item_video',
+      value: { kind: 'video', mediaSessionId: mediaSession.id,
+        questionResponses: [{ questionId: 'video_q1', response: 'hello' }] } }], 1, undefined,
+    'operation_private_video_submit')).toMatchObject({ ok: true });
+    const submission = harness.repository.debugSnapshot().submissions.find(row => row.status === 'submitted')!;
+    expect(submission.answers[0]?.value).toMatchObject({ correctQuestionIds: ['video_q1'] });
+    expect(await harness.service.publishReview(teacher, { submissionId: submission.id,
+      decision: 'approved', textComment: '完成得很好', expectedSubmissionVersion: 1 }, 2,
+    'operation_private_video_review')).toMatchObject({ ok: true });
+    expect(await harness.service.getParentTaskResult(parent, STUDENT_ID,
+      String(draft.data.taskId))).toMatchObject({ ok: true, data: { feedback: { score: 100 } } });
+    const nonOwner = { ...teacher, actorUserId: 'another_teacher' };
+    expect(await harness.service.copyTaskSnapshot(nonOwner, String(draft.data.taskId), 2,
+      'operation_other_teacher_copy')).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+  });
+
+  it('本地视频与任务配音分别采信九成连续进度和当前任务封存作品', async () => {
+    for (const kind of ['video', 'dubbing'] as const) {
+      let session: TaskMediaSessionRecord | null = null;
+      let taskId = '';
+      let workId = '';
+      const mediaEvidence = new TaskMediaSubmissionEvidenceService({ async findSession() { return session; } },
+        { async findTaskDubbingWork(id) { return kind === 'dubbing' && id === workId ? {
+          id, organizationId: ORGANIZATION_ID, studentId: STUDENT_ID,
+          assignmentId: `assignment_${taskId}_${STUDENT_ID}`, round: 1, taskId,
+          itemId: 'item_media', mediaId: 'resource_demo_exercise', mediaVersion: 3,
+          status: 'submitted' as const, fileId: 'cloud://private/task-work.mp3',
+          contentSha256: 'b'.repeat(64), mediaDeletedAt: null,
+          recording: { mediaId: 'recording_task_demo', durationMs: 3000,
+            sizeBytes: 1024, serverReadable: true },
+        } : null; } });
+      const harness = createHarness({ resourceType: kind, mediaEvidence, resourcePayload: {
+        assetLibrary: CENTRAL_MEDIA_ORIGIN, teacherMedia: {
+        title: `虚构${kind}素材`, reviewVersion: 3, reviewedBy: 'reviewer_demo',
+        reviewedAt: '2026-09-16T00:00:00.000Z', copyrightStatus: 'verified',
+        copyrightEvidenceKey: 'cloud://demo/fictional-proof.txt',
+        scanStatus: 'clean', transcodeStatus: 'ready',
+        mediaAssetKey: 'cloud://demo/media.mp4', mediaSha256: 'a'.repeat(64), durationMs: 10000,
+        allowedClassIds: [CLASS_ID],
+        sourceScanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+          scannedAt: '2026-09-15T23:58:00.000Z', scannedSha256: 'b'.repeat(64),
+          reportId: 'virtual_source_scan_01' },
+        scanEvidence: { engine: 'clamav', signatureVersion: 'virtual-unit-v1',
+          scannedAt: '2026-09-16T00:00:00.000Z', scannedSha256: 'a'.repeat(64), reportId: 'virtual_scan_01' },
+        transcodeEvidence: { engine: 'ffmpeg', engineVersion: 'virtual-unit-v1',
+          transcodedAt: '2026-09-15T23:59:00.000Z', sourceSha256: 'b'.repeat(64),
+          outputSha256: 'a'.repeat(64),
+          outputAssetKey: 'cloud://demo/media.mp4' },
+        questionIds: [], questions: [], answerKeys: [], clips: [], continuousPlaybackEnforced: true,
+        ...(kind === 'dubbing' ? { subtitleAssetKey: 'cloud://demo/subtitle.vtt',
+          subtitleCues: [{ startMs: 0, endMs: 10000, text: 'Hello.' }] } : {}),
+      } } });
+      const draft = await harness.service.saveTaskDraft(teacher, { title: `虚构${kind}任务`,
+        itemRefs: [{ id: 'item_media', resourceId: 'resource_demo_exercise',
+          completionRule: kind === 'video' ? { kind, durationMs: 10000, questionIds: [] } : { kind },
+          scoringRule: kind === 'video' ? { kind: 'completion_only' } : { kind: 'manual', maxScore: 100 },
+          order: 1 }], targetClassIds: [CLASS_ID],
+        startsAt: '2026-09-16T00:00:00.000Z', dueAt: '2026-09-16T12:00:00.000Z',
+        latePolicy: { allowLate: true, lateDays: 7 }, description: '虚构媒体', teacherNote: '',
+      }, 0, `operation_${kind}_draft`);
+      if (!draft.ok || typeof draft.data.taskId !== 'string') throw new Error('draft expected');
+      taskId = draft.data.taskId;
+      expect(await harness.service.publishTask(teacher, taskId, 1, `operation_${kind}_publish`))
+        .toMatchObject({ ok: true });
+      const assignment = harness.repository.debugSnapshot().assignments[0]!;
+      session = { id: `media_session_${kind}`, organizationId: ORGANIZATION_ID,
+        studentId: STUDENT_ID, assignmentId: assignment.id, round: 1, taskId,
+        itemId: 'item_media', mediaId: 'resource_demo_exercise', mediaVersion: 3,
+        confirmedThroughMs: kind === 'video' ? 9000 : 10000,
+        createdAt: '2026-09-16T01:00:00.000Z', lastHeartbeatAt: '2026-09-16T01:00:10.000Z',
+        expiresAt: '2026-09-16T03:00:00.000Z', version: 2 };
+      workId = `work_${kind}_demo`;
+      const answer = kind === 'video' ? { kind, mediaSessionId: session.id }
+        : { kind, mediaSessionId: session.id, finalWorkId: workId };
+      expect(await harness.service.submit(student, taskId,
+        [{ itemId: 'item_media', value: answer }], 1, undefined, `operation_${kind}_submit`))
+        .toMatchObject({ ok: true });
+      const formal = harness.repository.debugSnapshot().submissions.find(row => row.status === 'submitted')!;
+      if (kind === 'video') {
+        expect(formal.answers[0]?.value).toMatchObject({ kind: 'video',
+          verifiedRanges: [{ startMs: 0, endMs: 9000 }] });
+      } else {
+        expect(formal.answers[0]?.value).toMatchObject({ kind: 'dubbing', finalWorkId: workId });
+        expect(await harness.service.publishReview(teacher, { submissionId: formal.id,
+          decision: 'approved', textComment: '虚构点评', expectedSubmissionVersion: 1 }, 2,
+        'operation_dubbing_unscored')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+        expect(await harness.service.publishReview(teacher, { submissionId: formal.id,
+          decision: 'approved', itemScores: [{ itemId: 'item_media', score: 80 }],
+          textComment: '虚构点评', expectedSubmissionVersion: 1 }, 2,
+        'operation_dubbing_review')).toMatchObject({ ok: true });
+        expect(await harness.service.getParentTaskResult(parent, STUDENT_ID, taskId))
+          .toMatchObject({ ok: true, data: { feedback: { score: 80 } } });
+      }
+    }
+  });
+
   it('限制任务说明、教师备注、点评和退回原因长度', async () => {
     const harness = createHarness();
     expect(await harness.service.saveTaskDraft(teacher, {
@@ -1367,6 +1821,37 @@ describe('M1 本地任务持久化闭环', () => {
     }, 2, 'operation_review_overlong_reason')).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { returnReason: expect.any(String) } } });
   });
 
+  it('教师正式点评仅接受当前提交绑定的已封存语音编号并持久化私有引用', async () => {
+    const reviewVoice: Pick<ReviewVoiceCommentService, 'resolveForFeedback'> = {
+      async resolveForFeedback(actor, submissionId, version, recordingId) {
+        return actor.actorUserId === TEACHER_ID && submissionId.startsWith('submission_')
+          && version === 1 && recordingId === 'review_voice_demo'
+          ? { recordingId, fileId: 'cloud://private/review.mp3', contentSha256: 'a'.repeat(64),
+            durationMs: 3000, sizeBytes: 1024, mediaVersion: 1 } : null;
+      },
+    };
+    const harness = createHarness({ reviewVoice });
+    const taskId = await publishSingleStudentTask(harness);
+    const submitted = await harness.service.submit(student, taskId,
+      [{ itemId: 'item_exercise', value: exerciseResult('voice-review') }], 1, undefined,
+      'operation_voice_submit');
+    if (!submitted.ok || typeof submitted.data.submissionId !== 'string') throw new Error('submission expected');
+    const submissionId = submitted.data.submissionId;
+    expect(await harness.service.publishReview(teacher, { submissionId, decision: 'approved',
+      score: 80, voiceRecordingId: 'review_voice_other', expectedSubmissionVersion: 1 }, 2,
+    'operation_voice_wrong')).toMatchObject({ ok: false, error: { code: 'MEDIA_INVALID' } });
+    expect(await harness.service.publishReview(teacher, { submissionId, decision: 'approved',
+      score: 80, textComment: '加油', voiceRecordingId: 'review_voice_demo', expectedSubmissionVersion: 1 }, 2,
+    'operation_voice_publish')).toMatchObject({ ok: true });
+    const feedback = harness.repository.debugSnapshot().feedback[0];
+    expect(feedback?.voiceComment).toMatchObject({ recordingId: 'review_voice_demo',
+      fileId: 'cloud://private/review.mp3', sha256: 'a'.repeat(64), mediaDeletedAt: null });
+    expect(await harness.service.getParentTaskResult(parent, STUDENT_ID, taskId))
+      .toMatchObject({ ok: true, data: { feedback: { textComment: '加油', score: 80 } } });
+    expect(JSON.stringify((await harness.service.getParentTaskResult(parent, STUDENT_ID, taskId))))
+      .not.toContain('cloud://private/review.mp3');
+  });
+
   it('人工评分精确绑定提交版本且每版本至多一个反馈，家长只能读取已绑定孩子结果', async () => {
     const harness = createHarness();
     const taskId = await publishSingleStudentTask(harness);
@@ -1387,14 +1872,16 @@ describe('M1 本地任务持久化闭环', () => {
       expectedSubmissionVersion: 2,
     }, 2, 'operation_review_stale_submission');
     expect(staleReview).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
-    const reviewed = await harness.service.publishReview(teacher, {
+    const reviewInput = {
       submissionId,
       decision: 'approved',
       score: 92,
       textComment: '完成认真，继续保持。',
       expectedSubmissionVersion: 1,
-    }, 2, 'operation_review_approved');
+    } as const;
+    const reviewed = await harness.service.publishReview(teacher, reviewInput, 2, 'operation_review_approved');
     expect(reviewed).toMatchObject({ ok: true, data: { submissionVersion: 1, decision: 'approved', assignmentVersion: 3 } });
+    expect(await harness.service.publishReview(teacher, reviewInput, 2, 'operation_review_approved')).toEqual(reviewed);
 
     const duplicate = await harness.service.publishReview(teacher, {
       submissionId,
@@ -1410,11 +1897,15 @@ describe('M1 本地任务持久化闭环', () => {
       data: {
         title: '动物主题听说练习',
         assignmentStatus: 'completed',
-        submission: { id: submissionId, version: 1, answers: [{ itemId: 'item_exercise', value: exerciseResult('answer-v1') }] },
+        submission: { id: submissionId, version: 1, answers: [{ itemId: 'item_exercise',
+          value: { kind: 'exercise', answeredQuestionCount: 1 } }] },
         feedback: { decision: 'approved', score: 92, textComment: '完成认真，继续保持。' },
       },
     });
-    if (parentView.ok) expect(parentView.data).not.toHaveProperty('teacherNote');
+    if (parentView.ok) {
+      expect(parentView.data).not.toHaveProperty('teacherNote');
+      expect(JSON.stringify(parentView.data)).not.toContain('responseKey');
+    }
   });
 
   it('批量点评只写入预览时实际符合条件的提交，并保持幂等、原子审计且不覆盖已有点评', async () => {
@@ -1596,6 +2087,52 @@ describe('M1 本地任务持久化闭环', () => {
     snapshot = harness.repository.debugSnapshot();
     expect(snapshot.feedback).toHaveLength(2);
     expect(snapshot.assignments.every((item) => item.status === 'completed' && item.version === 3)).toBe(true);
+  });
+
+  it('rejects an old AI prompt while allowing a teacher-edited current suggestion', async () => {
+    let suggestion: TeacherSuggestionRecord | null = null;
+    const harness = createHarness({ teacherSuggestions: {
+      async findById(organizationId, teacherId, suggestionId) {
+        return suggestion?.organizationId === organizationId && suggestion.teacherId === teacherId
+          && suggestion.id === suggestionId ? suggestion : null;
+      },
+    } });
+    const taskId = await publishSingleStudentTask(harness,
+      { kind: 'exercise_questions', requiredQuestionCount: 1 }, { kind: 'automatic', maxScore: 100 });
+    const submitted = await harness.service.submit(student, taskId,
+      [{ itemId: 'item_exercise', value: exerciseResult('answer-v1') }],
+      1, undefined, 'operation_submit_ai_prompt_gate');
+    if (!submitted.ok || typeof submitted.data.submissionId !== 'string') throw new Error('submission expected');
+    const submissionId = submitted.data.submissionId;
+    suggestion = { id: 'suggestion_prompt_test', organizationId: ORGANIZATION_ID,
+      teacherId: TEACHER_ID, taskId, submissionId, submissionVersion: 1,
+      assignmentVersion: 2, operationId: 'operation_generate_ai_prompt_gate',
+      evidenceDigest: 'a'.repeat(64), modelVersion: 'qwen3-0.6b-q4_0-b11345',
+      promptVersion: 'teacher-v5', text: '这次习题已记录作答，当前有一题需要教师进一步核对。建议请学生解释选择理由，再安排同类练习观察后续理解是否稳定。',
+      citedFactIds: ['exercise'], status: 'trial', generationNumber: 1,
+      failureReason: null, version: 2, createdAt: '2026-09-16T02:00:00.000Z' };
+    const reviewInput = { submissionId, decision: 'approved', expectedSubmissionVersion: 1,
+      textComment: '这次习题已记录作答，建议对照题干解释选择理由并练习同类题。',
+      aiSuggestionId: suggestion.id } as const;
+    expect(await harness.service.publishReview(teacher, reviewInput, 2, 'operation_publish_old_ai'))
+      .toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    expect(harness.repository.debugSnapshot().feedback).toHaveLength(0);
+
+    suggestion = { ...suggestion, promptVersion: 'teacher-v13',
+      text: '本次提交均通过考核完成，表现良好。教师可核对细节并安排练习，确保所有作答准确无误。' };
+    expect(await harness.service.publishReview(teacher, reviewInput, 2, 'operation_publish_unsafe_ai'))
+      .toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    expect(harness.repository.debugSnapshot().feedback).toHaveLength(0);
+
+    suggestion = { ...suggestion,
+      text: '这次习题已记录作答，当前有一题需要教师进一步核对。建议请学生解释选择理由，再安排同类练习观察后续理解是否稳定。' };
+    const published = await harness.service.publishReview(teacher, reviewInput, 2,
+      'operation_publish_current_ai');
+    expect(published).toMatchObject({ ok: true });
+    expect(harness.repository.debugSnapshot().feedback).toHaveLength(1);
+    expect(harness.repository.debugSnapshot().feedback[0]?.aiAssistance).toMatchObject({
+      suggestionId: suggestion.id, promptVersion: 'teacher-v13', teacherEditedText: true,
+    });
   });
 
   it('退回原因必填、最多退回两次，并为每次重做创建递增且不可覆盖的提交版本', async () => {

@@ -62,6 +62,13 @@ export function validateActivitySchedule(schedule: ActivitySchedule): boolean {
     || new Set(schedule.restDates).size !== schedule.restDates.length
     || schedule.restDates.some((date) => !validLocalDate(date) || date < schedule.startsOn || date > schedule.endsOn)) return false;
   if (!schedule.conditions.every(validCondition)) return false;
+  // An activity made entirely of rest days has no work a student can complete.
+  const rest = new Set(schedule.restDates);
+  let hasEffectiveDay = false;
+  for (let date = schedule.startsOn; date <= schedule.endsOn; date = nextLocalDate(date)) {
+    if (!rest.has(date)) { hasEffectiveDay = true; break; }
+  }
+  if (!hasEffectiveDay) return false;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: schedule.schoolTimeZone });
     return true;

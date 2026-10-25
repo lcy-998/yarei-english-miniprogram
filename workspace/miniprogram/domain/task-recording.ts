@@ -8,6 +8,7 @@ export interface RecordingPromptView {
   allowedClassIds: string[]
 }
 export interface RecordingPromptPage { items: RecordingPromptView[]; nextOffset: number | null }
+export interface RecordingPromptFacet { grade: string; unit: string }
 export interface TaskRecordingView {
   id: string
   taskId: string

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseBuffer } from 'music-metadata';
 import type { TrustedActorContext } from '../../src/auth/trusted-actor';
 import { TaskRecordingService } from '../../src/task-recording/service';
 import { TaskRecordingCatalogService } from '../../src/task-recording/catalog-service';
@@ -16,6 +18,7 @@ import { FakeDocumentDatabase } from '../../src/repositories/fake-document-datab
 import type { VersionedDocument } from '../../src/repositories/document-database-port';
 import type { TaskRecord, TaskAssignmentRecord, SubmissionRecord } from '../../src/task-core/types';
 import { automaticTaskScore } from '../../src/task-core/task-score';
+import { hashHex } from '../../src/shared/request-summary';
 
 const now = '2026-09-26T12:00:00.000+08:00';
 const teacher: TrustedActorContext = { requestId: 'req_teacher', sessionId: 'ses_teacher',
@@ -61,6 +64,14 @@ function harness(seal?: TaskRecordingSealPort, submissions: readonly SubmissionR
 }
 
 describe('M2 录音任务可信证据', () => {
+  it('拒绝在创建上传意图满 60 天后封存旧草稿', async () => {
+    const { service, setNow } = harness();
+    const draft = await service.begin(student, 'task_1', 'item_1', 'old_recording_begin');
+    setNow(new Date(Date.parse(draft.createdAt) + 60 * 86400000).toISOString());
+    await expect(service.submit(student, draft.id, `cloud://virtual-env/${draft.stagingPath}`,
+      draft.version, 'old_recording_submit')).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
   it('教师只看到授权且无需视频的文字提示，按页查找', async () => {
     const prompt: VersionedDocument = { _id: 'prompt_1', id: 'prompt_1', organizationId: 'org_1',
       schemaVersion: 1, version: 1, deletedAt: null, type: 'recording', status: 'published',
@@ -73,7 +84,11 @@ describe('M2 录音任务可信证据', () => {
     const { tasks } = harness();
     const catalog = new TaskRecordingCatalogService(database, tasks);
     expect(await catalog.list(teacher, { targetClassIds: ['class_1'], keyword: 'cat', limit: 20, offset: 0 }))
-      .toMatchObject({ items: [{ id: 'prompt_1' }], nextOffset: null });
+      .toMatchObject({ items: [{ id: 'prompt_1' }, { id: 'prompt_other' }], nextOffset: null });
+    expect(await catalog.list(teacher, { targetClassIds: ['class_1'], grade: '四年级', limit: 20, offset: 0 }))
+      .toMatchObject({ items: [], nextOffset: null });
+    expect(await catalog.facets(teacher, ['class_1']))
+      .toEqual([{ grade: '三年级', unit: 'Unit 1' }]);
     const bothClasses = { ...teacher, scopeIds: ['class_1', 'class_2'] };
     const bothTasks = new InMemoryTaskQueryRepository({ teacherGrants: [
       { id: 'grant_1', organizationId: 'org_1', teacherId: 'teacher_1', classId: 'class_1', className: '三年级 1 班',
@@ -85,15 +100,18 @@ describe('M2 录音任务可信证据', () => {
     expect((await unionCatalog.list(bothClasses, { limit: 20, offset: 0 })).items.map(item => item.id))
       .toEqual(['prompt_1', 'prompt_other']);
     expect((await unionCatalog.list(bothClasses, { targetClassIds: ['class_1', 'class_2'], limit: 20, offset: 0 })).items)
-      .toEqual([]);
+      .toMatchObject([{ id: 'prompt_1' }, { id: 'prompt_other' }]);
     await expect(unionCatalog.get(bothClasses, 'prompt_other')).resolves.toMatchObject({ id: 'prompt_other' });
     expect(validateTaskRecordingQueryRequest({ apiVersion: 'm1.v1', action: 'listPrompts', payload: {
       page: { limit: 20, offset: 0 },
     } })).toMatchObject({ ok: true, value: { action: 'listPrompts' } });
+    expect(validateTaskRecordingQueryRequest({ apiVersion: 'm1.v1', action: 'listPromptFacets', payload: {
+      targetClassIds: ['class_1'],
+    } })).toMatchObject({ ok: true, value: { action: 'listPromptFacets' } });
     await expect(catalog.get(teacher, 'prompt_other', ['class_1']))
-      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+      .resolves.toMatchObject({ id: 'prompt_other', allowedClassIds: [] });
     await expect(catalog.list({ ...teacher, scopeIds: [] }, { targetClassIds: ['class_1'], limit: 20, offset: 0 }))
-      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+      .resolves.toMatchObject({ items: [{ id: 'prompt_1', allowedClassIds: [] }, { id: 'prompt_other', allowedClassIds: [] }] });
   });
 
   it('本人当前任务可创建草稿并服务端封存；他人、无效媒体与未提交证据不能冒用', async () => {
@@ -125,8 +143,10 @@ describe('M2 录音任务可信证据', () => {
   });
 
   it('封存只接受当前组织与本人摘要的 staging 路径，并写入独立私有路径', async () => {
-    const ownerDigest = createHash('sha256').update(JSON.stringify(['org_1', 'student_1'])).digest('hex');
-    const stagingPath = `task-recordings/staging/${ownerDigest}/recording_demo_1.mp3`;
+    const ownerKey = JSON.stringify(['org_1', 'student_1']);
+    const stagingOwnerDigest = hashHex(ownerKey);
+    const privateOwnerDigest = createHash('sha256').update(ownerKey).digest('hex');
+    const stagingPath = `task-recordings/staging/${stagingOwnerDigest}/recording_demo_1.mp3`;
     const uploads: string[] = [];
     const seal = new CloudBaseTaskRecordingSeal({
       downloadFile: async () => ({ fileContent: Buffer.alloc(1200, 7) }),
@@ -136,16 +156,61 @@ describe('M2 录音任务可信证据', () => {
       organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_demo_1' };
     expect(await seal.inspectAndSeal(input)).toMatchObject({ durationMs: 3400, codec: 'mp3' });
     expect(uploads).toHaveLength(1);
-    expect(uploads[0]).toMatch(new RegExp(`^task-recordings/private/${ownerDigest}/recording_demo_1/[a-f0-9]{64}\\.mp3$`));
+    expect(uploads[0]).toMatch(new RegExp(`^task-recordings/private/${privateOwnerDigest}/recording_demo_1/[a-f0-9]{64}\\.mp3$`));
+    const aacPath = `task-recordings/staging/${stagingOwnerDigest}/recording_demo_aac.mp3`;
+    const aacSeal = new CloudBaseTaskRecordingSeal({
+      downloadFile: async () => ({ fileContent: Buffer.alloc(1600, 8) }),
+      uploadFile: async ({ cloudPath }) => { uploads.push(cloudPath); return { fileID: `cloud://virtual-env/${cloudPath}` }; },
+    }, 'virtual-env', { read: async () => ({ durationSeconds: 2.1, codec: 'AAC', container: 'ADTS' }) });
+    const aacResult = await aacSeal.inspectAndSeal({ stagingFileId: `cloud://virtual-env/${aacPath}`,
+      stagingPath: aacPath, organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_demo_aac' });
+    expect(aacResult).toMatchObject({ durationMs: 2100, codec: 'aac' });
+    expect(uploads[1]).toMatch(new RegExp(`^task-recordings/private/${privateOwnerDigest}/recording_demo_aac/[a-f0-9]{64}\\.aac$`));
     await expect(seal.inspectAndSeal({ ...input, studentId: 'student_other' }))
       .rejects.toMatchObject({ code: 'MEDIA_INVALID' });
     await expect(seal.inspectAndSeal({ ...input, stagingFileId: `cloud://other-env/${stagingPath}` }))
       .rejects.toMatchObject({ code: 'MEDIA_INVALID' });
-    expect(uploads).toHaveLength(1);
+    expect(uploads).toHaveLength(2);
   });
 
-  it('服务端拒绝非 MP3、过短和超过大小限制的录音，不封存无效文件', async () => {
-    const ownerDigest = createHash('sha256').update(JSON.stringify(['org_1', 'student_1'])).digest('hex');
+  it('创建草稿签发的暂存路径可直接通过云端封存校验', async () => {
+    const draft = await harness().service.begin(student, 'task_1', 'item_1', 'operation_begin_path_1');
+    const seal = new CloudBaseTaskRecordingSeal({
+      downloadFile: async () => ({ fileContent: Buffer.alloc(1200, 7) }),
+      uploadFile: async ({ cloudPath }) => ({ fileID: `cloud://virtual-env/${cloudPath}` }),
+    }, 'virtual-env', { read: async () => ({ durationSeconds: 2, codec: 'MPEG Layer 3' }) });
+    await expect(seal.inspectAndSeal({ stagingFileId: `cloud://virtual-env/${draft.stagingPath}`,
+      stagingPath: draft.stagingPath, organizationId: student.organizationId,
+      studentId: student.actorUserId, recordingId: draft.id })).resolves.toMatchObject({
+        durationMs: 2000, codec: 'mp3',
+      });
+  });
+
+  it('将录音器生成的 WebM/Opus 安全转成 MP3 后再封存', async () => {
+    const inputBytes = readFileSync(new URL('./fixtures/synthetic-440hz-two-seconds.webm', import.meta.url));
+    const stagingPath = `task-recordings/staging/${hashHex(JSON.stringify(['org_1', 'student_1']))}/recording_webm_demo.mp3`;
+    let uploadedPath = '';
+    let uploadedBytes = Buffer.alloc(0);
+    const seal = new CloudBaseTaskRecordingSeal({
+      downloadFile: async () => ({ fileContent: inputBytes }),
+      uploadFile: async ({ cloudPath, fileContent }) => {
+        uploadedPath = cloudPath;
+        uploadedBytes = fileContent;
+        return { fileID: `cloud://virtual-env/${cloudPath}` };
+      },
+    }, 'virtual-env');
+    const sealed = await seal.inspectAndSeal({ stagingFileId: `cloud://virtual-env/${stagingPath}`,
+      stagingPath, organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_webm_demo' });
+    expect(sealed).toMatchObject({ codec: 'mp3', durationMs: 2000 });
+    expect(uploadedPath).toMatch(/\.mp3$/);
+    expect(uploadedBytes.equals(inputBytes)).toBe(false);
+    const metadata = await parseBuffer(uploadedBytes, { size: uploadedBytes.length }, { duration: true });
+    expect(metadata.format.codec?.toLowerCase()).toContain('layer 3');
+    expect(metadata.format.duration).toBeCloseTo(2, 1);
+  });
+
+  it('服务端拒绝不支持的编码、过短和超过大小限制的录音，不封存无效文件', async () => {
+    const ownerDigest = hashHex(JSON.stringify(['org_1', 'student_1']));
     const stagingPath = `task-recordings/staging/${ownerDigest}/recording_demo_2.mp3`;
     const input = { stagingFileId: `cloud://virtual-env/${stagingPath}`, stagingPath,
       organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_demo_2' };
@@ -157,7 +222,7 @@ describe('M2 录音任务可信证据', () => {
       },
     });
     await expect(new CloudBaseTaskRecordingSeal(storage(Buffer.alloc(1200, 7)), 'virtual-env',
-      { read: async () => ({ durationSeconds: 2, codec: 'AAC' }) }).inspectAndSeal(input))
+      { read: async () => ({ durationSeconds: 2, codec: 'FLAC' }) }).inspectAndSeal(input))
       .rejects.toMatchObject({ code: 'MEDIA_INVALID' });
     await expect(new CloudBaseTaskRecordingSeal(storage(Buffer.alloc(1200, 7)), 'virtual-env',
       { read: async () => ({ durationSeconds: 0.5, codec: 'MPEG Layer 3' }) }).inspectAndSeal(input))
@@ -169,7 +234,7 @@ describe('M2 录音任务可信证据', () => {
   });
 
   it('暂存文件下载故障可重试，不误判为音频无效或创建私有副本', async () => {
-    const ownerDigest = createHash('sha256').update(JSON.stringify(['org_1', 'student_1'])).digest('hex');
+    const ownerDigest = hashHex(JSON.stringify(['org_1', 'student_1']));
     const stagingPath = `task-recordings/staging/${ownerDigest}/recording_demo_3.mp3`;
     const input = { stagingFileId: `cloud://virtual-env/${stagingPath}`, stagingPath,
       organizationId: 'org_1', studentId: 'student_1', recordingId: 'recording_demo_3' };

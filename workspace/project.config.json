@@ -14,7 +14,7 @@
     },
     "coverView": false,
     "postcss": false,
-    "minified": false,
+    "minified": true,
     "enhance": true,
     "showShadowRootInWxmlPanel": false,
     "packNpmRelationList": [],
@@ -47,7 +47,27 @@
   "packOptions": {
     "ignore": [
       {
-        "value": "assets/g0/mascot-speaking-pink.png",
+        "value": "assets/content/m2-zoo-friends-cover-v1.jpg",
+        "type": "file"
+      },
+      {
+        "value": "assets/content/demo-sync-textbook-cover-v1.jpg",
+        "type": "file"
+      },
+      {
+        "value": "assets/content/demo-current-affairs-cover-v1.jpg",
+        "type": "file"
+      },
+      {
+        "value": "assets/content/demo-original-reader-cover-v1.jpg",
+        "type": "file"
+      },
+      {
+        "value": "assets/content/demo-chapter-reader-cover-v1.jpg",
+        "type": "file"
+      },
+      {
+        "value": "miniprogram_npm/@cloudbase/js-sdk/index.js",
         "type": "file"
       }
     ],

@@ -13,6 +13,7 @@ const SAFE_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   NOT_FOUND: '请求的内容不存在或当前不可见。',
   CONFLICT: '内容已发生变化，请刷新后重试。',
   RESOURCE_OFFLINE: '该资源当前不可用于新操作。',
+  ACTIVITY_PENDING_REVIEW: '仍有待评分习题，完成点评后再结算打卡活动。',
   MEDIA_INVALID: '录音文件无效或超出时长、大小限制，请重录后重试。',
   TASK_NOT_SUBMITTABLE: '当前任务不在可提交状态。',
   REDO_LIMIT_REACHED: '已达到允许的重做次数。',

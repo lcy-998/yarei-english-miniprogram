@@ -1,10 +1,12 @@
 import type { ActivityTransaction, ActivityUnitOfWork } from './repository';
-import type { ActivityClass, ActivityConditionResource, ActivityEntity, ActivityExerciseSource, ActivityFinalSnapshot, ActivityGrant, ActivityMembership,
+import { ActivityError } from './types';
+import type { ActivityClass, ActivityConditionResource, ActivityEntity, ActivityExerciseOpportunity, ActivityExerciseSource, ActivityFinalSnapshot, ActivityGrant, ActivityMembership,
   ActivityOperationReceipt, ActivityOrganization, ActivityOverrideReceipt, ActivityOverrideRecord, ActivityUser } from './types';
 import type { ReadingPageEventRecord } from '../learning-progress/types';
 import type { VocabularyAttemptRecord } from '../vocabulary-evidence/types';
 import type { StudentWork } from '../student-work/types';
 import type { ReviewFeedbackRecord, SubmissionRecord, TaskAssignmentRecord, TaskRecord } from '../task-core/types';
+import type { OperationLogRecord } from '../runtime/records';
 
 export interface ActivityFixture {
   readonly organizations?: readonly ActivityOrganization[];
@@ -25,6 +27,7 @@ export interface ActivityFixture {
   readonly overrides?: readonly ActivityOverrideRecord[];
   readonly overrideReceipts?: readonly ActivityOverrideReceipt[];
   readonly finalSnapshots?: readonly ActivityFinalSnapshot[];
+  readonly audits?: readonly OperationLogRecord[];
 }
 
 function copy<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
@@ -48,6 +51,7 @@ interface MutableActivityState {
   overrides: ActivityOverrideRecord[];
   overrideReceipts: ActivityOverrideReceipt[];
   finalSnapshots: ActivityFinalSnapshot[];
+  audits: OperationLogRecord[];
 }
 
 export class InMemoryActivityRepository implements ActivityUnitOfWork, ActivityTransaction {
@@ -64,7 +68,7 @@ export class InMemoryActivityRepository implements ActivityUnitOfWork, ActivityT
       submissions: [...(fixture.submissions ?? [])], feedback: [...(fixture.feedback ?? [])],
       activities: [...(fixture.activities ?? [])], receipts: [...(fixture.receipts ?? [])],
       overrides: [...(fixture.overrides ?? [])], overrideReceipts: [...(fixture.overrideReceipts ?? [])],
-      finalSnapshots: [...(fixture.finalSnapshots ?? [])] });
+      finalSnapshots: [...(fixture.finalSnapshots ?? [])], audits: [...(fixture.audits ?? [])] });
   }
 
   public async transaction<T>(work: (transaction: ActivityTransaction) => Promise<T>): Promise<T> {
@@ -136,6 +140,21 @@ export class InMemoryActivityRepository implements ActivityUnitOfWork, ActivityT
     }
     return result;
   }
+  public async listExerciseOpportunities(organizationId: string, classId: string,
+    resourceId: string): Promise<readonly ActivityExerciseOpportunity[]> {
+    return copy(this.state.tasks.filter(task => task.organizationId === organizationId
+      && task.publishedAt !== null && task.visibility === 'visible'
+      && (task.status === 'scheduled' || task.status === 'active' || task.status === 'expired')
+      && task.items.some(item => item.resourceId === resourceId && item.resourceSnapshot.type === 'exercise'))
+      .map(task => ({ taskId: task.id,
+        resourceVersion: String(task.items.find(item => item.resourceId === resourceId)!.resourceVersion),
+        startsAt: task.startsAt, dueAt: task.dueAt,
+        lateDays: task.latePolicy.allowLate ? task.latePolicy.lateDays : 0,
+        studentIds: this.state.assignments.filter(assignment => assignment.organizationId === organizationId
+          && assignment.classId === classId && assignment.taskId === task.id
+          && assignment.latestSubmissionId === null && assignment.status !== 'completed'
+          && assignment.status !== 'awaiting_review').map(assignment => assignment.studentId) })));
+  }
   public async findActivity(organizationId: string, activityId: string): Promise<ActivityEntity | null> {
     return copy(this.state.activities.find(item => item.organizationId === organizationId && item.id === activityId) ?? null);
   }
@@ -148,6 +167,14 @@ export class InMemoryActivityRepository implements ActivityUnitOfWork, ActivityT
     if (index >= 0 && this.state.activities[index]?.version !== expectedVersion) return false;
     if (index < 0) this.state.activities.push(copy(activity));
     else this.state.activities[index] = copy(activity);
+    return true;
+  }
+
+  public async deleteActivity(activity: ActivityEntity): Promise<boolean> {
+    const index = this.state.activities.findIndex(item => item.organizationId === activity.organizationId
+      && item.id === activity.id && item.version === activity.version);
+    if (index < 0) return false;
+    this.state.activities.splice(index, 1);
     return true;
   }
   public async findReceipt(organizationId: string, actorUserId: string, action: ActivityOperationReceipt['action'], operationId: string): Promise<ActivityOperationReceipt | null> {
@@ -189,6 +216,10 @@ export class InMemoryActivityRepository implements ActivityUnitOfWork, ActivityT
     if (this.state.finalSnapshots.some(item => item.organizationId === snapshot.organizationId && item.activityId === snapshot.activityId)) return false;
     this.state.finalSnapshots.push(copy(snapshot));
     return true;
+  }
+  public async appendAudit(entry: OperationLogRecord): Promise<void> {
+    if (this.state.audits.some(item => item.id === entry.id)) throw new ActivityError('CONFLICT');
+    this.state.audits.push(copy(entry));
   }
   public snapshot(): Readonly<MutableActivityState> { return copy(this.state); }
 }

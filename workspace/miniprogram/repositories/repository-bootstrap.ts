@@ -22,6 +22,7 @@ export type RepositoryStartupFailureReason =
   | 'CLIENT_SDK_UNAVAILABLE'
   | 'CONTEXT_UNAVAILABLE'
   | 'CLOUD_INITIALIZATION_FAILED'
+  | 'ACCOUNT_VERSION_UNAVAILABLE'
 
 export type RepositoryStartupResult =
   | Readonly<{ ok: true; mode: RepositoryMode; alreadyActive: boolean }>
@@ -49,17 +50,18 @@ export function initializeRepositories(
     }
     return {
       ok: false,
-      mode: startupState.status === 'active' ? startupState.mode : 'memory',
+      mode: startupState.status === 'active' ? startupState.mode : 'blocked',
       reason: 'ALREADY_ACTIVATED',
     }
   }
 
-  configureRepositories({ mode: 'memory' })
-
   if (configuration.mode === 'memory') {
+    configureRepositories({ mode: 'memory' })
     startupState = { status: 'active', mode: 'memory' }
     return { ok: true, mode: 'memory', alreadyActive: false }
   }
+
+  configureRepositories({ mode: 'blocked' })
 
   const envId = configuration.envId
   if (!isValidEnvId(envId)) return blockStartup('INVALID_ENV_ID')
@@ -76,7 +78,6 @@ export function initializeRepositories(
       context: dependencies.context,
     })
   } catch (_error: unknown) {
-    configureRepositories({ mode: 'memory' })
     return blockStartup('CLOUD_INITIALIZATION_FAILED')
   }
 
@@ -85,8 +86,17 @@ export function initializeRepositories(
 }
 
 function blockStartup(reason: RepositoryStartupFailureReason): RepositoryStartupResult {
+  configureRepositories({ mode: 'blocked' })
   startupState = { status: 'blocked', reason }
-  return { ok: false, mode: 'memory', reason }
+  return { ok: false, mode: 'blocked', reason }
+}
+
+export function blockRepositoryStartup(reason: RepositoryStartupFailureReason): RepositoryStartupResult {
+  if (startupState.status !== 'uninitialized') {
+    return { ok: false, mode: startupState.status === 'active' ? startupState.mode : 'blocked',
+      reason: 'ALREADY_ACTIVATED' }
+  }
+  return blockStartup(reason)
 }
 
 function isSameActivation(

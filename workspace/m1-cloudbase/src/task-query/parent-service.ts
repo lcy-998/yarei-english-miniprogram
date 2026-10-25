@@ -8,6 +8,9 @@ import type { ParentTaskResultView, ReviewFeedbackRecord, SubmissionRecord, Task
 import { automaticTaskScore } from '../task-core/task-score';
 import type { TaskQueryRepository } from './repository';
 import { InMemoryOpaqueCursorCodec } from './service';
+import { hasOnlyOfficialAutomaticItems } from './official-score';
+import { parentSafeAnswers } from './parent-answer-projection';
+import { parentVoiceCommentSummary } from './parent-feedback-voice';
 import type {
   CursorCodec,
   FeedbackDetailView,
@@ -15,8 +18,8 @@ import type {
   PageResult,
   ParentChildListItem,
   ParentHomeView,
+  ParentTaskFilters,
   ParentTaskListItem,
-  StudentTaskFilters,
 } from './types';
 
 export interface ParentQueryServiceDependencies {
@@ -65,22 +68,37 @@ export class ParentTaskQueryService {
     const visible = records.filter((record) => isParentVisible(record.task, record.assignment));
     const items = await Promise.all(visible.map((record) => this.toListItem(actor.organizationId, record)));
     items.sort(parentTaskOrder);
-    const recentFeedback = items
-      .filter((item) => item.feedbackId !== null && item.feedbackPublishedAt !== null)
-      .sort((left, right) => (right.feedbackPublishedAt as string).localeCompare(left.feedbackPublishedAt as string))
-      .slice(0, 3)
-      .map((item) => {
-        const record = visible.find((candidate) => candidate.task.id === item.taskId) as ChildTaskRecord;
-        const feedback = record.feedback as ReviewFeedbackRecord;
-        return {
-          feedbackId: feedback.id,
-          taskId: item.taskId,
-          taskTitle: item.title,
-          decision: feedback.decision,
-          score: feedback.score,
-          publishedAt: feedback.publishedAt,
-        };
-      });
+    const organization = await this.dependencies.identities.findOrganization(actor.organizationId);
+    const timeZone = organization?.timeZone ?? 'Asia/Shanghai';
+    const { startsOn, endsOn } = schoolWeek(this.dependencies.clock.nowIso(), timeZone);
+    const weekItems = items.filter(item => {
+      const dueOn = schoolDate(item.dueAt, timeZone);
+      return dueOn >= startsOn && dueOn <= endsOn;
+    });
+    const visibleByAssignment = new Map(visible.map(record => [record.assignment.id, record]));
+    const submissions = (await this.dependencies.repository.listSubmissions(actor.organizationId))
+      .filter(submission => visibleByAssignment.has(submission.assignmentId)
+        && submission.studentId === childId && submission.submittedAt !== null);
+    const feedbackCandidates = await Promise.all(submissions.map(async submission => {
+      const feedback = await this.dependencies.repository.findFeedback(actor.organizationId, submission.id);
+      if (feedback === null) return null;
+      const record = visibleByAssignment.get(submission.assignmentId);
+      if (record === undefined) return null;
+      const teacher = await this.dependencies.identities.findUser(feedback.teacherId, actor.organizationId);
+      return {
+        feedbackId: feedback.id,
+        taskId: record.task.id,
+        taskTitle: record.task.title,
+        teacherName: teacher?.displayName ?? '任课教师',
+        textComment: feedback.textComment ?? feedback.returnReason,
+        decision: feedback.decision,
+        score: feedback.score,
+        publishedAt: feedback.publishedAt,
+      };
+    }));
+    const recentFeedback = feedbackCandidates.filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt))
+      .slice(0, 3);
     return success({
       childId,
       child: {
@@ -92,6 +110,10 @@ export class ParentTaskQueryService {
       },
       pendingTaskCount: items.filter((item) => !isCompletedStatus(item.status)).length,
       completedTaskCount: items.filter((item) => isCompletedStatus(item.status)).length,
+      weeklyAssignedCount: weekItems.length,
+      weeklyCompletedCount: weekItems.filter(item => isCompletedStatus(item.status)).length,
+      overdueTaskCount: items.filter(item => !isCompletedStatus(item.status)
+        && item.status !== 'redo_required' && item.dueAt < this.dependencies.clock.nowIso()).length,
       recentTasks: items.slice(0, 5),
       recentFeedback,
     }, this.meta());
@@ -100,14 +122,22 @@ export class ParentTaskQueryService {
   public async listChildTasks(
     actor: TrustedActorContext,
     childId: string,
-    filters: StudentTaskFilters,
+    filters: ParentTaskFilters,
     page: PageRequest,
   ): Promise<ServiceResult<PageResult<ParentTaskListItem>>> {
     if (!(await this.authorization.canParentReadStudent(actor, childId)).allowed) return failure('NOT_FOUND', this.meta());
+    const organization = await this.dependencies.identities.findOrganization(actor.organizationId);
+    const timeZone = organization?.timeZone ?? 'Asia/Shanghai';
     const records = await this.readChildRecords(actor.organizationId, childId);
     const filtered = records
       .filter((record) => isParentVisible(record.task, record.assignment))
       .filter((record) => filters.status === undefined || record.assignment.status === filters.status)
+      .filter((record) => matchesParentStatusGroup(record.assignment.status, filters.statusGroup))
+      .filter((record) => {
+        if (filters.startsOn === undefined || filters.endsOn === undefined) return true;
+        const dueOn = schoolDate(record.task.dueAt, timeZone);
+        return dueOn >= filters.startsOn && dueOn <= filters.endsOn;
+      })
       .filter((record) => filters.keyword === undefined || record.task.title.toLocaleLowerCase().includes(filters.keyword.toLocaleLowerCase()));
     const items = await Promise.all(filtered.map((record) => this.toListItem(actor.organizationId, record)));
     items.sort(parentTaskOrder);
@@ -128,19 +158,56 @@ export class ParentTaskQueryService {
       ? null
       : await this.dependencies.repository.findSubmission(actor.organizationId, assignment.latestSubmissionId);
     const feedback = submission === null ? null : await this.dependencies.repository.findFeedback(actor.organizationId, submission.id);
+    const latestTeacher = feedback === null ? null
+      : await this.dependencies.identities.findUser(feedback.teacherId, actor.organizationId);
+    const versions = (await this.dependencies.repository.listSubmissions(actor.organizationId))
+      .filter(item => item.assignmentId === assignment.id && item.studentId === childId && item.taskId === taskId
+        && item.submittedAt !== null)
+      .sort((left, right) => right.submissionVersion - left.submissionVersion);
+    const submissionHistory = await Promise.all(versions.map(async version => {
+      const published = await this.dependencies.repository.findFeedback(actor.organizationId, version.id);
+      const teacher = published === null ? null
+        : await this.dependencies.identities.findUser(published.teacherId, actor.organizationId);
+      return {
+        id: version.id,
+        version: version.submissionVersion,
+        submittedAt: version.submittedAt as string,
+        answers: parentSafeAnswers(task, version.answers, version.submittedAt, this.dependencies.clock.nowIso()),
+        feedback: published === null ? null : {
+          id: published.id, teacherName: teacher?.displayName ?? '任课教师',
+          ...(parentVoiceCommentSummary(published, this.dependencies.clock.nowIso())
+            ? { voiceComment: parentVoiceCommentSummary(published, this.dependencies.clock.nowIso()) } : {}),
+          decision: published.decision, score: published.score,
+          textComment: published.textComment, returnReason: published.returnReason,
+          publishedAt: published.publishedAt,
+        },
+      };
+    }));
     return success({
       taskId,
       title: task.title,
       studentId: childId,
+      assignmentId: assignment.id,
       assignmentStatus: assignment.status,
-      automaticScore: submission === null ? null : automaticTaskScore(task, submission),
+      itemSummaries: task.items.map(item => ({ itemId: item.id, title: item.resourceSnapshot.title,
+        type: item.resourceSnapshot.type, order: item.order,
+        pronunciationAvailable: approvedPronunciation(item.resourceSnapshot.payload.pronunciation) }))
+        .sort((left, right) => left.order - right.order),
+      automaticScore: submission === null || !hasOnlyOfficialAutomaticItems(task)
+        ? null : automaticTaskScore(task, submission),
       submission: submission === null || submission.submittedAt === null ? null : {
-        id: submission.id, version: submission.submissionVersion, answers: submission.answers, submittedAt: submission.submittedAt,
+        id: submission.id, version: submission.submissionVersion,
+        answers: parentSafeAnswers(task, submission.answers, submission.submittedAt, this.dependencies.clock.nowIso()),
+        submittedAt: submission.submittedAt,
       },
       feedback: feedback === null ? null : {
-        id: feedback.id, decision: feedback.decision, score: feedback.score, textComment: feedback.textComment,
+        id: feedback.id, teacherName: latestTeacher?.displayName ?? '任课教师',
+        ...(parentVoiceCommentSummary(feedback, this.dependencies.clock.nowIso())
+          ? { voiceComment: parentVoiceCommentSummary(feedback, this.dependencies.clock.nowIso()) } : {}),
+        decision: feedback.decision, score: feedback.score, textComment: feedback.textComment,
         returnReason: feedback.returnReason, publishedAt: feedback.publishedAt,
       },
+      submissionHistory,
     }, this.meta());
   }
 
@@ -164,9 +231,13 @@ export class ParentTaskQueryService {
         taskId: task.id,
         taskTitle: task.title,
         submission: {
-          id: submission.id, version: submission.submissionVersion, answers: submission.answers, submittedAt: submission.submittedAt as string,
+          id: submission.id, version: submission.submissionVersion,
+          answers: parentSafeAnswers(task, submission.answers, submission.submittedAt, this.dependencies.clock.nowIso()),
+          submittedAt: submission.submittedAt as string,
         },
         feedback: {
+          ...(parentVoiceCommentSummary(feedback, this.dependencies.clock.nowIso())
+            ? { voiceComment: parentVoiceCommentSummary(feedback, this.dependencies.clock.nowIso()) } : {}),
           decision: feedback.decision, score: feedback.score, textComment: feedback.textComment,
           returnReason: feedback.returnReason, publishedAt: feedback.publishedAt,
         },
@@ -204,15 +275,18 @@ export class ParentTaskQueryService {
       dueAt: record.task.dueAt,
       submittedAt: record.assignment.submittedAt,
       isLate: record.assignment.isLate,
+      contentTypes: [...new Set(record.task.items.map(item => item.resourceSnapshot.type))],
       feedbackId: feedback?.id ?? null,
       feedbackPublishedAt: feedback?.publishedAt ?? null,
+      score: feedback?.score ?? (record.submission !== null && hasOnlyOfficialAutomaticItems(record.task)
+        ? automaticTaskScore(record.task, record.submission) : null),
     };
   }
 
   private page(
     actor: TrustedActorContext,
     childId: string,
-    filters: StudentTaskFilters,
+    filters: ParentTaskFilters,
     page: PageRequest,
     items: readonly ParentTaskListItem[],
   ): ServiceResult<PageResult<ParentTaskListItem>> {
@@ -258,6 +332,34 @@ function parentTaskOrder(left: ParentTaskListItem, right: ParentTaskListItem): n
   return right.dueAt.localeCompare(left.dueAt) || left.taskId.localeCompare(right.taskId);
 }
 
-function stable(value: StudentTaskFilters): string {
-  return `status:${value.status ?? ''};keyword:${value.keyword ?? ''}`;
+function stable(value: ParentTaskFilters): string {
+  return `status:${value.status ?? ''};group:${value.statusGroup ?? ''};keyword:${value.keyword ?? ''};from:${value.startsOn ?? ''};to:${value.endsOn ?? ''}`;
+}
+
+function matchesParentStatusGroup(status: TaskAssignmentRecord['status'], group: ParentTaskFilters['statusGroup']): boolean {
+  if (group === undefined) return true;
+  if (group === 'active') return status !== 'awaiting_review' && status !== 'completed';
+  return status === group;
+}
+
+function schoolDate(value: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(value));
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function schoolWeek(nowIso: string, timeZone: string): Readonly<{ startsOn: string; endsOn: string }> {
+  const today = schoolDate(nowIso, timeZone);
+  const monday = new Date(`${today}T00:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+  return { startsOn: monday.toISOString().slice(0, 10), endsOn: sunday.toISOString().slice(0, 10) };
+}
+
+function approvedPronunciation(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && 'reviewStatus' in value && value.reviewStatus === 'approved'
+    && 'segments' in value && Array.isArray(value.segments) && value.segments.length > 0;
 }

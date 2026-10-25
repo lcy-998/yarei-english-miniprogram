@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activityHistoryDates, previousActivityDate } from '../../miniprogram/pages/student/checkin-leaderboard/history-dates'
+import { activityHistoryDates, previousActivityDate } from '../../miniprogram/subpackages/student/checkin-leaderboard/history-dates'
 
 describe('student activity history date paging', () => {
   it('walks backward across month boundaries and stops at the activity start', () => {

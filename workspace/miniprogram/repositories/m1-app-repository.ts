@@ -20,6 +20,8 @@ export interface WordPracticeView {
   wordId: string
   word: string
   syllables: string
+  /** Verified structured syllables from the content service; never inferred from display text. */
+  syllableParts: string[]
   meaning: string
   example: string
   options: string[]
@@ -41,6 +43,9 @@ export interface ReadingBookView {
   progressPercent: number
   favorite: boolean
   pageCount: number
+  audioPointreadReady?: boolean
+  audioPointreadPending?: boolean
+  pronunciationReady?: boolean
 }
 
 export interface ReadingProgressView {
@@ -94,7 +99,8 @@ export interface M1AppRepository {
   getWordPractice(userId: string): Promise<ServiceResult<WordPracticeView>>
   listReadingBooks(userId: string, category?: ReadingCategory, onlyFavorites?: boolean): Promise<ServiceResult<ReadingBookView[]>>
   toggleReadingFavorite(userId: string, bookId: string): Promise<ServiceResult<ReadingBookView>>
-  getReadingProgress(userId: string, bookId: string): Promise<ServiceResult<ReadingProgressView>>
+  getReadingProgress(userId: string, bookId: string,
+    task?: Readonly<{ taskId: string; itemId: string }>): Promise<ServiceResult<ReadingProgressView>>
   setReadingPage(userId: string, bookId: string, pageNumber: number): Promise<ServiceResult<ReadingProgressView>>
   listChildren(parentId: string): Promise<ServiceResult<ChildView[]>>
   bindChild(parentId: string, operationId: string, studentNumber: string, bindingCode: string): Promise<ServiceResult<ChildView>>

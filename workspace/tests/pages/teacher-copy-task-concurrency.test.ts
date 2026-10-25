@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../miniprogram/services/app-service', () => ({
+vi.mock('../../miniprogram/subpackages/teacher/services/app-service', () => ({
   getTeacherTaskForEdit: vi.fn(),
   copyTeacherTaskSnapshot: vi.fn(),
   getTeacherTasks: vi.fn(),
@@ -19,16 +19,16 @@ describe('T-07 copy action', () => {
     const navigateTo = vi.fn()
     vi.stubGlobal('wx', { getStorageSync: () => ({ user: { id: 'teacher_demo', role: 'teacher' } }),
       navigateTo, showToast: vi.fn() })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/teacher/services/app-service')
     let finishRead: ((result: unknown) => void) | null = null
     vi.mocked(services.getTeacherTaskForEdit).mockImplementation(() => new Promise(resolve => {
       finishRead = resolve as (result: unknown) => void
     }))
     vi.mocked(services.copyTeacherTaskSnapshot).mockResolvedValue({ ok: true,
       data: { taskId: 'task_copied_demo', version: 1 } })
-    await import('../../miniprogram/pages/teacher/task-review-list/task-review-list')
+    await import('../../miniprogram/subpackages/teacher/task-review-list/task-review-list')
     if (moreAction === null) throw new Error('Copy handler was not registered')
-    const context = { data: { allRows: [{ id: 'task_source_demo', version: 2 }], copyInProgress: false,
+    const context = { data: { rows: [{ id: 'task_source_demo', kind: 'classroom', version: 2 }], copyInProgress: false,
       copySourceKey: '', copyOperationId: '' },
     setData(change: Record<string, unknown>) { Object.assign(this.data, change) } }
     const event = { currentTarget: { dataset: { action: 'copy', id: 'task_source_demo' } } } as unknown as WechatMiniprogram.TouchEvent
@@ -42,6 +42,6 @@ describe('T-07 copy action', () => {
       items: [{ resourceId: 'resource_reading_demo' }] } })
     await first
     expect(services.copyTeacherTaskSnapshot).toHaveBeenCalledTimes(1)
-    expect(navigateTo).toHaveBeenCalledWith({ url: '/pages/teacher/publish-task/publish-task?editTaskId=task_copied_demo' })
+    expect(navigateTo).toHaveBeenCalledWith({ url: '/subpackages/teacher/publish-task/publish-task?editTaskId=task_copied_demo' })
   })
 })

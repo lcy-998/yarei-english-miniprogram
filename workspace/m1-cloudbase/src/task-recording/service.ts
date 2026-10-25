@@ -68,7 +68,8 @@ export class TaskRecordingService {
       }
       const recording = await transaction.findRecording(actor.organizationId, recordingId);
       if (!recording || recording.studentId !== actor.actorUserId) throw new TaskRecordingError('NOT_FOUND');
-      if (recording.status !== 'draft' || recording.version !== expectedVersion) throw new TaskRecordingError('CONFLICT');
+      if (recording.status !== 'draft' || recording.version !== expectedVersion
+        || originalAudioExpired(recording.createdAt, this.clock.nowIso())) throw new TaskRecordingError('CONFLICT');
       await this.requireRecordingScope(actor, recording);
       return { recording } as const;
     });
@@ -79,7 +80,7 @@ export class TaskRecordingService {
     if (!sealed.fileId || !/^[a-f0-9]{64}$/.test(sealed.contentSha256)
       || !Number.isSafeInteger(sealed.sizeBytes) || sealed.sizeBytes < 1 || sealed.sizeBytes > MAX_BYTES
       || !Number.isSafeInteger(sealed.durationMs) || sealed.durationMs < 1000 || sealed.durationMs > MAX_DURATION_MS
-      || sealed.codec !== 'mp3') throw new TaskRecordingError('MEDIA_INVALID');
+      || (sealed.codec !== 'mp3' && sealed.codec !== 'aac')) throw new TaskRecordingError('MEDIA_INVALID');
     return this.recordings.transaction(async (transaction) => {
       const prior = await transaction.findReceipt(actor.organizationId, actor.actorUserId, operationId);
       if (prior) {
@@ -88,7 +89,8 @@ export class TaskRecordingService {
       }
       const current = await transaction.findRecording(actor.organizationId, recordingId);
       if (!current || current.studentId !== actor.actorUserId || current.status !== 'draft'
-        || current.version !== expectedVersion || current.stagingPath !== prepared.recording.stagingPath) {
+        || current.version !== expectedVersion || current.stagingPath !== prepared.recording.stagingPath
+        || originalAudioExpired(current.createdAt, this.clock.nowIso())) {
         throw new TaskRecordingError('CONFLICT');
       }
       await this.requireRecordingScope(actor, current);
@@ -107,6 +109,8 @@ export class TaskRecordingService {
     const scope = await this.requireTaskScope(actor, taskId, itemId);
     return (await this.recordings.transaction((transaction) => transaction.listMyRecordings(actor.organizationId,
       actor.actorUserId, taskId, itemId, scope.assignment.latestSubmissionVersion + 1)))
+      .filter(recording => recording.status !== 'draft'
+        || !originalAudioExpired(recording.createdAt, this.clock.nowIso()))
       .map(recording => ({ ...recording, mediaExpired: Boolean(recording.mediaDeletedAt)
         || originalAudioExpired(recording.submittedAt, this.clock.nowIso()) }));
   }

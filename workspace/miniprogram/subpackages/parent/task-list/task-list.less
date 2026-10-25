@@ -1,0 +1,32 @@
+.task-list-page { min-height: 100vh; padding-bottom: 30px; box-sizing: border-box; }
+.task-list-content { padding: 18px 20px 30px; }
+.child-card,.filters,.task-card,.empty-card { border: @yr-card-border; border-radius: @yr-radius-role-card; background: @yr-surface-warm; box-shadow: @yr-card-shadow; }
+.child-card { display: flex; align-items: center; gap: 12px; min-height: 78px; padding: 10px 14px; box-sizing: border-box; }
+.child-avatar { flex: 0 0 52px; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 21px; font-weight: 900; }
+.child-copy { flex: 1; min-width: 0; }
+.child-copy text { display: block; }
+.child-name { color: @yr-text-primary; font-size: 20px; font-weight: 900; }
+.child-class { margin-top: 3px; color: @yr-text-secondary; font-size: 12px; }
+.child-switch { color: @yr-brand-primary; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.filters { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px; }
+.status-tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; }
+.status-tab { flex: 0 0 auto; padding: 8px 10px; border-radius: 16px; color: @yr-text-secondary; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.status-tab.active { background: @yr-brand-primary; color: @yr-white; }
+.days-picker { padding: 9px 7px; color: @yr-brand-primary; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.task-cards { margin-top: 12px; }
+.task-card { display: flex; gap: 11px; align-items: flex-start; margin-bottom: 10px; padding: 14px 12px; }
+.task-icon { flex: 0 0 50px; width: 50px; height: 50px; display: grid; place-items: center; border-radius: 14px; background: @yr-surface-blue; }
+.task-main { flex: 1; min-width: 0; }
+.task-main text { display: block; }
+.task-title { color: @yr-text-primary; font-size: 17px; font-weight: 900; line-height: 1.4; overflow-wrap: anywhere; }
+.task-type,.task-time,.task-submitted { margin-top: 5px; color: @yr-text-secondary; font-size: 12px; }
+.task-bottom { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.task-bottom text { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; }
+.score { background: @yr-surface-warning; color: @yr-urgent; }
+.feedback,.status.completed { background: @yr-surface-green; color: @yr-success; }
+.status.awaiting_review { background: @yr-surface-warning; color: @yr-urgent; }
+.status.not_started,.status.in_progress,.status.overdue,.status.redo_required { background: @yr-surface-blue; color: @yr-brand-primary; }
+.arrow { flex: 0 0 16px; color: @yr-brand-primary; font-size: 28px; line-height: 1; }
+.empty-card { margin-top: 12px; padding: 24px; color: @yr-text-secondary; text-align: center; }
+.empty-card button { margin-top: 16px; border-radius: 22px; background: @yr-brand-primary; color: @yr-white; }
+.more,.more-error { display: block; width: 100%; margin-top: 10px; padding: 12px; border: 0; border-radius: 18px; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 13px; font-weight: 800; text-align: center; }

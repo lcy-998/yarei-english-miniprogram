@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { TextbookSummary } from '../../miniprogram/domain/types'
-import { selectTextbookFilter, textbookFilterOptions } from '../../miniprogram/pages/teacher/synchronized-textbooks/textbook-filter-options'
+import type { TextbookSummary } from '../../miniprogram/subpackages/teacher/domain/types'
+import { selectTextbookFilter, textbookFilterOptions } from '../../miniprogram/subpackages/teacher/synchronized-textbooks/textbook-filter-options'
 
 const books: TextbookSummary[] = [
   { id: 'demo_book_a', title: '演示英语 A', grade: '三年级', term: '上学期', edition: '演示版 A', contentVersion: 'v1',

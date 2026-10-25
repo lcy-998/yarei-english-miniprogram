@@ -1,0 +1,38 @@
+<g0-page-shell nature="{{true}}" natureOpacity="{{0.68}}" tone="nature">
+  <view class="exercise-page">
+    <app-header title="{{teacherReview ? '习题作业验收' : teacherPreview ? '习题预览' : '习题任务'}}" back="{{true}}"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else class="exercise-content">
+      <view class="exercise-hero">
+        <text class="exercise-eyebrow">课堂习题 · 逐题完成</text>
+        <text class="exercise-title">{{title}}</text>
+        <text class="exercise-description">{{teacherReview ? '第 ' + teacherReviewVersion + ' 次提交 · ' + (groupedTeacherReview ? '查看整份习题的原作答与判定' : '查看本题原作答与判定') : teacherPreview ? '查看学生看到的题目和选项；预览不保存答案。' : '按顺序完成下方习题，答案会自动保留。'}}</text>
+        <view class="exercise-progress"><text>{{teacherReview ? '当前核对' : teacherPreview ? '题目预览' : '作答进度'}}</text><text>{{teacherReview || teacherPreview ? cards.length + ' 道题' : answeredCount + ' / ' + cards.length + ' 题已作答'}}</text></view>
+      </view>
+      <view wx:if="{{!editable && unavailableReason}}" class="exercise-notice {{teacherReview || teacherPreview ? 'exercise-notice--readonly' : ''}}">{{unavailableReason}}</view>
+      <view wx:if="{{!hasSections}}" class="exercise-section-heading"><text>习题作答</text><text>{{cards.length}} 道题</text></view>
+      <view wx:for="{{cards}}" wx:for-item="row" wx:key="itemId" class="exercise-card {{row.highlighted ? 'exercise-card--highlighted' : ''}}">
+        <view wx:if="{{row.sectionStart}}" class="exercise-section-heading"><text>{{row.sectionTitle}}</text></view>
+        <text wx:if="{{row.sectionStart && row.sectionInstruction}}" class="exercise-section-instruction">{{row.sectionInstruction}}</text>
+        <text wx:if="{{row.sectionStart && row.sectionMaterial}}" class="exercise-section-material">{{row.sectionMaterial}}</text>
+        <view class="exercise-card-heading"><view class="exercise-number">{{row.localNumber}}</view><text class="exercise-question-label">第 {{row.localNumber}} {{hasSections ? '小题' : '题'}}</text><text class="exercise-type">{{row.typeLabel}}</text></view>
+        <text wx:if="{{cards.length > 1 && !hasSections}}" class="exercise-item-title">{{row.title}}</text>
+        <text wx:if="{{row.question}}" class="exercise-stem">{{row.question.stem}}</text>
+        <text wx:if="{{row.question && row.question.questionType === 'multiple_choice'}}" class="exercise-hint">可选择多个答案</text>
+        <view wx:if="{{row.choiceQuestion && row.choices.length}}" class="exercise-options">
+          <button wx:for="{{row.choices}}" wx:for-item="choice" wx:key="value" class="exercise-option {{choice.selected ? 'exercise-option--selected' : ''}} {{teacherReview && choice.selected ? (row.verdict === '正确' ? 'exercise-option--correct' : row.verdict === '错误' ? 'exercise-option--wrong' : '') : ''}}" data-item-id="{{row.itemId}}" data-value="{{choice.value}}" disabled="{{!editable}}" bindtap="chooseOption"><text class="exercise-option-dot">{{choice.selected ? '✓' : ''}}</text><text class="exercise-option-label">{{choice.value}}</text></button>
+        </view>
+        <text wx:elif="{{row.choiceQuestion}}" class="exercise-question-error">本题选项缺失，请联系老师处理。</text>
+        <view wx:elif="{{row.question && row.question.questionType === 'fill'}}" class="exercise-answer"><text class="exercise-answer-label">填写答案</text><input class="exercise-fill-input" value="{{row.response}}" data-item-id="{{row.itemId}}" disabled="{{!editable}}" maxlength="500" bindinput="inputAnswer" placeholder="在这里填写答案"/></view>
+        <view wx:elif="{{row.question}}" class="exercise-answer"><text class="exercise-answer-label">写下你的回答</text><textarea class="exercise-input" value="{{row.response}}" data-item-id="{{row.itemId}}" disabled="{{!editable}}" maxlength="500" bindinput="inputAnswer" placeholder="在这里写下你的回答"></textarea></view>
+        <view wx:else class="exercise-fallback"><text>{{teacherReview ? '本次提交缺少逐题证据。' : '本任务没有关联题目资源，请填写已完成题数。'}}</text><input wx:if="{{!teacherReview}}" type="number" value="{{row.answeredQuestionCount}}" data-item-id="{{row.itemId}}" disabled="{{!editable}}" bindinput="inputCount" placeholder="已完成题数"/></view>
+        <view wx:if="{{teacherReview}}" class="exercise-review-result"><text class="exercise-review-title">本次提交</text><text>学生答案：{{row.answerLabel}}</text><text>正确答案：{{row.correctLabel}}</text><text class="{{row.verdict === '正确' ? 'exercise-verdict--correct' : row.verdict === '错误' ? 'exercise-verdict--wrong' : 'exercise-verdict--pending'}}">{{row.verdict}}</text><text wx:if="{{row.explanation}}">解析：{{row.explanation}}</text><text wx:if="{{row.rubricText}}">评分要点：{{row.rubricText}}</text></view>
+        <view wx:if="{{teacherReview && row.teacherScoreRequired}}" class="exercise-question-score"><text>本题教师评分</text><view class="exercise-review-score"><input type="number" maxlength="3" value="{{row.teacherScoreInput}}" data-item-id="{{row.itemId}}" bindinput="onTeacherReviewScore" placeholder="0—100"/><text>分</text></view><text wx:if="{{row.teacherScoreError}}" class="exercise-notice">{{row.teacherScoreError}}</text></view>
+      </view>
+      <text wx:if="{{draftError}}" class="exercise-notice">{{draftError}}</text>
+      <text wx:if="{{teacherReview && cards.length}}" class="exercise-score-help">返回快速点评后核对作业总分并正式发布。</text>
+      <task-return-bar label="{{teacherReview ? '返回快速点评' : teacherPreview ? '返回内容选择' : '返回任务详情'}}" bind:press="returnToTask"></task-return-bar>
+    </view>
+  </view>
+</g0-page-shell>

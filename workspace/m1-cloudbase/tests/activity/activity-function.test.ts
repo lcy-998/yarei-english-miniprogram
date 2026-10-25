@@ -46,6 +46,33 @@ const draftPayload = { title: '虚构阅读打卡', classId, startsOn: '2026-09-
 
 describe('M2 trusted activity functions', () => {
   beforeEach(() => { currentTime = '2026-09-26T04:00:00.000Z'; });
+  it('T-09 progress query and close command enforce trusted teacher and exact fields', async () => {
+    const handler = service();
+    const command = createActivityCommandFunction({ ...boundary('activity-command', teacher), service: handler });
+    const teacherQuery = createActivityQueryFunction({ ...boundary('activity-query', teacher), service: handler });
+    const studentQuery = createActivityQueryFunction({ ...boundary('activity-query', student), service: handler });
+    const draft = await command({ apiVersion: 'm1.v1', action: 'saveDraft', payload: draftPayload,
+      expectedVersion: 0, operationId: 'operation_m3_progress_draft' });
+    if (!draft.ok) throw new Error('missing draft');
+    await command({ apiVersion: 'm1.v1', action: 'publish', payload: { activityId: draft.data.id },
+      expectedVersion: 1, operationId: 'operation_m3_progress_publish' });
+    currentTime = '2026-09-27T10:00:00+08:00';
+    expect(await teacherQuery({ apiVersion: 'm1.v1', action: 'getTeacherProgress', payload: {
+      activityId: draft.data.id, date: '2026-09-27', page: { limit: 20, offset: 0 },
+    } })).toMatchObject({ ok: true, data: { evidenceStatus: 'available',
+      participantCount: 1, completedCount: 0, rows: [{ complete: false }] } });
+    expect(await studentQuery({ apiVersion: 'm1.v1', action: 'getTeacherProgress', payload: {
+      activityId: draft.data.id, date: '2026-09-27', page: { limit: 20, offset: 0 },
+    } })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(await command({ apiVersion: 'm1.v1', action: 'close', payload: {
+      activityId: draft.data.id, reason: '测试活动结束',
+    }, expectedVersion: 2, operationId: 'operation_m3_progress_close' }))
+      .toMatchObject({ ok: true, data: { status: 'closed', version: 3 } });
+    expect(await command({ apiVersion: 'm1.v1', action: 'close', payload: {
+      activityId: draft.data.id, reason: '测试活动结束', actorUserId: teacherId,
+    }, expectedVersion: 2, operationId: 'operation_m3_progress_forged' }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+  });
   it('validates commands, binds the trusted teacher and allows only snapshotted student reads', async () => {
     const handler = service();
     const command = createActivityCommandFunction({ ...boundary('activity-command', teacher), service: handler });

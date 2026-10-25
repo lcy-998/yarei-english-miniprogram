@@ -1,18 +1,24 @@
 import type { FunctionRequest, JsonObject, JsonValue } from '../shared/protocol';
 import { parseExactObject } from '../shared/strict-object';
 import type { SaveTaskDraftInput, SubmissionAnswer, UpdatePublishedTaskInput } from '../task-core/types';
-import type { PageRequest, StudentTaskFilters } from '../task-query/types';
+import type { PageRequest, ParentTaskFilters } from '../task-query/types';
 
-export const TASK_COMMAND_ACTIONS = ['saveDraft', 'copyTaskSnapshot', 'instantiateTemplate', 'publishTask', 'updatePublishedTask', 'withdrawTask', 'recycleTask'] as const;
+export const TASK_COMMAND_ACTIONS = ['saveDraft', 'copyTaskSnapshot', 'instantiateTemplate', 'publishTask', 'updatePublishedTask', 'withdrawTask', 'recycleTask', 'deleteDraftTask',
+  'submitTeacherMediaReview', 'decideTeacherMediaReview', 'publishTeacherMedia',
+  'privateVideoAvailability', 'privateVideoList', 'privateVideoGet', 'privateVideoSave',
+  'privateVideoBeginUpload', 'privateVideoSeal', 'privateVideoRetryProcessing',
+  'privateVideoPublish', 'privateVideoWithdraw'] as const;
 export type TaskCommandAction = (typeof TASK_COMMAND_ACTIONS)[number];
 
 export const SUBMISSION_COMMAND_ACTIONS = ['saveDraft', 'submit'] as const;
 export type SubmissionCommandAction = (typeof SUBMISSION_COMMAND_ACTIONS)[number];
 
-export const REVIEW_COMMAND_ACTIONS = ['publishReview', 'publishBatchComment'] as const;
+export const REVIEW_COMMAND_ACTIONS = ['publishReview', 'publishBatchComment',
+  'beginReviewVoiceRecording', 'sealReviewVoiceRecording'] as const;
 export type ReviewCommandAction = (typeof REVIEW_COMMAND_ACTIONS)[number];
 
-export const PARENT_QUERY_ACTIONS = ['listChildren', 'getHome', 'listChildTasks', 'getChildTask', 'getFeedback'] as const;
+export const PARENT_QUERY_ACTIONS = ['listChildren', 'getHome', 'listChildTasks', 'getChildTask',
+  'getFeedback', 'getRecordingPlayback', 'getChildFeedbackVoicePlayback', 'getTaskMediaPlayback'] as const;
 export type ParentQueryAction = (typeof PARENT_QUERY_ACTIONS)[number];
 
 export type BoundaryValidation<T> =
@@ -20,6 +26,14 @@ export type BoundaryValidation<T> =
   | { readonly ok: false; readonly fieldErrors: Readonly<Record<string, string>> };
 
 export type TaskCommandInput =
+  | Readonly<{ action: 'privateVideoAvailability' | 'privateVideoList' }>
+  | Readonly<{ action: 'privateVideoGet'; id: string }>
+  | Readonly<{ action: 'privateVideoSave'; title: string; questions: JsonValue[];
+      id?: string; expectedVersion?: number; operationId: string }>
+  | Readonly<{ action: 'privateVideoBeginUpload' | 'privateVideoRetryProcessing'
+      | 'privateVideoPublish' | 'privateVideoWithdraw'; id: string; expectedVersion: number }>
+  | Readonly<{ action: 'privateVideoSeal'; id: string; expectedVersion: number;
+      stagingFileId: string }>
   | Readonly<{
       action: 'saveDraft';
       input: SaveTaskDraftInput;
@@ -51,12 +65,16 @@ export type TaskCommandInput =
       operationId: string;
     }>
   | Readonly<{
-      action: 'withdrawTask' | 'recycleTask';
+      action: 'withdrawTask' | 'recycleTask' | 'deleteDraftTask';
       taskId: string;
       reason: string;
       expectedVersion: number;
       operationId: string;
-    }>;
+    }>
+  | Readonly<{ action: 'submitTeacherMediaReview' | 'publishTeacherMedia'; mediaId: string;
+      expectedVersion: number; operationId: string }>
+  | Readonly<{ action: 'decideTeacherMediaReview'; mediaId: string;
+      decision: 'approved' | 'rejected'; reason: string; expectedVersion: number; operationId: string }>;
 
 export type SubmissionCommandInput = Readonly<{
   action: SubmissionCommandAction;
@@ -76,6 +94,8 @@ export type ReviewCommandInput =
         score?: number;
         itemScores?: readonly Readonly<{ itemId: string; score: number }>[];
         textComment?: string;
+        aiSuggestionId?: string;
+        voiceRecordingId?: string;
         returnReason?: string;
         overrideReason?: string;
         expectedSubmissionVersion: number;
@@ -89,19 +109,57 @@ export type ReviewCommandInput =
       previewVersion: number;
       textComment: string;
       operationId: string;
-    }>;
+    }>
+  | Readonly<{ action: 'beginReviewVoiceRecording'; submissionId: string; operationId: string }>
+  | Readonly<{ action: 'sealReviewVoiceRecording'; recordingId: string; stagingFileId: string;
+      expectedVersion: number; operationId: string }>;
 
 export type ParentQueryInput =
   | Readonly<{ action: 'listChildren' }>
   | Readonly<{ action: 'getHome'; childId: string }>
-  | Readonly<{ action: 'listChildTasks'; childId: string; filters: StudentTaskFilters; page: PageRequest }>
+  | Readonly<{ action: 'listChildTasks'; childId: string; filters: ParentTaskFilters; page: PageRequest }>
   | Readonly<{ action: 'getChildTask'; childId: string; taskId: string }>
-  | Readonly<{ action: 'getFeedback'; childId: string; feedbackId: string }>;
+  | Readonly<{ action: 'getFeedback'; childId: string; feedbackId: string }>
+  | Readonly<{ action: 'getRecordingPlayback'; childId: string; taskId: string; assignmentId: string;
+    submissionVersion: number; itemId: string }>
+  | Readonly<{ action: 'getTaskMediaPlayback'; childId: string; taskId: string; assignmentId: string;
+    submissionVersion: number; itemId: string }>
+  | Readonly<{ action: 'getChildFeedbackVoicePlayback'; childId: string; taskId: string;
+    assignmentId: string; submissionVersion: number; feedbackId: string }>;
 
 export function validateTaskCommandRequest(
   request: FunctionRequest<TaskCommandAction, JsonObject>,
 ): BoundaryValidation<TaskCommandInput> {
+  if (request.action.startsWith('privateVideo')) return validatePrivateVideoAction(request);
   if (request.operationId === undefined) return invalid('operationId', '写操作必须提供操作标识。');
+  if (request.action === 'submitTeacherMediaReview' || request.action === 'publishTeacherMedia') {
+    if (request.expectedVersion === undefined || !Number.isSafeInteger(request.expectedVersion)
+      || request.expectedVersion < 1) return invalid('expectedVersion', '媒体版本无效。');
+    const exact = parseExactObject(request.payload, ['mediaId']);
+    if (!exact.ok) return exact;
+    const mediaId = requiredId(exact.value.mediaId, 'mediaId');
+    return mediaId.ok ? { ok: true, value: { action: request.action,
+      mediaId: mediaId.value, expectedVersion: request.expectedVersion,
+      operationId: request.operationId } } : mediaId;
+  }
+  if (request.action === 'decideTeacherMediaReview') {
+    if (request.expectedVersion === undefined || !Number.isSafeInteger(request.expectedVersion)
+      || request.expectedVersion < 1) return invalid('expectedVersion', '媒体版本无效。');
+    const exact = parseExactObject(request.payload, ['mediaId', 'decision', 'reason']);
+    if (!exact.ok) return exact;
+    const mediaId = requiredId(exact.value.mediaId, 'mediaId');
+    if (!mediaId.ok) return mediaId;
+    if (exact.value.decision !== 'approved' && exact.value.decision !== 'rejected') {
+      return invalid('decision', '审核决定无效。');
+    }
+    if (typeof exact.value.reason !== 'string' || exact.value.reason.length > 300
+      || exact.value.decision === 'rejected' && !exact.value.reason.trim()) {
+      return invalid('reason', '驳回须填写 1—300 字原因。');
+    }
+    return { ok: true, value: { action: request.action, mediaId: mediaId.value,
+      decision: exact.value.decision, reason: exact.value.reason,
+      expectedVersion: request.expectedVersion, operationId: request.operationId } };
+  }
   if (request.action === 'copyTaskSnapshot') {
     const exact = parseExactObject(request.payload, ['sourceTaskId']);
     if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
@@ -120,7 +178,7 @@ export function validateTaskCommandRequest(
     return { ok: true, value: { action: 'instantiateTemplate', templateId: templateId.value,
       expectedVersion: request.expectedVersion, operationId: request.operationId } };
   }
-  if (request.action === 'withdrawTask' || request.action === 'recycleTask') {
+  if (request.action === 'withdrawTask' || request.action === 'recycleTask' || request.action === 'deleteDraftTask') {
     const exact = parseExactObject(request.payload, ['taskId', 'reason']);
     if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
     const taskId = requiredId(exact.value.taskId, 'taskId');
@@ -251,6 +309,67 @@ export function validateTaskCommandRequest(
   };
 }
 
+function validatePrivateVideoAction(
+  request: FunctionRequest<TaskCommandAction, JsonObject>,
+): BoundaryValidation<TaskCommandInput> {
+  if (request.action === 'privateVideoAvailability' || request.action === 'privateVideoList') {
+    const exact = parseExactObject(request.payload, []);
+    return exact.ok ? { ok: true, value: { action: request.action } } : exact;
+  }
+  if (request.action === 'privateVideoGet') {
+    const exact = parseExactObject(request.payload, ['id']);
+    if (!exact.ok) return exact;
+    const id = requiredId(exact.value.id, 'id');
+    return id.ok ? { ok: true, value: { action: request.action, id: id.value } } : id;
+  }
+  if (request.action === 'privateVideoSave') {
+    if (typeof request.operationId !== 'string'
+      || !/^[A-Za-z0-9_-]{8,128}$/.test(request.operationId)) {
+      return invalid('operationId', '保存操作标识无效。');
+    }
+    const exact = parseExactObject(request.payload, ['title', 'questions'], ['id', 'expectedVersion']);
+    if (!exact.ok) return exact;
+    if (typeof exact.value.title !== 'string' || !Array.isArray(exact.value.questions)
+      || exact.value.questions.length > 6) return invalid('questions', '教师视频草稿无效。');
+    const id = exact.value.id === undefined
+      ? { ok: true as const, value: undefined } : requiredId(exact.value.id, 'id');
+    if (!id.ok) return id;
+    const version = exact.value.expectedVersion === undefined
+      ? undefined : Number(exact.value.expectedVersion);
+    if (id.value && (!Number.isSafeInteger(version) || version! < 1)) {
+      return invalid('expectedVersion', '视频版本无效。');
+    }
+    return { ok: true, value: { action: request.action, title: exact.value.title,
+      questions: exact.value.questions as JsonValue[],
+      operationId: request.operationId,
+      ...(id.value === undefined ? {} : { id: id.value, expectedVersion: version }) } };
+  }
+  if (request.action === 'privateVideoBeginUpload' || request.action === 'privateVideoSeal'
+    || request.action === 'privateVideoRetryProcessing' || request.action === 'privateVideoPublish'
+    || request.action === 'privateVideoWithdraw') {
+    const exact = parseExactObject(request.payload, ['id', 'expectedVersion'],
+      request.action === 'privateVideoSeal' ? ['stagingFileId'] : []);
+    if (!exact.ok) return exact;
+    const id = requiredId(exact.value.id, 'id');
+    if (!id.ok) return id;
+    const version = Number(exact.value.expectedVersion);
+    if (!Number.isSafeInteger(version) || version < 1) {
+      return invalid('expectedVersion', '视频版本无效。');
+    }
+    if (request.action === 'privateVideoSeal') {
+      if (typeof exact.value.stagingFileId !== 'string'
+        || !exact.value.stagingFileId.startsWith('cloud://')) {
+        return invalid('stagingFileId', '上传文件无效。');
+      }
+      return { ok: true, value: { action: request.action, id: id.value,
+        expectedVersion: version, stagingFileId: exact.value.stagingFileId } };
+    }
+    return { ok: true, value: { action: request.action, id: id.value,
+      expectedVersion: version } };
+  }
+  return invalid('action', '教师视频操作无效。');
+}
+
 export function validateSubmissionCommandRequest(
   request: FunctionRequest<SubmissionCommandAction, JsonObject>,
 ): BoundaryValidation<SubmissionCommandInput> {
@@ -286,6 +405,28 @@ export function validateSubmissionCommandRequest(
 export function validateReviewCommandRequest(
   request: FunctionRequest<ReviewCommandAction, JsonObject>,
 ): BoundaryValidation<ReviewCommandInput> {
+  if (request.action === 'beginReviewVoiceRecording') {
+    if (request.operationId === undefined) return invalid('operationId', '开始语音评语必须提供操作标识。');
+    if (request.expectedVersion !== undefined) return invalid('expectedVersion', '开始录音不接受客户端版本。');
+    const exact = parseExactObject(request.payload, ['submissionId']);
+    if (!exact.ok) return exact;
+    const submissionId = requiredId(exact.value.submissionId, 'submissionId');
+    return submissionId.ok ? { ok: true, value: { action: request.action,
+      submissionId: submissionId.value, operationId: request.operationId } } : submissionId;
+  }
+  if (request.action === 'sealReviewVoiceRecording') {
+    if (request.operationId === undefined) return invalid('operationId', '封存语音评语必须提供操作标识。');
+    if (request.expectedVersion === undefined) return invalid('expectedVersion', '封存语音评语须提供草稿版本。');
+    const exact = parseExactObject(request.payload, ['recordingId', 'stagingFileId']);
+    if (!exact.ok) return exact;
+    const recordingId = requiredId(exact.value.recordingId, 'recordingId');
+    if (!recordingId.ok) return recordingId;
+    if (typeof exact.value.stagingFileId !== 'string'
+      || !exact.value.stagingFileId.startsWith('cloud://')) return invalid('stagingFileId', '暂存录音标识无效。');
+    return { ok: true, value: { action: request.action, recordingId: recordingId.value,
+      stagingFileId: exact.value.stagingFileId, expectedVersion: request.expectedVersion,
+      operationId: request.operationId } };
+  }
   if (request.action === 'publishBatchComment') {
     const exact = parseExactObject(request.payload, ['previewToken', 'previewVersion', 'textComment']);
     if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
@@ -314,7 +455,7 @@ export function validateReviewCommandRequest(
   const exact = parseExactObject(
     request.payload,
     ['submissionId', 'decision', 'expectedSubmissionVersion'],
-    ['score', 'itemScores', 'textComment', 'returnReason', 'overrideReason'],
+    ['score', 'itemScores', 'textComment', 'aiSuggestionId', 'voiceRecordingId', 'returnReason', 'overrideReason'],
   );
   if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
   if (request.operationId === undefined) return invalid('operationId', '发布点评必须提供操作标识。');
@@ -338,6 +479,10 @@ export function validateReviewCommandRequest(
   }
   const textComment = optionalString(exact.value.textComment, 'textComment');
   if (!textComment.ok) return textComment;
+  const aiSuggestionId = optionalId(exact.value.aiSuggestionId, 'aiSuggestionId');
+  if (!aiSuggestionId.ok) return aiSuggestionId;
+  const voiceRecordingId = optionalId(exact.value.voiceRecordingId, 'voiceRecordingId');
+  if (!voiceRecordingId.ok) return voiceRecordingId;
   const returnReason = optionalString(exact.value.returnReason, 'returnReason');
   if (!returnReason.ok) return returnReason;
   const overrideReason = optionalString(exact.value.overrideReason, 'overrideReason');
@@ -353,6 +498,8 @@ export function validateReviewCommandRequest(
         ...(score.value === undefined ? {} : { score: score.value }),
         ...(itemScores === undefined ? {} : { itemScores: itemScores as Array<{ itemId: string; score: number }> }),
         ...(textComment.value === undefined ? {} : { textComment: textComment.value }),
+        ...(aiSuggestionId.value === undefined ? {} : { aiSuggestionId: aiSuggestionId.value }),
+        ...(voiceRecordingId.value === undefined ? {} : { voiceRecordingId: voiceRecordingId.value }),
         ...(returnReason.value === undefined ? {} : { returnReason: returnReason.value }),
         ...(overrideReason.value === undefined ? {} : { overrideReason: overrideReason.value }),
       },
@@ -396,6 +543,31 @@ export function validateParentQueryRequest(
     const feedbackId = requiredId(exact.value.feedbackId, 'feedbackId');
     return feedbackId.ok ? { ok: true, value: { action: 'getFeedback', childId: childId.value, feedbackId: feedbackId.value } } : feedbackId;
   }
+  if (request.action === 'getRecordingPlayback' || request.action === 'getTaskMediaPlayback'
+    || request.action === 'getChildFeedbackVoicePlayback') {
+    const voice = request.action === 'getChildFeedbackVoicePlayback';
+    const exact = parseExactObject(request.payload,
+      ['childId', 'taskId', 'assignmentId', 'submissionVersion', voice ? 'feedbackId' : 'itemId']);
+    if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
+    const ids = voice ? ['childId', 'taskId', 'assignmentId', 'feedbackId'] as const
+      : ['childId', 'taskId', 'assignmentId', 'itemId'] as const;
+    const values: Record<string, string> = {};
+    for (const field of ids) {
+      const parsed = requiredId(exact.value[field], field);
+      if (!parsed.ok) return parsed;
+      values[field] = parsed.value;
+    }
+    if (!Number.isSafeInteger(exact.value.submissionVersion)
+      || Number(exact.value.submissionVersion) < 1) return invalid('submissionVersion', '提交版本无效。');
+    return { ok: true, value: voice
+      ? { action: 'getChildFeedbackVoicePlayback', childId: values.childId!, taskId: values.taskId!,
+        assignmentId: values.assignmentId!, submissionVersion: Number(exact.value.submissionVersion),
+        feedbackId: values.feedbackId! }
+      : { action: request.action === 'getTaskMediaPlayback' ? 'getTaskMediaPlayback' : 'getRecordingPlayback',
+        childId: values.childId!, taskId: values.taskId!,
+        assignmentId: values.assignmentId!, submissionVersion: Number(exact.value.submissionVersion),
+        itemId: values.itemId! } };
+  }
   const exact = parseExactObject(request.payload, ['childId', 'taskId']);
   if (!exact.ok) return { ok: false, fieldErrors: exact.fieldErrors };
   const childId = requiredId(exact.value.childId, 'childId');
@@ -405,8 +577,8 @@ export function validateParentQueryRequest(
   return { ok: true, value: { action: 'getChildTask', childId: childId.value, taskId: taskId.value } };
 }
 
-function parseParentTaskFilters(value: unknown): BoundaryValidation<StudentTaskFilters> {
-  const exact = parseExactObject(value, [], ['status', 'keyword']);
+function parseParentTaskFilters(value: unknown): BoundaryValidation<ParentTaskFilters> {
+  const exact = parseExactObject(value, [], ['status', 'keyword', 'statusGroup', 'startsOn', 'endsOn']);
   if (!exact.ok) return prefixErrors('filters', exact.fieldErrors);
   const statuses = ['not_started', 'in_progress', 'awaiting_review', 'completed', 'redo_required', 'overdue'] as const;
   if (exact.value.status !== undefined && !statuses.includes(exact.value.status as typeof statuses[number])) {
@@ -415,13 +587,39 @@ function parseParentTaskFilters(value: unknown): BoundaryValidation<StudentTaskF
   const keyword = optionalString(exact.value.keyword, 'filters.keyword');
   if (!keyword.ok) return keyword;
   if ((keyword.value?.length ?? 0) > 50) return invalid('filters.keyword', '关键词最多 50 字。');
+  const groups = ['active', 'awaiting_review', 'completed'] as const;
+  if (exact.value.statusGroup !== undefined
+    && !groups.includes(exact.value.statusGroup as typeof groups[number])) {
+    return invalid('filters.statusGroup', '任务筛选状态无效。');
+  }
+  const startsOn = exact.value.startsOn;
+  const endsOn = exact.value.endsOn;
+  if ((startsOn === undefined) !== (endsOn === undefined)) {
+    return invalid('filters.startsOn', '开始和结束日期须同时提供。');
+  }
+  if (startsOn !== undefined && (!isCalendarDate(startsOn) || !isCalendarDate(endsOn)
+    || (startsOn as string) > (endsOn as string))) {
+    return invalid('filters.startsOn', '任务日期范围无效。');
+  }
+  if (typeof startsOn === 'string' && typeof endsOn === 'string'
+    && (Date.parse(`${endsOn}T00:00:00Z`) - Date.parse(`${startsOn}T00:00:00Z`)) / 86400000 > 365) {
+    return invalid('filters.endsOn', '任务日期范围最多 366 天。');
+  }
   return {
     ok: true,
     value: {
       ...(exact.value.status === undefined ? {} : { status: exact.value.status as typeof statuses[number] }),
       ...(keyword.value === undefined ? {} : { keyword: keyword.value }),
+      ...(exact.value.statusGroup === undefined ? {} : { statusGroup: exact.value.statusGroup as typeof groups[number] }),
+      ...(startsOn === undefined ? {} : { startsOn: startsOn as string, endsOn: endsOn as string }),
     },
   };
+}
+
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function parseParentPage(value: unknown): BoundaryValidation<PageRequest> {
@@ -440,14 +638,15 @@ export function parseItemRefs(value: unknown): BoundaryValidation<SaveTaskDraftI
   if (!Array.isArray(value)) return invalid('itemRefs', '任务内容必须是数组。');
   const result: SaveTaskDraftInput['itemRefs'][number][] = [];
   for (const [index, item] of value.entries()) {
-    const exact = parseExactObject(item, ['id', 'resourceId', 'completionRule', 'scoringRule', 'order']);
+    const exact = parseExactObject(item, ['id', 'resourceId', 'scoringRule', 'order'], ['completionRule']);
     if (!exact.ok) return prefixErrors(`itemRefs[${index}]`, exact.fieldErrors);
     const id = requiredId(exact.value.id, `itemRefs[${index}].id`);
     if (!id.ok) return id;
     const resourceId = requiredId(exact.value.resourceId, `itemRefs[${index}].resourceId`);
     if (!resourceId.ok) return resourceId;
-    const completionRule = parseJsonObject(exact.value.completionRule, `itemRefs[${index}].completionRule`);
-    if (!completionRule.ok) return completionRule;
+    const completionRule = exact.value.completionRule === undefined ? null
+      : parseJsonObject(exact.value.completionRule, `itemRefs[${index}].completionRule`);
+    if (completionRule !== null && !completionRule.ok) return completionRule;
     const scoringRule = parseJsonObject(exact.value.scoringRule, `itemRefs[${index}].scoringRule`);
     if (!scoringRule.ok) return scoringRule;
     const order = requiredPositiveInteger(exact.value.order, `itemRefs[${index}].order`);
@@ -455,7 +654,7 @@ export function parseItemRefs(value: unknown): BoundaryValidation<SaveTaskDraftI
     result.push({
       id: id.value,
       resourceId: resourceId.value,
-      completionRule: completionRule.value,
+      ...(completionRule === null ? {} : { completionRule: completionRule.value }),
       scoringRule: scoringRule.value,
       order: order.value,
     });

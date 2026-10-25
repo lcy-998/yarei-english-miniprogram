@@ -58,9 +58,9 @@ describe('repository startup activation', () => {
     const { getRepositoryMode } = await import('../../miniprogram/repositories/repository-factory')
 
     expect(initializeRepositories({ mode: 'cloudbase', envId: input.envId }, dependencies)).toEqual({
-      ok: false, mode: 'memory', reason,
+      ok: false, mode: 'blocked', reason,
     })
-    expect(getRepositoryMode()).toBe('memory')
+    expect(getRepositoryMode()).toBe('blocked')
   })
 
   it('initializes the exact explicit environment and one shared JS SDK app before cloud mode', async () => {
@@ -79,18 +79,25 @@ describe('repository startup activation', () => {
     expect(getRepositoryMode()).toBe('cloudbase')
   })
 
-  it('keeps memory active and blocks retry when JS SDK initialization fails', async () => {
+  it('blocks all business access and retry when JS SDK initialization fails', async () => {
     const client = clientSdk(() => { throw new Error('init failed') })
     const { initializeRepositories } = await import('../../miniprogram/repositories/repository-bootstrap')
-    const { getRepositoryMode } = await import('../../miniprogram/repositories/repository-factory')
+    const { getRepositoryMode, getCloudAppService } = await import('../../miniprogram/repositories/repository-factory')
+    const { getProfile } = await import('../../miniprogram/services/m1-app-service')
 
     expect(initializeRepositories(
       { mode: 'cloudbase', envId: 'env-explicit-dev' },
       { clientSdk: client.sdk, context },
-    )).toEqual({ ok: false, mode: 'memory', reason: 'CLOUD_INITIALIZATION_FAILED' })
-    expect(getRepositoryMode()).toBe('memory')
+    )).toEqual({ ok: false, mode: 'blocked', reason: 'CLOUD_INITIALIZATION_FAILED' })
+    expect(getRepositoryMode()).toBe('blocked')
+    expect(await getCloudAppService()?.login('13800138000', 'invalid')).toMatchObject({
+      ok: false, error: { code: 'SERVICE_UNAVAILABLE' },
+    })
+    expect(await getProfile('student_demo')).toMatchObject({
+      ok: false, error: { code: 'SERVICE_UNAVAILABLE' },
+    })
     expect(initializeRepositories({ mode: 'memory' })).toEqual({
-      ok: false, mode: 'memory', reason: 'ALREADY_ACTIVATED',
+      ok: false, mode: 'blocked', reason: 'ALREADY_ACTIVATED',
     })
   })
 
@@ -102,8 +109,8 @@ describe('repository startup activation', () => {
     expect(initializeRepositories(
       { mode: 'cloudbase', envId: 'env-explicit-dev' },
       { clientSdk: client.sdk, context },
-    )).toEqual({ ok: false, mode: 'memory', reason: 'CLOUD_INITIALIZATION_FAILED' })
-    expect(getRepositoryMode()).toBe('memory')
+    )).toEqual({ ok: false, mode: 'blocked', reason: 'CLOUD_INITIALIZATION_FAILED' })
+    expect(getRepositoryMode()).toBe('blocked')
   })
 
   it('allows an idempotent repeat but rejects a runtime mode switch', async () => {
@@ -130,5 +137,18 @@ describe('repository startup activation', () => {
       ok: false, mode: 'cloudbase', reason: 'ALREADY_ACTIVATED',
     })
     expect(getRepositoryMode()).toBe('cloudbase')
+  })
+
+  it('locks out memory mode when the account version cannot be verified', async () => {
+    const { blockRepositoryStartup, initializeRepositories } = await import('../../miniprogram/repositories/repository-bootstrap')
+    const { getRepositoryMode } = await import('../../miniprogram/repositories/repository-factory')
+
+    expect(blockRepositoryStartup('ACCOUNT_VERSION_UNAVAILABLE')).toEqual({
+      ok: false, mode: 'blocked', reason: 'ACCOUNT_VERSION_UNAVAILABLE',
+    })
+    expect(getRepositoryMode()).toBe('blocked')
+    expect(initializeRepositories({ mode: 'memory' })).toEqual({
+      ok: false, mode: 'blocked', reason: 'ALREADY_ACTIVATED',
+    })
   })
 })

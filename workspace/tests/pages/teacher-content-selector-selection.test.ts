@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskDraftOptionsView } from '../../miniprogram/services/app-service'
-import { replaceSelectedCatalogResources } from '../../miniprogram/pages/teacher/publish-task/selected-catalog-resources'
+import type { TaskDraftOptionsView } from '../../miniprogram/subpackages/teacher/services/app-service'
+import { replaceSelectedCatalogResources } from '../../miniprogram/subpackages/teacher/publish-task/selected-catalog-resources'
 
 const options: TaskDraftOptionsView = {
   selectedClassName: '三年级 2 班',
@@ -37,5 +37,15 @@ describe('T-18 selection returned to T-06', () => {
     expect(replaceSelectedCatalogResources(options, ['book_zoo', 'book_zoo'], ['class_a'])).toMatchObject({ ok: false })
     expect(replaceSelectedCatalogResources(options, ['book_zoo'], ['class_b'])).toMatchObject({ ok: false })
     expect(replaceSelectedCatalogResources(options, [], ['class_a'])).toMatchObject({ ok: false })
+  })
+
+  it('carries the server-provided media scoring mode into a new task item', () => {
+    const result = replaceSelectedCatalogResources(options, ['video_real'], ['class_a'], [
+      { id: 'video_real', title: '真人朗读视频', type: 'video', requiredCount: 1,
+        scoringKind: 'completion_only', allowedClassIds: ['class_a'] },
+    ])
+    expect(result).toMatchObject({ ok: true, options: { structuredDraft: { items: [
+      { resourceId: 'video_real', type: 'video', scoringKind: 'completion_only' },
+    ] } } })
   })
 })

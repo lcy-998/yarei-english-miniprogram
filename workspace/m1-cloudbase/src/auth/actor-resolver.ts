@@ -64,6 +64,10 @@ function isAudienceAllowed(functionName: FunctionName, session: Readonly<{
     || functionName === 'textbook-admin-query' || functionName === 'textbook-admin-command') {
     return audience === 'admin-console' && session.role === 'admin';
   }
+  if (functionName === 'native-admin-command') {
+    return audience === 'admin-console' && session.role === 'admin'
+      || audience === 'mini-program' && session.role === 'teacher';
+  }
   if (functionName === 'relationship-command' && session.role === 'admin') {
     return audience === 'admin-console';
   }

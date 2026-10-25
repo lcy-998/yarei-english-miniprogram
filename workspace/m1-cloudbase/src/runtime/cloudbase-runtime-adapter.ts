@@ -1,4 +1,5 @@
 import type { CloudCallContext, FunctionName } from '../shared/protocol';
+import { cloudbaseUsernameSubject } from '../auth/trusted-actor';
 import type { CloudBaseRuntimePort } from './ports';
 
 export interface CloudBasePlatformContext {
@@ -90,7 +91,7 @@ class CloudBaseRuntimeAdapter implements CloudBaseRuntimePort {
     }
 
     return {
-      subject: `cloudbase:username:${uid}`,
+      subject: cloudbaseUsernameSubject(uid),
       loginType: 'USERNAME',
       isAuthenticated: true,
     };
@@ -119,7 +120,9 @@ function audiencesForFunction(functionName: FunctionName): readonly BusinessSess
   if (functionName === 'admin-session' || functionName === 'organization-admin'
     || functionName === 'admin-task-activity-query' || functionName === 'admin-task-activity-command'
     || functionName === 'textbook-admin-query' || functionName === 'textbook-admin-command') return ['admin-console'];
-  if (functionName === 'relationship-command') return ['mini-program', 'admin-console'];
+  if (functionName === 'relationship-command' || functionName === 'native-admin-command') {
+    return ['mini-program', 'admin-console'];
+  }
   return ['mini-program'];
 }
 

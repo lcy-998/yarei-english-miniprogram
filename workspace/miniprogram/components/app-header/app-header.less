@@ -7,3 +7,8 @@
 .bell-badge { position: absolute; right: -5px; top: -5px; min-width: 18px; height: 18px; padding: 0 3px; box-sizing: border-box; border: 1px solid @yr-white; border-radius: 9px; background: @yr-danger; color: @yr-white; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
 .back-shape { width: 12px; height: 12px; border-left: 3px solid currentColor; border-bottom: 3px solid currentColor; border-radius: 2px; transform: rotate(45deg); }
 .header-placeholder { width: 44px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-header--admin { min-height: 52px !important; padding-top: 4px !important; padding-left: max(42px, env(safe-area-inset-left)); padding-right: max(42px, env(safe-area-inset-right)); }
+  .app-header--admin .header-title { font-size: 18px; }
+  .app-header--admin .header-icon { width: 42px; height: 42px; }
+}

@@ -1,14 +1,15 @@
-<view class="media-player media-player--{{state}}" aria-label="{{title || '媒体播放器'}}">
+<view class="media-player media-player--{{state}} {{bare ? 'media-player--bare' : ''}}" aria-label="{{title || '媒体播放器'}}">
   <view class="media-player__heading">
     <view><text class="media-player__title">{{title}}</text><status-badge wx:if="{{locked}}" tone="warning" icon="lock" label="不可快进"></status-badge></view>
-    <button class="media-player__mode {{earMode ? 'is-active' : ''}}" bindtap="onEarMode">磨耳朵</button>
+    <view wx:if="{{showEarModeToggle && earModeLocked}}" class="media-player__mode is-active is-locked" aria-role="text">磨耳朵已开启 · 固定</view>
+    <button wx:elif="{{showEarModeToggle}}" class="media-player__mode {{earMode ? 'is-active' : ''}}" bindtap="onEarMode">磨耳朵</button>
   </view>
-  <view wx:if="{{state === 'loading'}}" class="media-player__message">正在缓冲…</view>
-  <view wx:elif="{{state === 'error' || state === 'offline' || state === 'removed'}}" class="media-player__message media-player__message--error">
+  <view wx:if="{{state === 'error' || state === 'offline' || state === 'removed'}}" class="media-player__message media-player__message--error">
     <visual-icon name="warning" size="28" label=""></visual-icon><text>{{state === 'removed' ? '资源已下架' : state === 'offline' ? '网络不可用' : '播放失败，已保留进度'}}</text><button bindtap="onRetry">重试</button>
   </view>
   <block wx:else>
-    <view class="media-player__timeline"><view class="media-player__verified" style="width:{{progress}}%"></view><view wx:if="{{locked}}" class="media-player__unverified"></view></view>
+    <view wx:if="{{state === 'loading' && showBufferingText}}" class="media-player__buffering">正在缓冲，可暂停或重试播放</view>
+    <view class="media-player__timeline"><view class="media-player__verified" style="width:{{progress}}%"></view><view wx:if="{{locked}}" class="media-player__unverified"></view><slider class="media-player__seek" min="0" max="100" step="1" value="{{progress}}" activeColor="transparent" backgroundColor="transparent" block-size="18" bindchange="onSeek" aria-label="播放位置"></slider></view>
     <view class="media-player__times"><text>{{currentTime}}</text><text>{{duration}}</text></view>
     <view class="media-player__controls">
       <button class="media-player__play" bindtap="onToggle" aria-label="{{playing ? '暂停' : '播放'}}"><visual-icon name="{{playing ? 'pause' : 'play'}}" size="28" label=""></visual-icon></button>

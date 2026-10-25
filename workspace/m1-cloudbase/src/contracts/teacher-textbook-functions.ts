@@ -4,13 +4,14 @@ import type { TextbookListFilters, TextbookSaveInput } from '../textbook/service
 
 type Validation<T> = { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly fieldErrors: Readonly<Record<string, string>> };
-export const TEACHER_TEXTBOOK_QUERY_ACTIONS = ['getCenterSettings', 'listClasses', 'getClass', 'listTextbooks', 'getTextbook'] as const;
+export const TEACHER_TEXTBOOK_QUERY_ACTIONS = ['getCenterSettings', 'listClasses', 'getClass', 'listTextbooks', 'listTextbookFacets', 'getTextbook'] as const;
 export const TEACHER_TEXTBOOK_COMMAND_ACTIONS = ['saveClassTextbooks', 'publishClassTextbooks'] as const;
 export type TeacherTextbookQueryAction = (typeof TEACHER_TEXTBOOK_QUERY_ACTIONS)[number];
 export type TeacherTextbookCommandAction = (typeof TEACHER_TEXTBOOK_COMMAND_ACTIONS)[number];
 export type TeacherTextbookQueryInput = Readonly<{ action: 'getCenterSettings' | 'listClasses' }>
   | Readonly<{ action: 'getClass'; classId: string }>
   | Readonly<{ action: 'listTextbooks'; filters: TextbookListFilters; page: { limit: number; offset: number }; targetClassId?: string }>
+  | Readonly<{ action: 'listTextbookFacets'; filters: TextbookListFilters; targetClassId?: string }>
   | Readonly<{ action: 'getTextbook'; textbookId: string; targetClassId?: string }>;
 export type TeacherTextbookCommandInput = Readonly<{ action: TeacherTextbookCommandAction;
   input: TextbookSaveInput; expectedVersion: number; operationId: string }>;
@@ -38,6 +39,14 @@ export function validateTeacherTextbookQueryRequest(request: FunctionRequest<Tea
       ? { ok: true, value: { action: 'getTextbook', textbookId: exact.value.textbookId,
         ...(exact.value.targetClassId === undefined ? {} : { targetClassId: exact.value.targetClassId }) } }
       : invalid('textbookId');
+  }
+  if (request.action === 'listTextbookFacets') {
+    const exact = parseExactObject(request.payload, ['filters'], ['targetClassId']);
+    if (!exact.ok || (exact.value.targetClassId !== undefined && !id(exact.value.targetClassId))) return invalid('targetClassId');
+    const filters = parseExactObject(exact.value.filters, [], ['grade', 'term', 'edition', 'unit', 'lesson', 'keyword']);
+    if (!filters.ok || Object.values(filters.value).some(value => !optionalString(value))) return invalid('filters');
+    return { ok: true, value: { action: 'listTextbookFacets', filters: filters.value as TextbookListFilters,
+      ...(exact.value.targetClassId === undefined ? {} : { targetClassId: exact.value.targetClassId }) } };
   }
   const exact = parseExactObject(request.payload, ['filters', 'page'], ['targetClassId']);
   if (!exact.ok) return exact;

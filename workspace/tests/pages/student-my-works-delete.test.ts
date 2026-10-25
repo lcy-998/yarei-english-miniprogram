@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../miniprogram/services/app-service', () => ({
+vi.mock('../../miniprogram/subpackages/student/services/app-service', () => ({
   deleteWorkDraft: vi.fn(),
   getWorkPlayback: vi.fn(),
   listMyWorks: vi.fn(),
@@ -18,7 +18,7 @@ describe('S-12 draft deletion', () => {
     vi.stubGlobal('wx', { getStorageSync: () => ({ sessionId: 'session_demo',
       user: { id: 'student_demo', role: 'student' } }),
     showModal: (options: typeof modal) => { modal = options } })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student/services/app-service')
     const draft = { id: 'work_draft', materialId: 'material_demo', materialVersion: 'v1',
       stagingPath: 'student-works/staging/demo/work_draft.mp3', status: 'draft' as const,
       fileId: null, sizeBytes: null, durationMs: null, note: '', version: 1,
@@ -33,7 +33,7 @@ describe('S-12 draft deletion', () => {
       .mockResolvedValueOnce({ ok: true, data: { ...draft, version: 2,
         deletedAt: '2026-09-27T09:02:00+08:00', recoverableUntil: '2026-10-04T01:02:00.000Z',
         deletedByUserId: 'student_demo' } })
-    await import('../../miniprogram/pages/student/my-works/my-works')
+    await import('../../miniprogram/subpackages/student/my-works/my-works')
     if (!definition) throw new Error('My works page was not registered')
     const context = { data: { ...definition.data },
       setData(change: Record<string, unknown>) { Object.assign(this.data, change) },

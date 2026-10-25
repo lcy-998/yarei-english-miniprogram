@@ -7,7 +7,7 @@ import {
   FunctionRequest,
 } from '../../miniprogram/repositories/cloudbase/protocol'
 import { configureRepositories, getCloudAppService, getRepositoryMode } from '../../miniprogram/repositories/repository-factory'
-import { getCompletion, getDraftOptions, getHome, getParentFeedback, getParentHome, getReadingProgress, getReadingResource, getTaskDetail, getTeacherTasks, getVocabularyProgress, listReadingResources, listVocabularyPacks, login, logout, publishClassroomTask, requestPasswordResetCode, resetPassword, saveDraft, saveReadingProgress, saveVocabularyProgress, selectRole, submitTask } from '../../miniprogram/services/app-service'
+import { getCompletion, getDraftOptions, getHome, getParentFeedback, getParentHome, getReadingProgress, getReadingResource, getTaskDetail, getTeacherTasks, getVocabularyProgress, listReadingResources, listVocabularyPacks, login, logout, publishClassroomTask, requestPasswordResetCode, resetPassword, saveDraft, saveReadingProgress, saveVocabularyProgress, selectRole, submitTask, verifyPasswordResetCode } from '../../miniprogram/services/app-service'
 import { initialState, replaceState } from '../../miniprogram/repositories/memory/mock-state'
 import {
   PARENT_QUERY_ACTIONS,
@@ -177,7 +177,10 @@ describe('repository factory and CloudBase request mapping', () => {
     const options = await getDraftOptions('usr_teacher_lin', { now: () => new Date('2026-09-16T02:00:00.000Z') })
 
     expect(result).toMatchObject({ ok: true, data: { user: { id: 'usr_student_xiaoyu', role: 'student' } } })
-    expect(options).toMatchObject({ ok: true, data: { resources: [{ type: 'reading' }, { type: 'vocabulary' }, { type: 'exercise' }] } })
+    expect(options).toMatchObject({ ok: true, data: { resources: [
+      { type: 'reading' }, { type: 'vocabulary' }, { type: 'exercise' }, { type: 'exercise' },
+      { type: 'exercise' }, { type: 'exercise' }, { type: 'exercise' },
+    ] } })
   })
 
   it('maps a student home query without putting caller identity in the payload', async () => {
@@ -933,9 +936,11 @@ describe('repository factory and CloudBase request mapping', () => {
   it('supports the fictional memory password reset flow without account enumeration', async () => {
     expect(await requestPasswordResetCode('13800000001')).toEqual({ ok: true, data: { expiresInMinutes: 10 } })
     expect(await requestPasswordResetCode('13899999999')).toEqual({ ok: true, data: { expiresInMinutes: 10 } })
-    expect(await resetPassword('13800000001', '246810', '654321')).toEqual({ ok: true, data: null })
+    expect(await verifyPasswordResetCode('13800000001', '246810')).toEqual({ ok: true, data: { expiresInSeconds: 600 } })
+    expect(await resetPassword('13800000001', '654321')).toEqual({ ok: true, data: null })
     expect(await login('13800000001', '654321')).toMatchObject({ ok: true, data: { user: { id: 'usr_student_xiaoyu' } } })
-    expect(await resetPassword('13800000001', '246810', '123456')).toEqual({ ok: true, data: null })
+    expect(await verifyPasswordResetCode('13800000001', '246810')).toEqual({ ok: true, data: { expiresInSeconds: 600 } })
+    expect(await resetPassword('13800000001', '123456')).toEqual({ ok: true, data: null })
   })
 
   it('invalidates the trusted CloudBase business session when logging out', async () => {

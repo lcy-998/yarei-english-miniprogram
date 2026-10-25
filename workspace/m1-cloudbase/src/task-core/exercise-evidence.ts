@@ -2,6 +2,16 @@ import type { JsonObject, JsonValue } from '../shared/protocol';
 
 export type ExerciseQuestionType = 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
 
+export interface ExerciseSectionSnapshot {
+  readonly id: string;
+  readonly title: string;
+  readonly instruction: string;
+  readonly studentMaterial: string;
+  readonly order: number;
+  readonly questionOrder: number;
+  readonly points: number;
+}
+
 export interface ExerciseQuestionSnapshot {
   readonly questionId: string;
   readonly questionType: ExerciseQuestionType;
@@ -9,6 +19,9 @@ export interface ExerciseQuestionSnapshot {
   readonly options: readonly string[];
   readonly correctAnswer: JsonValue;
   readonly explanation: string;
+  readonly exerciseSection?: ExerciseSectionSnapshot;
+  readonly acceptedAnswers?: readonly string[];
+  readonly rubric?: readonly Readonly<{ criterion: string; points: number }>[];
 }
 
 export interface ExerciseSubmissionEvaluation {
@@ -29,10 +42,40 @@ export function readExerciseQuestionSnapshot(payload: JsonObject): ExerciseQuest
   if (type === 'single_choice' && (typeof payload.correctAnswer !== 'string' || !options.includes(payload.correctAnswer))) return null;
   if (type === 'multiple_choice' && (!Array.isArray(payload.correctAnswer) || !payload.correctAnswer.length
     || payload.correctAnswer.some((item) => typeof item !== 'string' || !options.includes(item)))) return null;
+  const rawSection = payload.exerciseSection;
+  if (rawSection !== undefined && (!isObject(rawSection)
+    || typeof rawSection.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(rawSection.id)
+    || typeof rawSection.title !== 'string' || !rawSection.title.trim()
+    || typeof rawSection.instruction !== 'string' || !rawSection.instruction.trim()
+    || typeof rawSection.studentMaterial !== 'string'
+    || typeof rawSection.order !== 'number' || !Number.isSafeInteger(rawSection.order) || rawSection.order < 1
+    || typeof rawSection.questionOrder !== 'number' || !Number.isSafeInteger(rawSection.questionOrder)
+    || rawSection.questionOrder < 1
+    || typeof rawSection.points !== 'number' || !Number.isSafeInteger(rawSection.points) || rawSection.points < 1)) return null;
+  const section = isObject(rawSection) ? {
+    id: rawSection.id as string, title: rawSection.title as string,
+    instruction: rawSection.instruction as string,
+    studentMaterial: rawSection.studentMaterial as string,
+    order: rawSection.order as number, questionOrder: rawSection.questionOrder as number,
+    points: rawSection.points as number,
+  } : undefined;
+  const accepted = payload.acceptedAnswers;
+  if (accepted !== undefined && (type !== 'fill' || !Array.isArray(accepted)
+    || !accepted.length || accepted.some(answer => typeof answer !== 'string' || !answer.trim())
+    || typeof payload.correctAnswer !== 'string' || !accepted.includes(payload.correctAnswer))) return null;
+  const rubric = payload.rubric;
+  if (rubric !== undefined && (type !== 'subjective' || !Array.isArray(rubric)
+    || rubric.length < 2 || rubric.some(row => !isObject(row)
+      || typeof row.criterion !== 'string' || !row.criterion.trim()
+      || typeof row.points !== 'number' || !Number.isSafeInteger(row.points) || row.points < 1)
+    || section === undefined || rubric.reduce((sum, row) => sum + Number((row as JsonObject).points), 0) !== section.points)) return null;
   return {
     questionId: questionIds[0], questionType: type as ExerciseQuestionType,
     stem: payload.stem, options: options as string[],
     correctAnswer: payload.correctAnswer, explanation: payload.explanation,
+    ...(section === undefined ? {} : { exerciseSection: section }),
+    ...(Array.isArray(accepted) ? { acceptedAnswers: accepted as string[] } : {}),
+    ...(Array.isArray(rubric) ? { rubric: rubric as Array<{ criterion: string; points: number }> } : {}),
   };
 }
 
@@ -45,7 +88,8 @@ export function evaluateExerciseSubmission(snapshot: ExerciseQuestionSnapshot, v
   if (!isObject(raw) || Object.keys(raw).sort().join(',') !== 'questionId,response'
     || raw.questionId !== snapshot.questionId || !validResponse(snapshot, raw.response)) return incomplete();
   const response = raw.response;
-  const isCorrect = snapshot.questionType === 'subjective' ? null : answersEqual(snapshot.questionType, response, snapshot.correctAnswer);
+  const isCorrect = snapshot.questionType === 'subjective' ? null
+    : answersEqual(snapshot.questionType, response, snapshot.correctAnswer, snapshot.acceptedAnswers);
   const canonicalValue: JsonObject = {
     kind: 'exercise', answeredQuestionCount: 1,
     questionResponses: [{ questionId: snapshot.questionId, response,
@@ -67,7 +111,8 @@ function validResponse(snapshot: ExerciseQuestionSnapshot, value: JsonValue | un
   return snapshot.questionType !== 'single_choice' || snapshot.options.includes(value);
 }
 
-function answersEqual(type: ExerciseQuestionType, response: JsonValue, correctAnswer: JsonValue): boolean {
+function answersEqual(type: ExerciseQuestionType, response: JsonValue, correctAnswer: JsonValue,
+  acceptedAnswers?: readonly string[]): boolean {
   if (type === 'multiple_choice') {
     if (!Array.isArray(response) || !Array.isArray(correctAnswer)
       || correctAnswer.some((item) => typeof item !== 'string')) return false;
@@ -75,7 +120,8 @@ function answersEqual(type: ExerciseQuestionType, response: JsonValue, correctAn
       && response.every((item) => correctAnswer.includes(item));
   }
   return typeof response === 'string' && typeof correctAnswer === 'string'
-    && response.trim().toLocaleLowerCase() === correctAnswer.trim().toLocaleLowerCase();
+    && (acceptedAnswers ?? [correctAnswer]).some(answer =>
+      response.trim().toLocaleLowerCase() === answer.trim().toLocaleLowerCase());
 }
 
 function isObject(value: JsonValue): value is JsonObject {

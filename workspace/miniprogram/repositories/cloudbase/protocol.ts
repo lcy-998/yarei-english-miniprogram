@@ -8,6 +8,7 @@ export type FunctionName =
   | 'submission-command'
   | 'review-query'
   | 'review-command'
+  | 'teacher-suggestion-command'
   | 'parent-query'
   | 'relationship-command'
   | 'content-query'
@@ -15,6 +16,7 @@ export type FunctionName =
   | 'learning-progress-command'
   | 'teacher-student-query'
   | 'teacher-student-command'
+  | 'teacher-student-import-command'
   | 'activity-query'
   | 'activity-command'
   | 'vocabulary-evidence-command'
@@ -32,6 +34,13 @@ export type FunctionName =
   | 'notification-command'
   | 'task-recording-query'
   | 'task-recording-command'
+  | 'pronunciation-command'
+  | 'pronunciation-query'
+  | 'native-admin-query'
+  | 'native-admin-command'
+  | 'native-admin-management-command'
+  | 'native-admin-operations-command'
+  | 'native-admin-media-command'
 
 export interface FunctionRequest<TAction extends string, TPayload extends object> {
   apiVersion: 'm1.v1'
@@ -57,7 +66,8 @@ export interface CloudFunctionInvoker {
 export interface CloudAuthenticationPort {
   signIn(input: Readonly<{ mobile: string; password: string }>): Promise<void>
   requestPasswordResetCode?(mobile: string): Promise<void>
-  resetPassword?(mobile: string, code: string, newPassword: string): Promise<void>
+  verifyPasswordResetCode?(mobile: string, code: string): Promise<number>
+  resetPassword?(mobile: string, newPassword: string): Promise<void>
 }
 
 export interface CloudClientContext {
@@ -114,12 +124,20 @@ export function createCloudRepositoryClient(
         return result
       } catch (error: unknown) {
         const code = platformErrorCode(error)
+        console.warn('[CloudBase] function call failed', functionName, action, platformErrorIdentifier(error), code)
         if (code === 'UNAUTHENTICATED') onUnauthenticated?.()
         return { ok: false, error: { code, message: PLATFORM_MESSAGES[code],
           retryable: code === 'NETWORK_ERROR' || code === 'SERVICE_UNAVAILABLE' } }
       }
     },
   }
+}
+
+function platformErrorIdentifier(error: unknown): string {
+  if (!isRecord(error)) return 'UNKNOWN'
+  const value = error.code ?? error.errCode
+  const identifier = typeof value === 'string' || typeof value === 'number' ? String(value) : 'UNKNOWN'
+  return /^[A-Za-z0-9_-]{1,80}$/.test(identifier) ? identifier : 'UNKNOWN'
 }
 
 function platformErrorCode(error: unknown): Extract<ServiceError['code'], 'UNAUTHENTICATED' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'> {

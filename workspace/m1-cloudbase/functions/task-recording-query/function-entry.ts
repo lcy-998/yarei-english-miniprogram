@@ -1,6 +1,7 @@
 import { TASK_RECORDING_QUERY_ACTIONS, validateTaskRecordingQueryRequest } from '../../src/contracts/task-recording-functions';
 import type { TaskRecordingService } from '../../src/task-recording/service';
-import type { TaskRecordingCatalogService, RecordingPromptPage, RecordingPromptView } from '../../src/task-recording/catalog-service';
+import type { TaskRecordingCatalogService, RecordingPromptPage, RecordingPromptView,
+  RecordingPromptFacet } from '../../src/task-recording/catalog-service';
 import type { TaskRecordingRecord } from '../../src/task-recording/types';
 import { TaskRecordingError } from '../../src/task-recording/types';
 import type { ServiceResult } from '../../src/shared/protocol';
@@ -14,6 +15,7 @@ export function createTaskRecordingQueryFunction(dependencies: TrustedFunctionDe
       : dependencies.mapFailure?.(phase, error) ?? (phase === 'runtime' ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR') },
     validateTaskRecordingQueryRequest,
     async (input, actor): Promise<ServiceResult<readonly TaskRecordingRecord[] | RecordingPromptPage
+      | readonly RecordingPromptFacet[]
       | RecordingPromptView | Readonly<{ recordingId: string; temporaryUrl: string; expiresAt: string }>
       | Readonly<{ recordingId: string; mediaDeletedAt: string | null; mediaExpired: boolean }>>> => {
       const data = input.action === 'listRound'
@@ -24,7 +26,11 @@ export function createTaskRecordingQueryFunction(dependencies: TrustedFunctionDe
             ? await dependencies.service.getMediaState(actor, input.recordingId)
           : input.action === 'listPrompts'
             ? await dependencies.catalog.list(actor, { targetClassIds: input.targetClassIds,
-              ...(input.keyword === undefined ? {} : { keyword: input.keyword }), ...input.page })
+              ...(input.keyword === undefined ? {} : { keyword: input.keyword }),
+              ...(input.grade === undefined ? {} : { grade: input.grade }),
+              ...(input.unit === undefined ? {} : { unit: input.unit }), ...input.page })
+            : input.action === 'listPromptFacets'
+              ? await dependencies.catalog.facets(actor, input.targetClassIds)
             : await dependencies.catalog.get(actor, input.promptId, input.targetClassIds);
       return success(data, createMeta(dependencies.clock, dependencies.requestIds));
     });

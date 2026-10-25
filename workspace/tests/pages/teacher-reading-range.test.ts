@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ReadingResource } from '../../miniprogram/domain/types'
-import { orderedReadingPages, selectedReadingPageIds } from '../../miniprogram/pages/teacher/reading-selector/reading-range'
+import type { ReadingResource } from '../../miniprogram/subpackages/teacher/domain/types'
+import { orderedReadingPages, selectedReadingPageIds } from '../../miniprogram/subpackages/teacher/reading-selector/reading-range'
 
 const book: ReadingResource = { id: 'reading_demo', title: '虚构阅读', category: 'picture_book',
   grade: '三年级', difficulty: '基础', contentVersion: 'v1', presentation: 'page_images_only',

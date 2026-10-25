@@ -1,16 +1,20 @@
 import type { TrustedActorContext } from '../../src/auth/trusted-actor';
 import { REVIEW_QUERY_ACTIONS, validateReviewQueryRequest } from '../../src/contracts/task-query-functions';
 import type { ServiceResult } from '../../src/shared/protocol';
+import { createMeta, failure } from '../../src/shared/result';
 import type { CloudBasePlaybackSdkPort } from '../../src/student-work/cloudbase-playback';
-import type { ReviewQueryService } from '../../src/task-query/service';
+import type { ReviewQueryService, TaskMediaReviewAccess } from '../../src/task-query/service';
 import type { ReviewSubmissionView } from '../../src/task-query/types';
 import { createTaskQueryFailureMapper } from '../shared/task-query-failure';
 import { createTrustedFunction, type TrustedFunctionDependencies } from '../shared/trusted-function';
 
-export interface ReviewQueryHandler extends Pick<ReviewQueryService, 'listReviewTasks' | 'getSubmissionForReview' | 'previewBatchComment'> {}
+export interface ReviewQueryHandler extends Pick<ReviewQueryService, 'listReviewTasks' | 'getSubmissionForReview' | 'previewBatchComment'> {
+  readonly getTaskMediaReviewEvidence?: ReviewQueryService['getTaskMediaReviewEvidence'];
+}
 export interface ReviewQueryFunctionDependencies extends TrustedFunctionDependencies {
   readonly handler: ReviewQueryHandler;
   readonly readingMediaStorage?: CloudBasePlaybackSdkPort;
+  readonly taskMediaReviewAccess?: TaskMediaReviewAccess;
 }
 
 async function withSignedReadingPages(result: ServiceResult<ReviewSubmissionView>,
@@ -50,6 +54,11 @@ export function createReviewQueryFunction(dependencies: ReviewQueryFunctionDepen
         case 'listReviewTasks': return dependencies.handler.listReviewTasks(actor, input.filters, input.page);
         case 'getSubmissionForReview': return withSignedReadingPages(
           await dependencies.handler.getSubmissionForReview(actor, input.submissionId), dependencies.readingMediaStorage);
+        case 'getTaskMediaReviewEvidence': return dependencies.handler.getTaskMediaReviewEvidence
+          && dependencies.taskMediaReviewAccess
+          ? dependencies.handler.getTaskMediaReviewEvidence(actor, input.submissionId,
+            input.itemId, dependencies.taskMediaReviewAccess)
+          : failure('SERVICE_UNAVAILABLE', createMeta(dependencies.clock, dependencies.requestIds));
         case 'previewBatchComment': return dependencies.handler.previewBatchComment(actor, input.taskId, input.filter, input.selection, input.comment);
       }
     },

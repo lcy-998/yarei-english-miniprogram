@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterStudentsByClass } from '../../miniprogram/pages/teacher/student-list/student-list-filter'
+import { filterStudentsByClass } from '../../miniprogram/subpackages/teacher/student-list/student-list-filter'
 import { StudentListView } from '../../miniprogram/repositories/m1-app-repository'
 
 const students: StudentListView[] = [

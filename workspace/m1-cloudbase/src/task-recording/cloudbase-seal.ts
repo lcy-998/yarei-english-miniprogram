@@ -3,13 +3,16 @@ import { parseBuffer } from 'music-metadata';
 import type { CloudBaseWorkStoragePort, AudioMetadataReader } from '../student-work/cloudbase-recording-seal';
 import type { TaskRecordingSealPort } from './repository';
 import { TaskRecordingError } from './types';
+import { hashHex } from '../shared/request-summary';
+import { transcodeWebmOpusToMp3, type NormalizedAudio } from './webm-opus-transcode';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_DURATION_MS = 5 * 60 * 1000;
 const metadataReader: AudioMetadataReader = { async read(buffer) {
-  const parsed = await parseBuffer(buffer, { mimeType: 'audio/mpeg', size: buffer.length },
+  const parsed = await parseBuffer(buffer, { size: buffer.length },
     { duration: true, skipCovers: true });
-  return { durationSeconds: parsed.format.duration ?? null, codec: parsed.format.codec ?? null };
+  return { durationSeconds: parsed.format.duration ?? null, codec: parsed.format.codec ?? null,
+    container: parsed.format.container ?? null, numberOfChannels: parsed.format.numberOfChannels ?? null };
 } };
 function cloudPath(fileId: string, environmentId: string): string | null {
   const match = /^cloud:\/\/([^/]+)\/(.+)$/.exec(fileId);
@@ -17,12 +20,15 @@ function cloudPath(fileId: string, environmentId: string): string | null {
 }
 export class CloudBaseTaskRecordingSeal implements TaskRecordingSealPort {
   public constructor(private readonly storage: CloudBaseWorkStoragePort, private readonly environmentId: string,
-    private readonly metadata: AudioMetadataReader = metadataReader) {}
+    private readonly metadata: AudioMetadataReader = metadataReader,
+    private readonly transcodeWebm: (input: Buffer, channels: 1 | 2) => Promise<NormalizedAudio> = transcodeWebmOpusToMp3) {}
   public async inspectAndSeal(input: Readonly<{ stagingFileId: string; stagingPath: string;
     organizationId: string; studentId: string; recordingId: string }>) {
-    const ownerDigest = createHash('sha256').update(JSON.stringify([input.organizationId, input.studentId])).digest('hex');
+    const ownerKey = JSON.stringify([input.organizationId, input.studentId]);
+    const stagingOwnerDigest = hashHex(ownerKey);
+    const privateOwnerDigest = createHash('sha256').update(ownerKey).digest('hex');
     if (!this.environmentId.trim() || cloudPath(input.stagingFileId, this.environmentId) !== input.stagingPath
-      || input.stagingPath !== `task-recordings/staging/${ownerDigest}/${input.recordingId}.mp3`
+      || input.stagingPath !== `task-recordings/staging/${stagingOwnerDigest}/${input.recordingId}.mp3`
       || !/^[A-Za-z0-9_-]{8,128}$/.test(input.recordingId)) {
       throw new TaskRecordingError('MEDIA_INVALID');
     }
@@ -40,17 +46,32 @@ export class CloudBaseTaskRecordingSeal implements TaskRecordingSealPort {
     try { parsed = await this.metadata.read(buffer); }
     catch { throw new TaskRecordingError('MEDIA_INVALID'); }
     const codec = parsed.codec?.toLowerCase() ?? '';
-    const durationMs = parsed.durationSeconds === null ? NaN : Math.round(parsed.durationSeconds * 1000);
-    if ((!codec.includes('mp3') && !codec.includes('layer 3'))
+    const container = parsed.container?.toLowerCase() ?? '';
+    let normalizedCodec: 'mp3' | 'aac' | null = codec.includes('mp3') || codec.includes('layer 3') ? 'mp3'
+      : codec.includes('aac') ? 'aac' : null;
+    let durationMs = parsed.durationSeconds === null ? NaN : Math.round(parsed.durationSeconds * 1000);
+    if (codec === 'opus' && (container.includes('webm') || container.includes('ebml'))) {
+      if (parsed.numberOfChannels !== 1 && parsed.numberOfChannels !== 2) throw new TaskRecordingError('MEDIA_INVALID');
+      try {
+        const converted = await this.transcodeWebm(buffer, parsed.numberOfChannels);
+        buffer = converted.buffer;
+        durationMs = converted.durationMs;
+        normalizedCodec = 'mp3';
+      } catch { throw new TaskRecordingError('MEDIA_INVALID'); }
+    }
+    if (normalizedCodec === null
+      || buffer.length < 1 || buffer.length > MAX_BYTES
       || !Number.isSafeInteger(durationMs) || durationMs < 1000 || durationMs > MAX_DURATION_MS) {
       throw new TaskRecordingError('MEDIA_INVALID');
     }
     const contentSha256 = createHash('sha256').update(buffer).digest('hex');
-    const privatePath = `task-recordings/private/${ownerDigest}/${input.recordingId}/${contentSha256}.mp3`;
+    const extension = normalizedCodec === 'mp3' ? 'mp3'
+      : container.includes('m4a') || container.includes('mp4') || container.includes('mpeg-4') ? 'm4a' : 'aac';
+    const privatePath = `task-recordings/private/${privateOwnerDigest}/${input.recordingId}/${contentSha256}.${extension}`;
     try {
       const uploaded = await this.storage.uploadFile({ cloudPath: privatePath, fileContent: buffer });
       if (cloudPath(uploaded.fileID, this.environmentId) !== privatePath) throw new TaskRecordingError('SERVICE_UNAVAILABLE');
-      return { fileId: uploaded.fileID, contentSha256, sizeBytes: buffer.length, durationMs, codec: 'mp3' as const };
+      return { fileId: uploaded.fileID, contentSha256, sizeBytes: buffer.length, durationMs, codec: normalizedCodec };
     } catch (error: unknown) {
       if (error instanceof TaskRecordingError) throw error;
       throw new TaskRecordingError('SERVICE_UNAVAILABLE');

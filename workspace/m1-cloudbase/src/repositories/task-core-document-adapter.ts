@@ -29,6 +29,10 @@ import type { TaskRecordingRecord } from '../task-recording/types';
 import { projectTemplate } from '../task-template/document-repository';
 import type { TaskTemplate } from '../task-template/types';
 import { readingProgressDocumentId, vocabularyProgressDocumentId } from './learning-progress-document-adapter';
+import { hasActivePublicMediaSource } from '../teacher-media/public-media-source';
+import { hasActivePublicQuestionSource } from '../question-admin/public-question-source';
+import { hasActivePublicLearningSource } from '../org-content/public-learning-source';
+import { hasActiveLegacyGlobalSource } from '../global-assets/legacy-global-source';
 
 export const TASK_CORE_COLLECTIONS = {
   classes: 'classes',
@@ -161,6 +165,15 @@ class TaskCoreDocumentReader implements TaskCoreReader {
 
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.resources, resourceId, organizationId);
+    const privateVideo = found?.type === 'video'
+      && found.payload !== null && typeof found.payload === 'object'
+      && !Array.isArray(found.payload)
+      && (found.payload as Record<string, unknown>).teacherPrivate !== undefined;
+    if (found && (!privateVideo && ['listening', 'video', 'dubbing'].includes(String(found.type))
+      && !await hasActivePublicMediaSource(this.documents, found)
+      || !await hasActivePublicQuestionSource(this.documents, found)
+      || !await hasActivePublicLearningSource(this.documents, found)
+      || !await hasActiveLegacyGlobalSource(this.documents, found))) return null;
     return found === null ? null : decodeLearningResource(found);
   }
 
@@ -322,6 +335,11 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
   public async findResource(organizationId: string, resourceId: string): Promise<LearningResourceRecord | null> {
     if (!this.scope.resourceIds.includes(resourceId)) return null;
     const found = await this.getScoped(TASK_CORE_COLLECTIONS.resources, resourceId, organizationId);
+    if (found && (['listening', 'video', 'dubbing'].includes(String(found.type))
+      && !await hasActivePublicMediaSource(this.transaction, found)
+      || !await hasActivePublicQuestionSource(this.transaction, found)
+      || !await hasActivePublicLearningSource(this.transaction, found)
+      || !await hasActiveLegacyGlobalSource(this.transaction, found))) return null;
     return found === null ? null : decodeLearningResource(found);
   }
 
@@ -474,6 +492,12 @@ class TaskCoreDocumentTransaction implements TaskCoreTransaction {
 
   public async saveTask(task: TaskRecord): Promise<void> {
     await this.saveVersioned(TASK_CORE_COLLECTIONS.tasks, task.id, task.organizationId, task.version, task);
+  }
+
+  public async deleteTask(task: TaskRecord): Promise<void> {
+    if (!(await this.transaction.delete(TASK_CORE_COLLECTIONS.tasks, task.id, task.version))) {
+      throw new TaskCorePersistenceError('CONFLICT');
+    }
   }
 
   public async saveTemplate(template: TaskTemplate): Promise<void> {
@@ -759,6 +783,19 @@ function decodeDocument<T>(document: VersionedDocument, includeVersion = false):
 
 function decodeLearningResource(document: VersionedDocument): LearningResourceRecord {
   const resource = decodeDocument<LearningResourceRecord>(document);
+  const storedPayload = document.payload;
+  const payload = storedPayload !== null && typeof storedPayload === 'object' && !Array.isArray(storedPayload)
+    ? storedPayload as JsonObject : null;
+  if (storedPayload !== undefined && payload === null) throw new TaskCorePersistenceError('INTERNAL_ERROR');
+  const vocabularyPayload = resource.type === 'vocabulary' ? {
+    ...(payload ?? {}),
+    ...(['grade', 'term', 'textbook', 'unit', 'words'] as const).reduce<Record<string, JsonValue>>((fields, key) => {
+      const value = payload?.[key] ?? document[key];
+      if (value !== undefined) fields[key] = value;
+      return fields;
+    }, {}),
+  } : null;
+  if (resource.type !== 'vocabulary' && payload === null) throw new TaskCorePersistenceError('INTERNAL_ERROR');
   const rawVisibility = document.visibility;
   const classIds = rawVisibility !== null && typeof rawVisibility === 'object' && !Array.isArray(rawVisibility)
     ? (rawVisibility as Record<string, unknown>).classIds : undefined;
@@ -772,6 +809,7 @@ function decodeLearningResource(document: VersionedDocument): LearningResourceRe
     throw new TaskCorePersistenceError('INTERNAL_ERROR');
   }
   return { ...resource, id: typeof document.id === 'string' && document.id.length > 0 ? document.id : document._id,
+    payload: cloneJson(vocabularyPayload ?? payload) as JsonObject,
     visibility, allowedClassIds: [...allowedClassIds] };
 }
 

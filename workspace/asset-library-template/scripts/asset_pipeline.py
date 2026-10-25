@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import fnmatch
 import hashlib
 import io
 import json
@@ -20,6 +21,14 @@ from typing import Any, Iterable
 from pypdf import PdfReader
 from PIL import Image
 
+from content_review import reconcile_review
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "runtime" / "python-packages"))
+try:
+    from mutagen import File as mutagen_file
+except ImportError:
+    mutagen_file = None
+
 try:
     import pdfplumber
 except ImportError:
@@ -31,7 +40,7 @@ SUPPORTED_EXTENSIONS = {
     ".vtt", ".srt", ".txt", ".json", ".csv", ".xlsx", ".docx",
 }
 EXCLUDED_DIRECTORIES = {
-    "library", "reports", "exports", "scripts", "docs", "config", ".git", "__pycache__",
+    "library", "reports", "exports", "runtime", "scripts", "docs", "config", ".git", "__pycache__",
 }
 UNIT_PATTERN = re.compile(r"(?:^|\n)\s*(?:unit|module|starter\s+unit)\s*[0-9a-z]+", re.I)
 
@@ -414,10 +423,27 @@ def probe_media(source: Path, ffprobe: str | None) -> dict[str, Any]:
             streams = payload.get("streams", [])
             details["durationMs"] = round(float(media_format["duration"]) * 1000) if media_format.get("duration") else None
             details["codec"] = streams[0].get("codec_name") if streams else None
+            if source.suffix.lower() == ".mp4":
+                details["videoCodec"] = next((stream.get("codec_name") for stream in streams
+                                              if stream.get("codec_type") == "video"), None)
+                details["audioCodec"] = next((stream.get("codec_name") for stream in streams
+                                              if stream.get("codec_type") == "audio"), None)
         else:
             details["processingErrors"].append({"stage": "probe", "error": completed.stderr.strip()[-500:]})
+    elif mutagen_file and source.suffix.lower() in {".mp3", ".aac", ".m4a"}:
+        try:
+            parsed = mutagen_file(str(source))
+            info = parsed.info if parsed is not None else None
+            if info is None or not getattr(info, "length", 0):
+                raise ValueError("audio_duration_unavailable")
+            details["durationMs"] = round(info.length * 1000)
+            details["codec"] = source.suffix.lower().lstrip(".")
+            details["sampleRate"] = getattr(info, "sample_rate", None)
+            details["channels"] = getattr(info, "channels", None)
+        except Exception as exc:
+            details["processingErrors"].append({"stage": "probe", "error": type(exc).__name__})
     else:
-        details["processingErrors"].append({"stage": "probe", "error": "ffprobe_not_found"})
+        details["processingErrors"].append({"stage": "probe", "error": "media_probe_not_found"})
     details["missingComponents"] = ["content_role_confirmation"]
     return details
 
@@ -473,6 +499,24 @@ def generate_human_reports(output_root: Path, resources: list[dict[str, Any]], e
             review_rows.append(f"- `{item['resourceId']}`：状态 `{item['processingStatus']}`；{missing}")
         for field in item.get("needsMetadata", []):
             review_rows.append(f"- `{item['resourceId']}`：需要确认元数据 `{field}`。")
+        candidate_files = sorted((version_root / "review").glob("content-candidate*.json")) if version_root else []
+        if candidate_files and item["processingStatus"] != "publish_ready":
+            newest = max(candidate_files, key=lambda path: int(path.stem.rsplit("-v", 1)[1])
+                         if "-v" in path.stem else 1)
+            review_rows.append(f"- `{item['resourceId']}`：已有 {len(candidate_files)} 份内容候选，最新为 `review/{newest.name}`，须人工核对后另存版本化审批记录。")
+        coordinate_audit = details.get("coordinateAudit")
+        if isinstance(coordinate_audit, dict):
+            invalid = coordinate_audit.get("invalidPages", [])
+            missing_pages = coordinate_audit.get("missingPages", [])
+            if invalid:
+                labels = ", ".join(f"{row['pageNumber']}({row['count']})" for row in invalid)
+                review_rows.append(f"- `{item['resourceId']}`：归一化词坐标越界 {coordinate_audit['invalidWordBoxes']} 项；页码：{labels}。")
+            if missing_pages:
+                review_rows.append(f"- `{item['resourceId']}`：没有词坐标文件的 PDF 页：{', '.join(map(str, missing_pages))}；应核对是否为空白/图片页。")
+            if version_root:
+                coordinate_candidates = list((version_root / "review" / "coordinate-candidates").glob("page-*.json"))
+                if coordinate_candidates:
+                    review_rows.append(f"- `{item['resourceId']}`：已有 {len(coordinate_candidates)} 页替代 OCR 坐标候选，须逐页复核后选用。")
         if "unclassified_audio" in item.get("roles", []):
             review_rows.append(f"- `{item['resourceId']}`：需要确认音频对应教材、单元和用途。")
         if details.get("pdfClassification") == "ocr_text" and version_root:
@@ -526,12 +570,15 @@ def generate_human_reports(output_root: Path, resources: list[dict[str, Any]], e
 
     wechat_items = []
     upload_assets = []
+    source_root = Path(run["sourceRoot"])
     for item in resources:
         version_root = None
         if item.get("manifestRelativePath"):
             version_root = (output_root / item["manifestRelativePath"]).parent
         page_assets = []
         thumbnail_assets = []
+        media_assets = []
+        delivery_status = "awaiting_cloud_upload" if item["processingStatus"] == "publish_ready" else "blocked_review"
         if item["resourceType"] == "textbook" and version_root:
             for page_path in sorted((version_root / "pages").glob("*.jpg")):
                 asset_key = f"books/{item['resourceId']}/v{item['version']}/pages/{page_path.name}"
@@ -541,7 +588,7 @@ def generate_human_reports(output_root: Path, resources: list[dict[str, Any]], e
                     "kind": "textbook_page",
                     "assetKey": asset_key,
                     "localRelativePath": safe_relative(page_path, output_root),
-                    "deliveryStatus": "awaiting_cloud_upload",
+                    "deliveryStatus": delivery_status,
                     "deliveryUrl": None,
                     "cloudFileId": None,
                 }
@@ -555,24 +602,48 @@ def generate_human_reports(output_root: Path, resources: list[dict[str, Any]], e
                     "kind": "textbook_page_thumbnail",
                     "assetKey": asset_key,
                     "localRelativePath": safe_relative(thumbnail_path, output_root),
-                    "deliveryStatus": "awaiting_cloud_upload",
+                    "deliveryStatus": delivery_status,
                     "deliveryUrl": None,
                     "cloudFileId": None,
                 }
                 thumbnail_assets.append(asset_key)
                 upload_assets.append(asset)
+        if item["resourceType"] in {"audio", "video"} or (
+            item["resourceType"] == "supplement" and
+            Path(item["sourceRelativePath"]).suffix.lower() in {".vtt", ".srt"}
+        ):
+            media_path = source_root / item["sourceRelativePath"]
+            if item["version"] > 0 and media_path.is_file():
+                asset_key = f"media/{item['resourceId']}/v{item['version']}/{media_path.name}"
+                media_asset = {
+                    "resourceId": item["resourceId"],
+                    "version": item["version"],
+                    "kind": item["resourceType"] if item["resourceType"] != "supplement" else "subtitle",
+                    "assetKey": asset_key,
+                    "localRelativePath": safe_relative(media_path, output_root),
+                    "deliveryStatus": delivery_status,
+                    "deliveryUrl": None,
+                    "cloudFileId": None,
+                }
+                media_assets.append(asset_key)
+                upload_assets.append(media_asset)
+        item_delivery_status = ("ready_for_database_staging" if item["processingStatus"] == "publish_ready"
+                                and item["resourceType"] == "supplement" and not media_assets
+                                else delivery_status)
         wechat_items.append({
             "resourceId": item["resourceId"],
             "version": item["version"],
             "resourceType": item["resourceType"],
             "assetKey": f"{item['resourceId']}/v{item['version']}",
             "localManifestRelativePath": item.get("manifestRelativePath"),
-            "deliveryStatus": "awaiting_cloud_upload" if item["version"] > 0 else "awaiting_processing",
+            "processingStatus": item["processingStatus"],
+            "deliveryStatus": item_delivery_status if item["version"] > 0 else "awaiting_processing",
             "deliveryUrl": None,
             "cloudFileId": None,
             "pageAssetCount": len(page_assets),
             "coverAssetKey": page_assets[0] if page_assets else None,
             "thumbnailAssetCount": len(thumbnail_assets),
+            "mediaAssetCount": len(media_assets),
             "coverThumbnailAssetKey": thumbnail_assets[0] if thumbnail_assets else None,
         })
     write_json(output_root / "exports" / "wechat" / "asset-index.json", {
@@ -612,9 +683,17 @@ def run_pipeline(args: argparse.Namespace) -> int:
         resource_id = make_resource_id(kind, digest, override)
         roles = list(dict.fromkeys(override.get("roles", infer_roles(source))))
         previous = previous_by_path.get(relative)
-        selected = not args.only or source.name == args.only or relative == args.only
+        selected = (
+            not args.only
+            or source.name == args.only
+            or relative == args.only
+            or fnmatch.fnmatchcase(source.name.lower(), args.only.lower())
+            or fnmatch.fnmatchcase(relative.lower(), args.only.lower())
+        )
 
-        if previous and previous.get("sourceSha256") == digest and not args.refresh:
+        if (previous and previous.get("sourceSha256") == digest and not args.refresh
+                and previous.get("version", 0) > 0
+                and previous.get("processingStatus") not in {"discovered", "blocked_error"}):
             reused = dict(previous)
             reused.update({
                 "title": override.get("title", previous.get("title", source.stem)),
@@ -654,7 +733,8 @@ def run_pipeline(args: argparse.Namespace) -> int:
                 })
             continue
 
-        same_source_version = previous and previous.get("sourceSha256") == digest
+        same_source_version = (previous and previous.get("version", 0) > 0
+                               and previous.get("sourceSha256") == digest)
         version = previous.get("version", 1) if same_source_version else (previous.get("version", 0) + 1) if previous else 1
         target_kind = "books" if kind == "textbook" else "media" if kind in {"audio", "video"} else "supplements"
         target = output_root / "library" / target_kind / resource_id / f"v{version}"
@@ -709,6 +789,11 @@ def run_pipeline(args: argparse.Namespace) -> int:
                     "details": {"missingComponents": ["technical_extraction"], "processingErrors": [str(exc)]},
                 })
 
+    current_resources = list(resources)
+    resources = [reconcile_review(output_root, item, current_resources) for item in current_resources]
+    for item in resources:
+        if item.get("manifestRelativePath"):
+            write_json(output_root / item["manifestRelativePath"], item)
     resources.sort(key=lambda item: (item["resourceType"], item["title"]))
     catalog = {"schemaVersion": "1.0", "generatedAt": utc_now(), "sourceRoot": str(source_root), "resources": resources}
     write_json(catalog_path, catalog)

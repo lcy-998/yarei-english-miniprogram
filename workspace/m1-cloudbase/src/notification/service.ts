@@ -83,6 +83,9 @@ export class NotificationService {
     }
     for (const event of scheduled) {
       if (Date.parse(event.occurredAt) < cutoff || Date.parse(event.occurredAt) > Date.parse(now)) continue;
+      if (event.kind === 'task_due' && (event.target.kind !== (actor.actorRole === 'parent' ? 'parent_task' : 'student_task')
+        || actor.actorRole === 'parent' && event.target.childId !== event.sourceStudentId)) continue;
+      if (event.kind === 'checkin_reminder' && event.target.kind !== 'student_activity') continue;
       if (event.kind === 'task_due' && !facts.tasks.some(task => task.taskId === event.target.id
         && task.studentId === event.sourceStudentId)) continue;
       if (event.kind === 'checkin_reminder' && (actor.actorRole !== 'student'

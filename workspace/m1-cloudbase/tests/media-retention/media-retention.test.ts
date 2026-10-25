@@ -76,6 +76,117 @@ describe('M2 original audio retention', () => {
     expect(await service.planBatch('student_work', ORG, 0)).toMatchObject({ planned: 1 });
   });
 
+  it('expires classroom recordings at 60 elapsed days while dubbing waits for day 180', async () => {
+    const submittedAt = '2026-07-01T00:00:00.000Z';
+    const database = new FakeDocumentDatabase({
+      task_recordings: [recording('task_recording', 'record_12345678', { submittedAt })],
+      student_works: [recording('student_work', 'work_12345678', { submittedAt })],
+    });
+    let now = new Date(Date.parse(submittedAt) + 60 * 86400000 - 1).toISOString();
+    const service = new MediaRetentionService(database, { async deleteFile() { return 'deleted'; } },
+      'test-env', { nowIso: () => now });
+    expect(await service.planBatch('task_recording', ORG, 0)).toMatchObject({ planned: 0 });
+    now = new Date(Date.parse(submittedAt) + 60 * 86400000).toISOString();
+    expect(await service.planBatch('task_recording', ORG, 0)).toMatchObject({ planned: 1 });
+    expect(await service.planBatch('student_work', ORG, 0)).toMatchObject({ planned: 0 });
+  });
+
+  it('cleans a task dubbing original only 180 days after its formal submission', async () => {
+    const id = 'task_dubbing_12345678';
+    const stagingPath = `task-dubbing/staging/${ORG}/${STUDENT}/task_12345678/item_12345678/${id}`;
+    const pathDigest = createHash('sha256').update(stagingPath).digest('hex').slice(0, 32);
+    const formalAt = new Date(Date.parse(OLD) + 86400000).toISOString();
+    const original = { _id: id, id, organizationId: ORG, schemaVersion: 1, version: 2,
+      deletedAt: null, status: 'submitted', studentId: STUDENT,
+      stagingPath, contentSha256: SHA,
+      fileId: `cloud://test-env/task-dubbing/private/${pathDigest}/${SHA}.mp3`, submittedAt: OLD,
+    } as VersionedDocument;
+    const database = new FakeDocumentDatabase({ task_dubbing_works: [original] });
+    const deleted: string[] = [];
+    let now = new Date(Date.parse(formalAt) + 180 * 86400000 - 1).toISOString();
+    let formal: string | null = formalAt;
+    const service = new MediaRetentionService(database,
+      { async deleteFile(file) { deleted.push(file); return 'deleted'; } },
+      'test-env', { nowIso: () => now }, null, { async submittedAt() { return formal; } });
+    expect(await service.planBatch('task_dubbing', ORG, 0)).toMatchObject({ planned: 0 });
+    now = new Date(Date.parse(formalAt) + 180 * 86400000).toISOString();
+    expect(await service.planBatch('task_dubbing', ORG, 0)).toMatchObject({ planned: 1 });
+    const job = database.snapshot().media_retention_jobs?.[0];
+    formal = null;
+    expect(await service.execute(job!._id)).toMatchObject({ status: 'stale' });
+    expect(deleted).toEqual([]);
+    formal = formalAt;
+    expect(await service.planBatch('task_dubbing', ORG, 0)).toMatchObject({ planned: 1 });
+
+    const successful = new FakeDocumentDatabase({ task_dubbing_works: [original] });
+    const cleaning = new MediaRetentionService(successful,
+      { async deleteFile(file) { deleted.push(file); return 'deleted'; } },
+      'test-env', { nowIso: () => now }, null, { async submittedAt() { return formalAt; } });
+    expect(await cleaning.planBatch('task_dubbing', ORG, 0)).toMatchObject({ planned: 1 });
+    const currentJob = successful.snapshot().media_retention_jobs?.[0];
+    expect(await cleaning.execute(currentJob!._id)).toMatchObject({ status: 'completed' });
+    expect(deleted).toEqual([original.fileId]);
+  });
+
+  it('cleans a published teacher voice comment at 30 days and preserves feedback history', async () => {
+    const id = 'feedback_12345678';
+    const teacherId = 'teacher_12345678';
+    const submissionId = 'submission_12345678';
+    const recordingId = 'review_voice_12345678';
+    const stagingPath = `review-voice/${ORG}/${teacherId}/${submissionId}/${recordingId}`;
+    const pathDigest = createHash('sha256').update(stagingPath).digest('hex').slice(0, 32);
+    const voiceFileId = `cloud://test-env/review-voice/private/${pathDigest}/${SHA}.mp3`;
+    const feedback = { _id: id, organizationId: ORG, schemaVersion: 1, version: 1,
+      deletedAt: null, teacherId, submissionId, publishedAt: OLD,
+      score: 85, textComment: '虚构评语', voiceComment: {
+        recordingId, fileId: voiceFileId, sha256: SHA, durationMs: 1500, mediaVersion: 1,
+      } } as VersionedDocument;
+    const database = new FakeDocumentDatabase({ review_feedback: [feedback] });
+    const deleted: string[] = [];
+    let now = new Date(Date.parse(OLD) + 30 * 86400000 - 1).toISOString();
+    const service = new MediaRetentionService(database,
+      { async deleteFile(file) { deleted.push(file); return 'deleted'; } },
+      'test-env', { nowIso: () => now });
+    expect(await service.planBatch('teacher_voice', ORG, 0)).toMatchObject({ planned: 0 });
+    now = new Date(Date.parse(OLD) + 30 * 86400000).toISOString();
+    expect(await service.planBatch('teacher_voice', ORG, 0)).toMatchObject({ planned: 1 });
+    const job = database.snapshot().media_retention_jobs?.[0];
+    expect(await service.execute(job!._id)).toMatchObject({ status: 'completed' });
+    expect(deleted).toEqual([voiceFileId]);
+    expect(database.snapshot().review_feedback?.[0]).toMatchObject({ score: 85,
+      textComment: '虚构评语', voiceComment: { mediaDeletedAt: now } });
+  });
+
+  it('keeps a sealed teacher voice draft when formal feedback references the same file', async () => {
+    const id = 'review_voice_12345678';
+    const teacherId = 'teacher_12345678';
+    const submissionId = 'submission_12345678';
+    const stagingPath = `review-voice/${ORG}/${teacherId}/${submissionId}/${id}`;
+    const pathDigest = createHash('sha256').update(stagingPath).digest('hex').slice(0, 32);
+    const voiceFileId = `cloud://test-env/review-voice/private/${pathDigest}/${SHA}.mp3`;
+    const draft = { _id: id, organizationId: ORG, schemaVersion: 1, version: 2,
+      deletedAt: null, status: 'sealed', teacherId, submissionId, stagingPath,
+      fileId: voiceFileId, contentSha256: SHA, createdAt: OLD, sealedAt: OLD } as VersionedDocument;
+    const feedback = { _id: `feedback:${ORG}:${submissionId}`, organizationId: ORG,
+      schemaVersion: 1, version: 1, deletedAt: null, publishedAt: OLD,
+      voiceComment: { recordingId: id, fileId: voiceFileId, sha256: SHA } } as VersionedDocument;
+    const database = new FakeDocumentDatabase({ review_voice_drafts: [draft], review_feedback: [feedback] });
+    const deleted: string[] = [];
+    const service = new MediaRetentionService(database,
+      { async deleteFile(file) { deleted.push(file); return 'deleted'; } },
+      'test-env', { nowIso: () => NOW });
+    expect(await service.planBatch('teacher_voice_draft', ORG, 0)).toMatchObject({ planned: 0 });
+    expect(deleted).toEqual([]);
+    const unreferenced = new FakeDocumentDatabase({ review_voice_drafts: [draft] });
+    const cleaning = new MediaRetentionService(unreferenced,
+      { async deleteFile(file) { deleted.push(file); return 'deleted'; } },
+      'test-env', { nowIso: () => NOW });
+    expect(await cleaning.planBatch('teacher_voice_draft', ORG, 0)).toMatchObject({ planned: 1 });
+    const job = unreferenced.snapshot().media_retention_jobs?.[0];
+    expect(await cleaning.execute(job!._id)).toMatchObject({ status: 'completed' });
+    expect(deleted).toEqual([voiceFileId]);
+  });
+
   it('revalidates source before deleting and marks changed plans stale', async () => {
     const original = recording('task_recording', 'record_12345678');
     const { database, deleted, service } = fixture({ task_recordings: [original] });

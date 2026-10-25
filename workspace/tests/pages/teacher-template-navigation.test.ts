@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { takeTeacherTemplateSeed } from '../../miniprogram/session/session'
+import { takeTeacherTemplateSeed } from '../../miniprogram/subpackages/teacher/session/session'
 
-vi.mock('../../miniprogram/services/app-service', () => ({
+vi.mock('../../miniprogram/subpackages/teacher/services/app-service', () => ({
   instantiateTaskTemplate: vi.fn(async () => ({ ok: true, data: {
     taskId: 'task_from_template_demo', version: 1, templateVersion: 2,
   } })),
@@ -20,7 +20,7 @@ describe('teacher template use navigation', () => {
     })
     const navigateTo = vi.fn()
     vi.stubGlobal('wx', { getStorageSync: () => ({ user: { id: 'teacher_demo' } }), navigateTo })
-    await import('../../miniprogram/pages/teacher/task-templates/task-templates')
+    await import('../../miniprogram/subpackages/teacher/task-templates/task-templates')
     if (useTemplate === null) throw new Error('Template handler was not registered')
     const context = {
       data: { templates: [{ id: 'template_personal_demo', version: 1, title: '虚构阅读模板' }], busyId: '', intents: {} },
@@ -29,7 +29,7 @@ describe('teacher template use navigation', () => {
     const event = { currentTarget: { dataset: { id: 'template_personal_demo' } } } as unknown as WechatMiniprogram.TouchEvent
     await useTemplate.call(context, event)
     expect(navigateTo).toHaveBeenCalledWith({
-      url: '/pages/teacher/publish-task/publish-task?editTaskId=task_from_template_demo',
+      url: '/subpackages/teacher/publish-task/publish-task?editTaskId=task_from_template_demo',
     })
     expect(takeTeacherTemplateSeed()).toBeNull()
   })

@@ -1,0 +1,32 @@
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="private-video-page">
+  <app-header title="录制视频并出题" back="{{true}}"></app-header>
+  <scroll-view scroll-y class="private-video-content">
+    <view class="card">
+      <text class="heading">教学视频</text>
+      <view class="actions"><button bindtap="chooseCamera" disabled="{{busy}}">现场录制</button><button bindtap="chooseAlbum" disabled="{{busy}}">从相册选择</button></view>
+      <text class="hint">现场录制最多 30 秒；较长视频可用手机相机录好后从相册选择。只接收 MP4（H.264 视频、AAC 音频），最长 10 分钟、200 MB。</text>
+      <video wx:if="{{previewUrl}}" src="{{previewUrl}}" controls class="preview-video"></video>
+      <text wx:if="{{durationMs}}" class="hint">视频时长 {{durationLabel}}，最长 10 分钟</text>
+      <input class="title-input" value="{{title}}" maxlength="100" placeholder="输入视频标题" bindinput="titleInput"/>
+    </view>
+    <view class="card">
+      <text class="heading">视频下方的作业题目（1—6 道）</text>
+      <view wx:for="{{questions}}" wx:for-item="question" wx:for-index="questionIndex" wx:key="questionId" class="question">
+        <view class="question-head"><text>第 {{questionIndex + 1}} 题</text><button size="mini" data-index="{{questionIndex}}" bindtap="removeQuestion">删除</button></view>
+        <picker range="{{typeLabels}}" value="{{question.questionType === 'single_choice' ? 0 : question.questionType === 'multiple_choice' ? 1 : question.questionType === 'fill' ? 2 : 3}}" data-index="{{questionIndex}}" bindchange="changeType"><view class="picker">题型：{{question.questionType === 'single_choice' ? '单选' : question.questionType === 'multiple_choice' ? '多选' : question.questionType === 'fill' ? '填空' : '简答'}} ▾</view></picker>
+        <textarea value="{{question.stem}}" maxlength="500" placeholder="输入题目" data-index="{{questionIndex}}" data-field="stem" bindinput="editText"></textarea>
+        <view wx:if="{{question.questionType === 'single_choice' || question.questionType === 'multiple_choice'}}">
+          <input wx:for="{{question.options}}" wx:for-item="choice" wx:for-index="optionIndex" wx:key="id" value="{{choice.value}}" placeholder="选项 {{optionIndex + 1}}" data-index="{{questionIndex}}" data-option-index="{{optionIndex}}" bindinput="editOption"/>
+          <button size="mini" data-index="{{questionIndex}}" bindtap="addOption">添加选项</button>
+        </view>
+        <input wx:if="{{question.questionType !== 'subjective'}}" value="{{question.answerText}}" placeholder="{{question.questionType === 'multiple_choice' ? '正确答案用英文逗号分隔' : '填写正确答案'}}" data-index="{{questionIndex}}" data-field="answerText" bindinput="editText"/>
+        <textarea value="{{question.explanation}}" maxlength="1000" placeholder="解析或简答评分要点（选填）" data-index="{{questionIndex}}" data-field="explanation" bindinput="editText"></textarea>
+      </view>
+      <button bindtap="addQuestion" disabled="{{questions.length >= 6 || busy}}">添加题目</button>
+    </view>
+    <text wx:if="{{message}}" class="message">{{message}}</text>
+    <view wx:if="{{id && status === 'processing'}}" class="footer"><button bindtap="refreshStatus" disabled="{{busy}}">刷新校验状态</button></view>
+    <view wx:if="{{status === 'failed'}}" class="footer"><button bindtap="retryProcessing" disabled="{{busy}}">重试校验</button></view>
+    <view class="footer"><button bindtap="saveDraft" disabled="{{busy}}">保存草稿</button><button class="primary" bindtap="publishAndAssign" loading="{{busy}}" disabled="{{busy}}">检查并布置作业</button></view>
+  </scroll-view>
+</view></g0-page-shell>

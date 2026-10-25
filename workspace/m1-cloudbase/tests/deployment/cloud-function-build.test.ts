@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
+import { builtinModules, createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCloudFunctions, CLOUD_FUNCTIONS } from '../../tools/build-cloud-functions.mjs';
+import { buildCloudFunctions, CLOUD_FUNCTIONS, IDENTITY_RUNTIME_FUNCTIONS, NATIVE_ADMIN_FUNCTIONS, TEACHER_AI_FUNCTIONS, TEACHER_PRIVATE_VIDEO_FUNCTIONS, TEACHER_STUDENT_IMPORT_FUNCTIONS } from '../../tools/build-cloud-functions.mjs';
 import { FUNCTION_NAMES } from '../../src/shared/protocol';
 
 const SDK_PACKAGE = '@cloudbase/node-sdk';
@@ -33,12 +33,26 @@ const SECRET_ENVIRONMENT_VARIABLES = [
 
 let temporaryRoot = '';
 let outputRoot = '';
+let nativeAdminOutputRoot = '';
+let teacherAiOutputRoot = '';
+let identityRuntimeOutputRoot = '';
+let teacherStudentImportOutputRoot = '';
 
 beforeAll(async () => {
   temporaryRoot = await mkdtemp(join(tmpdir(), 'yarei-cloud-functions-'));
   outputRoot = join(temporaryRoot, 'functions');
+  nativeAdminOutputRoot = join(temporaryRoot, 'native-admin-functions');
+  teacherAiOutputRoot = join(temporaryRoot, 'teacher-ai-functions');
+  identityRuntimeOutputRoot = join(temporaryRoot, 'identity-runtime-functions');
+  teacherStudentImportOutputRoot = join(temporaryRoot, 'teacher-student-import-functions');
   await buildCloudFunctions({ outDir: outputRoot });
-}, 30000);
+  await buildCloudFunctions({ outDir: nativeAdminOutputRoot, nativeAdminOnly: true });
+  await buildCloudFunctions({ outDir: teacherAiOutputRoot, teacherAiOnly: true });
+  await buildCloudFunctions({ outDir: identityRuntimeOutputRoot, identityRuntimeOnly: true });
+  await buildCloudFunctions({ outDir: teacherStudentImportOutputRoot, teacherStudentImportOnly: true });
+// The complete set of independently bundled functions shares CI CPU with the
+// other Vitest workers; the assertion still checks every generated package.
+}, 120000);
 
 afterAll(async () => {
   if (temporaryRoot !== '') await rm(temporaryRoot, { recursive: true, force: true });
@@ -46,7 +60,21 @@ afterAll(async () => {
 
 describe('CloudBase deployment packages', () => {
   it('builds an independent CommonJS package for every registered function', async () => {
-    expect(CLOUD_FUNCTIONS.map(({ name }) => name).sort()).toEqual([...FUNCTION_NAMES].sort());
+    // These M3 entries remain local-only until their separate security/grant
+    // review: never package them with the six existing business keys.
+    expect(CLOUD_FUNCTIONS.map(({ name }) => name).sort())
+      .toEqual(FUNCTION_NAMES.filter(name => name !== 'native-admin-query'
+        && name !== 'native-admin-command'
+        && name !== 'native-admin-management-command'
+        && name !== 'native-admin-operations-command'
+        && name !== 'native-admin-media-command'
+        && name !== 'pronunciation-command'
+        && name !== 'pronunciation-query'
+        && name !== 'pronunciation-worker'
+        && name !== 'teacher-suggestion-command'
+        && name !== 'teacher-suggestion-worker'
+        && name !== 'teacher-private-video-worker'
+        && name !== 'teacher-student-import-command').sort());
     const expectedNames = CLOUD_FUNCTIONS.map(({ name }) => name).sort();
     const packageNames = (await readdir(outputRoot, { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
@@ -69,8 +97,10 @@ describe('CloudBase deployment packages', () => {
       expect(bundle).not.toMatch(/require\(["']\.{1,2}[\\/]/);
       expect(bundle).not.toContain('sourceMappingURL');
       expect(externalRequires.every((name) => name === SDK_PACKAGE || name.startsWith('node:')
-        || name === 'tty' || name === 'util'
-        || ((functionName === 'student-work-command' || functionName === 'task-recording-command') && name === 'supports-color'
+        || builtinModules.includes(name)
+        || ((functionName === 'student-work-command' || functionName === 'task-recording-command'
+          || functionName === 'pronunciation-command' || functionName === 'review-command'
+          || functionName === 'submission-command' || functionName === 'task-command') && name === 'supports-color'
           && bundle.includes('try {\n      const supportsColor = require("supports-color")')))).toBe(true);
       expect(typeof deploymentModule.main).toBe('function');
       expect(packageJson).toEqual({
@@ -82,7 +112,76 @@ describe('CloudBase deployment packages', () => {
         dependencies: { [SDK_PACKAGE]: SDK_VERSION },
       });
     }
-  });
+  }, 30000);
+
+  it('builds the five native-admin functions only through an explicit review-bundle path', async () => {
+    expect(NATIVE_ADMIN_FUNCTIONS.map(({ name }) => name).sort()).toEqual([
+      'native-admin-command', 'native-admin-management-command', 'native-admin-media-command',
+      'native-admin-operations-command', 'native-admin-query',
+    ]);
+    const packageNames = (await readdir(nativeAdminOutputRoot, { withFileTypes: true }))
+      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+    expect(packageNames).toEqual(NATIVE_ADMIN_FUNCTIONS.map(({ name }) => name).sort());
+    for (const functionName of packageNames) {
+      const functionRoot = join(nativeAdminOutputRoot, functionName);
+      expect((await readdir(functionRoot)).sort()).toEqual(['index.js', 'package.json']);
+      const bundle = await readFile(join(functionRoot, 'index.js'), 'utf8');
+      expect(bundle).toContain('bootstrapCloudBaseNodeDeployment');
+      expect(bundle).not.toMatch(/require\(["']\.{1,2}[\\/]/);
+      const deploymentModule = createRequire(import.meta.url)(join(functionRoot, 'index.js')) as { main?: unknown };
+      expect(typeof deploymentModule.main).toBe('function');
+    }
+  }, 30000);
+
+  it('keeps high-memory teacher video processing behind its own build selector', async () => {
+    expect(TEACHER_PRIVATE_VIDEO_FUNCTIONS.map(({ name }) => name))
+      .toEqual(['teacher-private-video-worker']);
+    const result = await buildCloudFunctions({ outDir: join(temporaryRoot, 'teacher-private-video'),
+      teacherPrivateVideoOnly: true });
+    expect(result.functions).toEqual(['teacher-private-video-worker']);
+  }, 30000);
+
+  it('builds the Qwen business command and private worker only through its explicit M3 opt-in path', async () => {
+    expect(TEACHER_AI_FUNCTIONS.map(({ name }) => name)).toEqual(['teacher-suggestion-command', 'teacher-suggestion-worker']);
+    const packageNames = (await readdir(teacherAiOutputRoot, { withFileTypes: true }))
+      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+    expect(packageNames).toEqual(['teacher-suggestion-command', 'teacher-suggestion-worker']);
+    const bundle = await readFile(join(teacherAiOutputRoot, 'teacher-suggestion-command', 'index.js'), 'utf8');
+    expect(bundle).toContain('teacher-suggestion-command');
+    expect(bundle).toContain('bootstrapCloudBaseNodeDeployment');
+  }, 30000);
+
+  it('builds only the two runtime functions affected by the canonical Auth subject mapping', async () => {
+    expect(IDENTITY_RUNTIME_FUNCTIONS.map(({ name }) => name).sort())
+      .toEqual(['auth-session', 'native-admin-management-command']);
+    const packageNames = (await readdir(identityRuntimeOutputRoot, { withFileTypes: true }))
+      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+    expect(packageNames).toEqual(['auth-session', 'native-admin-management-command']);
+    for (const functionName of packageNames) {
+      const functionRoot = join(identityRuntimeOutputRoot, functionName);
+      expect((await readdir(functionRoot)).sort()).toEqual(['index.js', 'package.json']);
+      const bundle = await readFile(join(functionRoot, 'index.js'), 'utf8');
+      const deploymentModule = createRequire(import.meta.url)(join(functionRoot, 'index.js')) as { main?: unknown };
+      expect(bundle).toContain('bootstrapCloudBaseNodeDeployment');
+      expect(bundle).not.toMatch(/require\(["']\.{1,2}[\\/]/);
+      expect(typeof deploymentModule.main).toBe('function');
+    }
+  }, 30000);
+
+  it('keeps student account provisioning in its own protected opt-in bundle', async () => {
+    expect(TEACHER_STUDENT_IMPORT_FUNCTIONS.map(({ name }) => name))
+      .toEqual(['teacher-student-import-command']);
+    const packageNames = (await readdir(teacherStudentImportOutputRoot, { withFileTypes: true }))
+      .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
+    expect(packageNames).toEqual(['teacher-student-import-command']);
+    const functionRoot = join(teacherStudentImportOutputRoot, 'teacher-student-import-command');
+    const bundle = await readFile(join(functionRoot, 'index.js'), 'utf8');
+    const deploymentModule = createRequire(import.meta.url)(join(functionRoot, 'index.js')) as { main?: unknown };
+    expect(bundle).toContain('createTcbNativeAccountProviderFactory');
+    expect(bundle).toContain('teacher-student-import-command');
+    expect(bundle).not.toMatch(/require\(["']\.{1,2}[\\/]/);
+    expect(typeof deploymentModule.main).toBe('function');
+  }, 30000);
 
   it('contains only secret variable names and no environment identifier or credential values', async () => {
     const generatedText = (

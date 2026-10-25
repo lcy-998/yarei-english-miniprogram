@@ -54,6 +54,7 @@ export interface TaskCoreTransaction extends TaskCoreReader {
   findActiveTeacherGrant(organizationId: string, teacherId: string, classId: string): Promise<TeacherClassGrantRecord | null>;
 
   saveTask(task: TaskRecord): Promise<void>;
+  deleteTask(task: TaskRecord): Promise<void>;
   saveTemplate(template: TaskTemplate): Promise<void>;
   saveAssignment(assignment: TaskAssignmentRecord): Promise<void>;
   deleteAssignment(assignment: TaskAssignmentRecord): Promise<void>;

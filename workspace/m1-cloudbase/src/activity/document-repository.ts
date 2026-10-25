@@ -7,10 +7,11 @@ import type { ReviewFeedbackRecord, SubmissionRecord, TaskAssignmentRecord, Task
 import { feedbackDocumentId, submissionByIdDocumentId } from '../repositories/task-core-document-adapter';
 import { activityDays, validateActivitySchedule } from '../task-core/activity-rules';
 import type { JsonValue } from '../shared/protocol';
+import type { OperationLogRecord } from '../runtime/records';
 import { hashHex } from '../shared/request-summary';
 import type { DocumentDatabasePort, DocumentDatabaseTransactionPort, VersionedDocument } from '../repositories/document-database-port';
 import type { ActivityTransaction, ActivityUnitOfWork } from './repository';
-import { ActivityError, type ActivityClass, type ActivityConditionResource, type ActivityEntity, type ActivityExerciseSource,
+import { ActivityError, type ActivityClass, type ActivityConditionResource, type ActivityEntity, type ActivityExerciseOpportunity, type ActivityExerciseSource,
   type ActivityFinalSnapshot, type ActivityGrant,
   type ActivityMembership, type ActivityOperationReceipt, type ActivityOrganization, type ActivityOverrideReceipt,
   type ActivityOverrideRecord, type ActivityUser } from './types';
@@ -19,6 +20,7 @@ export const ACTIVITY_COLLECTIONS = {
   organizations: 'organizations', classes: 'classes', users: 'users',
   grants: 'teacher_class_grants', memberships: 'class_memberships',
   activities: 'checkin_activities', receipts: 'checkin_activity_operations',
+  audit: 'operation_logs',
   overrides: 'checkin_overrides',
   finalBoards: 'checkin_final_boards',
   resources: 'learning_resources',
@@ -134,7 +136,12 @@ function isActivity(value: unknown): value is ActivityEntity {
     && Number.isSafeInteger(value.version) && Number(value.version) >= 1
     && isOffsetIso(value.createdAt) && isOffsetIso(value.updatedAt)
     && (value.publishedAt === null || isOffsetIso(value.publishedAt))
-    && (value.closedAt === null || isOffsetIso(value.closedAt));
+    && (value.closedAt === null || isOffsetIso(value.closedAt))
+    && (value.visibility === undefined || value.visibility === 'visible' || value.visibility === 'recycled')
+    && (value.recycledAt === undefined || value.recycledAt === null || isOffsetIso(value.recycledAt))
+    && (value.recycledBy === undefined || value.recycledBy === null || typeof value.recycledBy === 'string')
+    && (value.recycleReason === undefined || value.recycleReason === null || typeof value.recycleReason === 'string')
+    && (value.recoverableUntil === undefined || value.recoverableUntil === null || isOffsetIso(value.recoverableUntil));
 }
 
 export function projectActivity(value: unknown): ActivityEntity | null {
@@ -165,6 +172,11 @@ export function projectActivity(value: unknown): ActivityEntity | null {
       activityVersion: change.activityVersion })) ?? [],
     version: value.version,
     createdAt: value.createdAt, updatedAt: value.updatedAt, publishedAt: value.publishedAt, closedAt: value.closedAt,
+    ...(value.visibility === undefined ? {} : { visibility: value.visibility }),
+    ...(value.recycledAt === undefined ? {} : { recycledAt: value.recycledAt }),
+    ...(value.recycledBy === undefined ? {} : { recycledBy: value.recycledBy }),
+    ...(value.recycleReason === undefined ? {} : { recycleReason: value.recycleReason }),
+    ...(value.recoverableUntil === undefined ? {} : { recoverableUntil: value.recoverableUntil }),
   };
 }
 
@@ -207,6 +219,17 @@ function projectFinalSnapshot(value: unknown): ActivityFinalSnapshot | null {
   const completed = projectDateMap(value.completedDatesByStudent);
   const supplemented = projectDateMap(value.supplementedDatesByStudent);
   if (!completed || !supplemented) return null;
+  let conditionStatusByStudentDay: Record<string, readonly boolean[]> | undefined;
+  if (value.conditionDetailComplete !== undefined && value.conditionDetailComplete !== true) return null;
+  if (value.conditionStatusByStudentDay !== undefined) {
+    if (!isRecord(value.conditionStatusByStudentDay)) return null;
+    conditionStatusByStudentDay = {};
+    for (const [key, statuses] of Object.entries(value.conditionStatusByStudentDay)) {
+      if (!/^.+:\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(statuses)
+        || !statuses.every(status => typeof status === 'boolean')) return null;
+      conditionStatusByStudentDay[key] = [...statuses] as boolean[];
+    }
+  }
   const rankIds = board.ranks.map(rank => String(rank.studentId));
   if (new Set(rankIds).size !== rankIds.length || Object.keys(completed).length !== rankIds.length
     || Object.keys(supplemented).length !== rankIds.length) return null;
@@ -224,7 +247,9 @@ function projectFinalSnapshot(value: unknown): ActivityFinalSnapshot | null {
     leaderboard: { classId: board.classId, effectiveDayCount: Number(board.effectiveDayCount), finalized: true,
       ranks: board.ranks.map(rank => ({ studentId: String(rank.studentId),
         displayNameMasked: String(rank.displayNameMasked), completedDays: Number(rank.completedDays), rank: Number(rank.rank) })) },
-    completedDatesByStudent: completed, supplementedDatesByStudent: supplemented };
+    completedDatesByStudent: completed, supplementedDatesByStudent: supplemented,
+    ...(value.conditionDetailComplete === true ? { conditionDetailComplete: true as const } : {}),
+    ...(conditionStatusByStudentDay === undefined ? {} : { conditionStatusByStudentDay }) };
 }
 
 function json(value: object): JsonValue { return JSON.parse(JSON.stringify(value)) as JsonValue; }
@@ -470,6 +495,51 @@ class DocumentActivityTransaction implements ActivityTransaction {
     return grouped;
   }
 
+  public async listExerciseOpportunities(organizationId: string, classId: string,
+    resourceId: string): Promise<readonly ActivityExerciseOpportunity[]> {
+    const taskDocs = await this.database.find(ACTIVITY_COLLECTIONS.tasks, { organizationId, deletedAt: null });
+    const opportunities: ActivityExerciseOpportunity[] = [];
+    for (const taskDoc of taskDocs) {
+      if (taskDoc.organizationId !== organizationId || taskDoc.deletedAt !== null) {
+        throw new ActivityError('SERVICE_UNAVAILABLE');
+      }
+      const task = plainRecord(taskDoc);
+      if (task.publishedAt === null || task.visibility !== 'visible'
+        || (task.status !== 'scheduled' && task.status !== 'active' && task.status !== 'expired')) continue;
+      if (!Array.isArray(task.items)) throw new ActivityError('SERVICE_UNAVAILABLE');
+      const matches = task.items.filter(item => isRecord(item) && item.resourceId === resourceId
+        && isRecord(item.resourceSnapshot) && item.resourceSnapshot.type === 'exercise');
+      if (matches.length !== 1) continue;
+      const item = matches[0] as Record<string, unknown>;
+      const latePolicy = task.latePolicy;
+      if (!isOffsetIso(task.startsAt) || !isOffsetIso(task.dueAt)
+        || !Number.isSafeInteger(item.resourceVersion) || !isRecord(latePolicy)
+        || typeof latePolicy.allowLate !== 'boolean'
+        || !Number.isSafeInteger(latePolicy.lateDays) || Number(latePolicy.lateDays) < 0) {
+        throw new ActivityError('SERVICE_UNAVAILABLE');
+      }
+      const taskId = typeof task.id === 'string' && task.id.trim() ? task.id : taskDoc._id;
+      const assignments = await this.database.find(ACTIVITY_COLLECTIONS.assignments,
+        { organizationId, classId, taskId, deletedAt: null });
+      const studentIds: string[] = [];
+      for (const document of assignments) {
+        const assignment = plainRecord(document);
+        if (document.organizationId !== organizationId || document.deletedAt !== null
+          || assignment.classId !== classId || assignment.taskId !== taskId
+          || typeof assignment.studentId !== 'string'
+          || (assignment.latestSubmissionId !== null && typeof assignment.latestSubmissionId !== 'string')) {
+          throw new ActivityError('SERVICE_UNAVAILABLE');
+        }
+        if (assignment.latestSubmissionId === null && assignment.status !== 'completed'
+          && assignment.status !== 'awaiting_review') studentIds.push(assignment.studentId);
+      }
+      opportunities.push({ taskId, resourceVersion: String(item.resourceVersion),
+        startsAt: task.startsAt, dueAt: task.dueAt,
+        lateDays: latePolicy.allowLate ? Number(latePolicy.lateDays) : 0, studentIds });
+    }
+    return opportunities;
+  }
+
   private async readSubmittedExerciseSource(organizationId: string,
     assignment: TaskAssignmentRecord, task: TaskRecord): Promise<ActivityExerciseSource> {
     if (assignment.latestSubmissionId === null) throw new ActivityError('SERVICE_UNAVAILABLE');
@@ -518,6 +588,10 @@ class DocumentActivityTransaction implements ActivityTransaction {
       : this.database.replace(ACTIVITY_COLLECTIONS.activities, activity.id, expectedVersion, document);
   }
 
+  public async deleteActivity(activity: ActivityEntity): Promise<boolean> {
+    return this.database.delete(ACTIVITY_COLLECTIONS.activities, activity.id, activity.version);
+  }
+
   public async findReceipt(organizationId: string, actorUserId: string, action: ActivityOperationReceipt['action'],
     operationId: string): Promise<ActivityOperationReceipt | null> {
     const document = await this.database.get(ACTIVITY_COLLECTIONS.receipts, receiptId(organizationId, actorUserId, action, operationId));
@@ -534,6 +608,16 @@ class DocumentActivityTransaction implements ActivityTransaction {
       receipt.action, receipt.operationId), organizationId: receipt.organizationId, schemaVersion: 1, version: 1,
     deletedAt: null, actorUserId: receipt.actorUserId, action: receipt.action, operationId: receipt.operationId,
     fingerprint: receipt.fingerprint, result: json(receipt.result) });
+  }
+
+  public async appendAudit(entry: OperationLogRecord): Promise<void> {
+    const created = await this.database.append(ACTIVITY_COLLECTIONS.audit, { _id: entry.id,
+      organizationId: entry.organizationId, schemaVersion: 1, version: 1, deletedAt: null,
+      requestId: entry.requestId, actorUserId: entry.actorUserId, actorRole: entry.actorRole,
+      action: entry.action, targetType: entry.targetType, targetId: entry.targetId,
+      result: entry.result, errorCode: entry.errorCode, occurredAt: entry.occurredAt,
+      metadata: json(entry.metadata) });
+    if (!created) throw new ActivityError('CONFLICT');
   }
 
   public async listOverrides(organizationId: string, activityId: string, studentId: string,

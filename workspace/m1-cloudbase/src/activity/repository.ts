@@ -1,8 +1,9 @@
-import type { ActivityClass, ActivityConditionResource, ActivityEntity, ActivityExerciseSource, ActivityFinalSnapshot, ActivityGrant, ActivityMembership,
+import type { ActivityClass, ActivityConditionResource, ActivityEntity, ActivityExerciseOpportunity, ActivityExerciseSource, ActivityFinalSnapshot, ActivityGrant, ActivityMembership,
   ActivityOperationReceipt, ActivityOrganization, ActivityOverrideReceipt, ActivityOverrideRecord, ActivityUser } from './types';
 import type { ReadingPageEventRecord } from '../learning-progress/types';
 import type { VocabularyAttemptRecord } from '../vocabulary-evidence/types';
 import type { StudentWork } from '../student-work/types';
+import type { OperationLogRecord } from '../runtime/records';
 
 export interface ActivityTransaction {
   findOrganization(organizationId: string): Promise<ActivityOrganization | null>;
@@ -19,9 +20,11 @@ export interface ActivityTransaction {
   listExerciseSources(organizationId: string, studentId: string, classId: string, resourceId: string): Promise<readonly ActivityExerciseSource[]>;
   listExerciseSourcesForStudents(organizationId: string, classId: string, resourceId: string,
     studentIds: readonly string[]): Promise<Readonly<Record<string, readonly ActivityExerciseSource[]>>>;
+  listExerciseOpportunities(organizationId: string, classId: string, resourceId: string): Promise<readonly ActivityExerciseOpportunity[]>;
   findActivity(organizationId: string, activityId: string): Promise<ActivityEntity | null>;
   listActivities(organizationId: string): Promise<readonly ActivityEntity[]>;
   saveActivity(activity: ActivityEntity, expectedVersion: number): Promise<boolean>;
+  deleteActivity(activity: ActivityEntity): Promise<boolean>;
   findReceipt(organizationId: string, actorUserId: string, action: ActivityOperationReceipt['action'], operationId: string): Promise<ActivityOperationReceipt | null>;
   saveReceipt(receipt: ActivityOperationReceipt): Promise<boolean>;
   listOverrides(organizationId: string, activityId: string, studentId: string, date: string): Promise<readonly ActivityOverrideRecord[]>;
@@ -31,6 +34,7 @@ export interface ActivityTransaction {
   saveOverrideReceipt(receipt: ActivityOverrideReceipt): Promise<boolean>;
   findFinalSnapshot(organizationId: string, activityId: string): Promise<ActivityFinalSnapshot | null>;
   createFinalSnapshot(snapshot: ActivityFinalSnapshot): Promise<boolean>;
+  appendAudit(entry: OperationLogRecord): Promise<void>;
 }
 
 export interface ActivityUnitOfWork {

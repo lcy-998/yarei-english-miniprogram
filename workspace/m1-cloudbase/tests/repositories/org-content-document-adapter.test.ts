@@ -87,6 +87,9 @@ describe('org-content document repository', () => {
     await expect(service.listVocabularyPacks(studentActor)).resolves.toEqual([
       expect.objectContaining({ id: 'vocabulary_published', title: '虚构单词包' }),
     ]);
+    await expect(service.getVocabularyPack(studentActor, 'vocabulary_published')).resolves.toMatchObject({
+      words: [{ id: 'word_demo', ipa: '/ˈdeməʊ/' }],
+    });
     const detail = await service.getReadingResource(studentActor, 'reading_published');
     expect(detail).toMatchObject({
       presentation: 'page_images_only',
@@ -324,6 +327,7 @@ function vocabularyFields() {
     type: 'vocabulary', title: '虚构单词包', contentVersion: 1, status: 'published',
     visibility: { type: 'classes', classIds: [CLASS_ID] }, copyrightStatus: 'demo',
     grade: '三年级', unit: 'Unit Demo',
-    words: [{ id: 'word_demo', word: 'demo', meaning: '示例', example: 'A demo.', syllables: ['de', 'mo'] }],
+    words: [{ id: 'word_demo', word: 'demo', meaning: '示例', example: 'A demo.',
+      syllables: ['de', 'mo'], ipa: '/ˈdeməʊ/' }],
   } as const;
 }

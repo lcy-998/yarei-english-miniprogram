@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const setCurrentBookId = vi.fn()
 const setCurrentTaskId = vi.fn()
 const preferDubbingMaterial = vi.fn()
-vi.mock('../../miniprogram/session/session', () => ({
+vi.mock('../../miniprogram/subpackages/student/session/session', () => ({
   getSession: () => ({ user: { id: 'student_demo' }, sessionId: 'session_demo' }),
   setCurrentBookId, setCurrentTaskId,
 }))
-vi.mock('../../miniprogram/shared/dubbing-navigation', () => ({ preferDubbingMaterial }))
+vi.mock('../../miniprogram/subpackages/student/shared/dubbing-navigation', () => ({ preferDubbingMaterial }))
 
 describe('student checkin task actions', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); vi.resetModules() })
@@ -18,7 +18,7 @@ describe('student checkin task actions', () => {
     vi.stubGlobal('Component', (value: typeof definition) => { definition = value })
     const navigateTo = vi.fn()
     vi.stubGlobal('wx', { navigateTo, showToast: vi.fn() })
-    await import('../../miniprogram/pages/student/checkin-detail/checkin-detail')
+    await import('../../miniprogram/subpackages/student/checkin-detail/checkin-detail')
     if (!definition) throw new Error('Checkin detail page was not registered')
     const rows = [
       { kind: 'reading', resourceId: 'book_demo', canOpen: true },
@@ -34,9 +34,9 @@ describe('student checkin task actions', () => {
     expect(preferDubbingMaterial).toHaveBeenCalledWith('student_demo', 'session_demo', 'material_demo')
     expect(setCurrentTaskId).toHaveBeenCalledWith('task_demo')
     expect(navigateTo.mock.calls.map(call => call[0].url)).toEqual([
-      '/pages/student/reading-detail/reading-detail?bookId=book_demo&activityId=activity_demo&startPageNumber=1',
-      '/pages/student/vocabulary/vocabulary?packId=pack_demo',
-      '/pages/student/dubbing/dubbing', '/pages/student/task-detail/task-detail',
+      '/subpackages/student/reading-detail/reading-detail?bookId=book_demo&activityId=activity_demo&startPageNumber=1',
+      '/subpackages/student/vocabulary/vocabulary?packId=pack_demo',
+      '/subpackages/student-media/dubbing/dubbing', '/subpackages/student/task-detail/task-detail',
     ])
   })
 
@@ -47,7 +47,7 @@ describe('student checkin task actions', () => {
     const navigateTo = vi.fn()
     const showToast = vi.fn()
     vi.stubGlobal('wx', { navigateTo, showToast })
-    await import('../../miniprogram/pages/student/checkin-detail/checkin-detail')
+    await import('../../miniprogram/subpackages/student/checkin-detail/checkin-detail')
     if (!definition) throw new Error('Checkin detail page was not registered')
     const context = { data: { ...definition.data, activeToday: true,
       conditions: [{ kind: 'listening', resourceId: 'future_audio', canOpen: false }] } }

@@ -9,3 +9,9 @@
 .g0-tab-bar__icon--mine::before { left:9px; top:3px; width:10px; height:10px; border:2px solid currentColor; border-radius:50%; }.g0-tab-bar__icon--mine::after { left:5px; bottom:2px; width:18px; height:11px; border:2px solid currentColor; border-radius:12px 12px 4px 4px; }
 .g0-tab-bar__icon--tasks::before { left:5px; top:3px; width:18px; height:22px; border:2px solid currentColor; border-radius:5px; }.g0-tab-bar__icon--tasks::after { left:10px; top:9px; width:9px; height:5px; border-left:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(-45deg); }
 .g0-tab-bar__icon--report::before { left:4px; top:4px; width:20px; height:20px; border:2px solid currentColor; border-radius:5px; }.g0-tab-bar__icon--report::after { left:8px; bottom:7px; width:3px; height:6px; border-radius:2px; background:currentColor; box-shadow:5px -4px 0 currentColor,10px -8px 0 currentColor; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .g0-tab-bar--admin-landscape { min-height: 48px; padding-left: max(36px, env(safe-area-inset-left)); padding-right: max(36px, env(safe-area-inset-right)); border-radius: 14px 14px 0 0; }
+  .g0-tab-bar--admin-landscape .g0-tab-bar__item { flex-direction: row; gap: 5px; padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
+  .g0-tab-bar--admin-landscape .g0-tab-bar__icon { flex: none; transform: scale(.75); }
+  .g0-tab-bar--admin-landscape .g0-tab-bar__item--active text { padding: 3px 5px; }
+}

@@ -18,7 +18,8 @@ describe('M2 question task memory fallback', () => {
     const options = await getDraftOptions(teacherId, clock)
     if (!options.ok) throw new Error('draft options missing')
     expect(options.data.structuredDraft.items.map(item => item.resourceId)).toEqual([
-      'book_zoo', 'vocab_animals', 'res_exercise_bird_demo',
+      'book_zoo', 'vocab_animals', 'res_exercise_garden_q1', 'res_exercise_garden_q2',
+      'res_exercise_garden_q3', 'res_exercise_garden_q4', 'res_exercise_garden_q5',
     ])
     const published = await publishClassroomTask(teacherId, {
       operationId: 'operation_m2_mixed_publish', expectedVersion: 0, title: '动物综合练习', description: '',
@@ -30,8 +31,17 @@ describe('M2 question task memory fallback', () => {
     const answers: StructuredSubmissionAnswer[] = [
       { itemId: 'item_reading', value: { kind: 'reading', completedPageCount: 4 } },
       { itemId: 'item_vocabulary', value: { kind: 'vocabulary', completedWordCount: 2, correctWordCount: 1 } },
-      { itemId: 'item_exercise', value: { kind: 'exercise', answeredQuestionCount: 1,
-        questionResponses: [{ questionId: 'res_exercise_bird_demo', response: 'A. bird' }] } },
+      ...[
+        ['res_exercise_garden_q1', 'Four'],
+        ['res_exercise_garden_q2', 'In a dark cupboard'],
+        ['res_exercise_garden_q3', 'Cup A'],
+        ['res_exercise_garden_q4', 'bean'],
+      ].map(([questionId, response], index) => ({ itemId: `item_exercise_${index + 1}`,
+        value: { kind: 'exercise' as const, answeredQuestionCount: 1,
+          questionResponses: [{ questionId, response }] } })),
+      { itemId: 'item_exercise_5', value: { kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: 'res_exercise_garden_q5',
+          response: ['Made a chart', 'Took turns watering the garden'] }] } },
     ]
     const command = { operationId: 'operation_m2_mixed_submit', expectedVersion: 0, taskId, answer: '', structuredAnswers: answers }
     expect(await submitTask(studentId, command, clock)).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } })
@@ -44,16 +54,24 @@ describe('M2 question task memory fallback', () => {
     expect(await submitTask(studentId, { ...command, operationId: 'operation_m2_mixed_forged', structuredAnswers: [
       answers[0], { ...answers[1], value: { kind: 'vocabulary', completedWordCount: 2, correctWordCount: 2 } }, answers[2],
     ] }, clock)).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } })
-    expect(await submitTask(studentId, command, clock)).toMatchObject({ ok: true, data: { automaticScore: 83 } })
-    expect(await getCompletion(teacherId, taskId)).toMatchObject({ ok: true, data: [{ score: 83 }] })
+    expect(await submitTask(studentId, command, clock)).toMatchObject({ ok: true, data: { automaticScore: 93 } })
+    expect(await getCompletion(teacherId, taskId)).toMatchObject({ ok: true, data: [{ score: 93 }] })
     expect(JSON.stringify(await getParentTask(parentId, taskId))).not.toContain('correctAnswer')
   })
 
   it('preserves the private key across publish, draft, submission, review and parent reads', async () => {
+    const questions = [
+      { id: 'res_exercise_garden_q1', response: 'Three' },
+      { id: 'res_exercise_garden_q2', response: 'In a dark cupboard' },
+      { id: 'res_exercise_garden_q3', response: 'Cup A' },
+      { id: 'res_exercise_garden_q4', response: 'bean' },
+      { id: 'res_exercise_garden_q5', response: ['Made a chart', 'Took turns watering the garden'] },
+    ]
     const published = await publishClassroomTask(teacherId, {
-      operationId: 'operation_m2_memory_publish', expectedVersion: 0, title: '动物选择练习', description: '完成本题',
+      operationId: 'operation_m2_memory_publish', expectedVersion: 0, title: '花园阅读练习', description: '完成这组习题',
       structuredDraft: {
-        items: [{ id: 'item_bird', resourceId: 'res_exercise_bird_demo', type: 'exercise', requiredCount: 1, maxScore: 100 }],
+        items: questions.map((question, index) => ({ id: `item_garden_${index + 1}`,
+          resourceId: question.id, type: 'exercise' as const, requiredCount: 1, maxScore: 100 })),
         target: { type: 'students', studentIds: [studentId] }, startsAt: '2026-09-26T00:00:00.000Z',
         dueAt: '2026-09-27T00:00:00.000Z', latePolicy: { allowLate: true, lateDays: 7 },
       },
@@ -61,16 +79,20 @@ describe('M2 question task memory fallback', () => {
     if (!published.ok) throw new Error(`publish failed: ${published.error.message}`)
     const taskId = published.data.id
     const studentBefore = await getTaskDetail(studentId, taskId)
-    expect(studentBefore).toMatchObject({ ok: true, data: { task: { items: [{ exerciseQuestion: {
-      questionId: 'res_exercise_bird_demo', stem: 'Which animal can fly?', options: ['A. bird', 'B. lion', 'C. elephant'],
-    } }] } } })
+    expect(studentBefore).toMatchObject({ ok: true, data: { task: { items: [
+      { exerciseQuestion: { questionId: 'res_exercise_garden_q1' } },
+      { exerciseQuestion: { questionId: 'res_exercise_garden_q2' } },
+      { exerciseQuestion: { questionId: 'res_exercise_garden_q3' } },
+      { exerciseQuestion: { questionId: 'res_exercise_garden_q4' } },
+      { exerciseQuestion: { questionId: 'res_exercise_garden_q5' } },
+    ] } } })
     expect(JSON.stringify(studentBefore)).not.toContain('correctAnswer')
-    expect(JSON.stringify(studentBefore)).not.toContain('Birds can fly.')
+    expect(JSON.stringify(studentBefore)).not.toContain('Only Cup A grew a small green shoot.')
 
-    const wrongAnswer: StructuredSubmissionAnswer[] = [{ itemId: 'item_bird', value: {
-      kind: 'exercise', answeredQuestionCount: 1,
-      questionResponses: [{ questionId: 'res_exercise_bird_demo', response: 'B. lion' }],
-    } }]
+    const wrongAnswer: StructuredSubmissionAnswer[] = questions.map((question, index) => ({
+      itemId: `item_garden_${index + 1}`, value: { kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: question.id, response: question.response }] },
+    }))
     const draftReceipt = await saveDraft(studentId, { operationId: 'operation_m2_memory_draft', expectedVersion: 0,
       taskId, answer: '需要复习', structuredAnswers: wrongAnswer })
     expect(draftReceipt).toMatchObject({ ok: true })
@@ -81,29 +103,33 @@ describe('M2 question task memory fallback', () => {
     const savedDraft = await getTaskDetail(studentId, taskId)
     expect(savedDraft).toMatchObject({ ok: true })
     if (!savedDraft.ok) throw new Error('draft missing')
-    expect(savedDraft.data.submission?.answers[0]?.structuredValue).toMatchObject({ questionResponses: [{ response: 'B. lion' }] })
-    expect(savedDraft.data.submission?.answers[1]?.value).toBe('需要复习')
+    expect(savedDraft.data.submission?.answers[0]?.structuredValue).toMatchObject({ questionResponses: [{ response: 'Three' }] })
+    expect(savedDraft.data.submission?.answers.find(answer => answer.value === '需要复习')?.value).toBe('需要复习')
     expect(await submitTask(studentId, { operationId: 'operation_m2_memory_fake_count', expectedVersion: 1,
-      taskId, answer: '', structuredAnswers: [{ itemId: 'item_bird', value: { kind: 'exercise', answeredQuestionCount: 1 } }] }, clock))
+      taskId, answer: '', structuredAnswers: [{ itemId: 'item_garden_1', value: { kind: 'exercise', answeredQuestionCount: 1 } }] }, clock))
       .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } })
     const submitCommand = { operationId: 'operation_m2_memory_submit', expectedVersion: 1,
       taskId, answer: '', structuredAnswers: wrongAnswer }
     const submitted = await submitTask(studentId, submitCommand, clock)
-    expect(submitted).toMatchObject({ ok: true,
-      data: { automaticScore: 0, answers: [{ structuredValue: { correctQuestionCount: 0, questionResponses: [{ isCorrect: false }] } }] } })
+    expect(submitted).toMatchObject({ ok: true, data: { automaticScore: 80 } })
+    if (submitted.ok) expect(submitted.data.answers[0]?.structuredValue).toMatchObject({
+      correctQuestionCount: 0, questionResponses: [{ isCorrect: false }],
+    })
     expect(await submitTask(studentId, submitCommand, clock)).toEqual(submitted)
-    expect(await submitTask(studentId, { ...submitCommand, structuredAnswers: [{ itemId: 'item_bird', value: {
-      kind: 'exercise', answeredQuestionCount: 1, questionResponses: [{ questionId: 'res_exercise_bird_demo', response: 'A. bird' }],
-    } }] }, clock)).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
+    expect(await submitTask(studentId, { ...submitCommand, structuredAnswers: questions.map((question, index) => ({
+      itemId: `item_garden_${index + 1}`, value: { kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: question.id, response: question.id === 'res_exercise_garden_q1' ? 'Four' : question.response }] },
+    })) }, clock)).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
 
     const completion = await getCompletion(teacherId, taskId)
-    expect(completion).toMatchObject({ ok: true, data: [{ score: 0 }] })
+    expect(completion).toMatchObject({ ok: true, data: [{ score: 80 }] })
     if (!completion.ok || !completion.data[0]?.submissionId || !completion.data[0].submissionVersion) throw new Error('submission missing')
     const submissionId = completion.data[0].submissionId
-    expect(await getReviewSubmission(teacherId, submissionId)).toMatchObject({ ok: true, data: {
-      automaticScore: 0, exerciseEvidence: [{ studentResponse: 'B. lion', correctAnswer: 'A. bird', isCorrect: false }],
-    } })
-    expect(await getParentTask(parentId, taskId)).toMatchObject({ ok: true, data: { automaticScore: 0 } })
+    const teacherReview = await getReviewSubmission(teacherId, submissionId)
+    expect(teacherReview).toMatchObject({ ok: true, data: { automaticScore: 80 } })
+    if (teacherReview.ok) expect(teacherReview.data.exerciseEvidence.some(evidence =>
+      evidence.studentResponse === 'Three' && evidence.correctAnswer === 'Four' && evidence.isCorrect === false)).toBe(true)
+    expect(await getParentTask(parentId, taskId)).toMatchObject({ ok: true, data: { automaticScore: 80 } })
     expect(JSON.stringify(await getParentTask(parentId, taskId))).not.toContain('correctAnswer')
 
     expect(await reviewSubmission(teacherId, { operationId: 'operation_m2_memory_bad_override', expectedVersion: completion.data[0].submissionVersion,
@@ -112,12 +138,12 @@ describe('M2 question task memory fallback', () => {
     expect(await reviewSubmission(teacherId, { operationId: 'operation_m2_memory_override', expectedVersion: completion.data[0].submissionVersion,
       taskId, assignmentId: completion.data[0].assignmentId, decision: 'approved', score: 75,
       overrideReason: '补充作答已核实', comment: '复核完成' }, clock)).toMatchObject({ ok: true,
-      data: { score: 75, originalAutomaticScore: 0, overrideReason: '补充作答已核实' } })
+      data: { score: 75, originalAutomaticScore: 80, overrideReason: '补充作答已核实' } })
     expect(await getReviewSubmission(teacherId, submissionId)).toMatchObject({ ok: true, data: { feedback: {
-      score: 75, originalAutomaticScore: 0, overrideReason: '补充作答已核实',
+      score: 75, originalAutomaticScore: 80, overrideReason: '补充作答已核实',
     } } })
     expect(await getParentTask(parentId, taskId)).toMatchObject({ ok: true, data: { feedback: { score: 75 } } })
     expect(JSON.stringify(await getParentTask(parentId, taskId))).not.toContain('补充作答已核实')
-    expect((getState().exerciseSnapshots ?? [])).toHaveLength(1)
+    expect((getState().exerciseSnapshots ?? [])).toHaveLength(5)
   })
 })

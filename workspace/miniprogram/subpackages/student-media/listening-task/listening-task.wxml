@@ -1,0 +1,42 @@
+<g0-page-shell nature="{{true}}" tone="nature">
+  <view class="listening-page">
+    <image class="listening-page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
+    <app-header title="{{teacherReview ? '听力作业验收' : teacherPreview ? '听力预览' : '听力任务'}}" back="{{true}}"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else class="listening-content">
+      <view class="listening-hero">
+        <view class="listening-hero__copy"><text class="listening-eyebrow">课堂听力 · 按顺序收听</text><text class="listening-title">{{itemTitle}}</text><text class="listening-description">{{teacherReview ? '教师只读查看 · 第 ' + teacherReviewVersion + ' 次提交' : teacherPreview ? '按学员作答页面查看音频与题目；预览不保存播放或答案。' : '听完音频，完成下方每道题。答案会自动保存在本机。'}}</text></view>
+        <view class="listening-art"><image src="/subpackages/student-media/assets/g0/listening-headphones-v1.webp" mode="aspectFit" aria-hidden="true"></image></view>
+      </view>
+      <view class="listening-card player-card">
+        <view class="card-heading"><view><text class="card-kicker">听力练习</text><text class="card-title">开始听一听</text></view><text class="question-count">{{questions.length}} 道题</text></view>
+        <view class="waveform" aria-hidden="true"><view></view><view></view><view></view><view></view><view></view><view></view><view></view><view></view><view></view><view></view><view></view><view></view></view>
+        <text wx:if="{{!earMode && subtitle}}" class="subtitle">{{subtitle}}</text>
+        <media-player title="听力音频" playing="{{playing}}" progress="{{positionPercent}}" currentTime="{{currentLabel}}" duration="{{durationLabel}}" speed="{{speed}}×" locked="{{!teacherPreview}}" seekLimit="{{teacherPreview ? 100 : confirmedPercent}}" earMode="{{earMode}}" earModeLocked="{{!teacherPreview}}" showEarModeToggle="{{hasListeningText}}" showBufferingText="{{false}}" state="{{playbackError ? 'error' : buffering ? 'loading' : 'ready'}}" bare="{{true}}" bind:toggle="togglePlayback" bind:speed="chooseSpeed" bind:earmode="toggleEarMode" bind:seek="seek" bind:seekblocked="blockSeek" bind:retry="retry"></media-player>
+        <text class="player-note">{{teacherReview ? teacherReviewProgress + '；教师试听不计入学员进度' : teacherPreview ? '教师只读试听 · 可自由定位，不计入学员进度' : '已确认播放 ' + confirmedPercent + '% · 可暂停、调速和向后重听'}}</text>
+        <text wx:if="{{teacherReview && !playback.temporaryUrl}}" class="notice">原音频当前不可试听，提交答案仍可核对。</text>
+        <text wx:if="{{completed}}" class="success-note">{{teacherReview ? '已试听完整段音频；本次试听不改变学生提交。' : teacherPreview ? '已听完整段音频；教师预览不会记录完成进度。' : '已听完整段音频，请完成题目后返回任务详情提交。'}}</text>
+        <text wx:if="{{warning}}" class="notice">{{warning}}</text>
+        <view wx:if="{{playbackError}}" class="error-note"><text>{{playbackError}}</text><button bindtap="retry">重试播放</button></view>
+      </view>
+      <view wx:if="{{earMode && hasListeningText}}" class="ear-card"><text>{{teacherReview ? '听力内容已隐藏，题目和原作答仍可核对。' : '听力内容已隐藏，题目仍可查看和作答。'}}</text><text>{{teacherPreview ? '教师可切换文本显示以核对内容。' : '课堂任务固定开启磨耳朵，音频进度与已选答案会保留。'}}</text></view>
+      <view wx:if="{{!earMode && hasListeningText}}" class="listening-card transcript-card"><view class="questions-heading"><text>听力内容</text><text>关闭磨耳朵后显示</text></view><text wx:for="{{snapshot.subtitleCues}}" wx:key="startMs" class="transcript-line">{{item.text}}</text></view>
+      <view class="question-section"><view class="questions-heading"><text>听力题目</text><text>点击题目音频可重听已播放片段</text></view>
+        <view wx:for="{{questions}}" wx:for-item="question" wx:key="questionId" class="listening-card question-card">
+          <view class="question-head"><text class="question-number">{{index + 1}}</text><text class="question-type">{{question.typeLabel}}</text></view>
+          <text class="question-stem">{{question.stem}}</text>
+          <view wx:if="{{!teacherReview || question.clip}}" class="clip-button" data-id="{{question.questionId}}" bindtap="playClip" aria-role="button"><image src="/assets/icons/headphones.svg" mode="aspectFit" aria-hidden="true"></image>播放本题片段</view><text wx:else class="notice">本题片段未记录</text>
+          <text wx:if="{{question.questionType === 'multiple_choice'}}" class="answer-hint">可选择多个答案</text>
+          <view wx:if="{{question.choiceQuestion && question.options.length}}" class="options"><view wx:for="{{question.options}}" wx:for-item="choice" wx:key="value" class="option {{choice.selected ? 'option--selected' : ''}} {{teacherReview && choice.selected ? (question.verdict === '正确' ? 'review-correct' : question.verdict === '错误' ? 'review-wrong' : '') : ''}}" data-question-id="{{question.questionId}}" data-value="{{choice.value}}" bindtap="chooseOption" aria-role="button"><text class="option-dot">{{choice.selected ? '✓' : ''}}</text><text>{{choice.value}}</text></view></view>
+          <text wx:elif="{{question.choiceQuestion}}" class="question-error">本题选项缺失，请联系老师处理。</text>
+          <textarea wx:else class="answer-input" disabled="{{teacherPreview}}" value="{{question.answerText}}" data-question-id="{{question.questionId}}" bindinput="inputAnswer" maxlength="500" placeholder="请输入你的答案"></textarea>
+          <view wx:if="{{teacherReview}}" class="review-evidence"><text>学生答案：{{question.responseLabel}}</text><text>正确答案：{{question.correctLabel}}</text><text class="{{question.verdict === '正确' ? 'review-verdict-correct' : question.verdict === '错误' ? 'review-verdict-wrong' : ''}}">{{question.verdict}}</text><text wx:if="{{question.explanation}}">解析：{{question.explanation}}</text></view>
+        </view>
+        <text wx:if="{{draftError}}" class="error-note">{{draftError}}</text>
+      </view>
+      <view wx:if="{{teacherReview && teacherScoreRequired}}" class="listening-card question-card"><text class="question-stem">本项评分草稿</text><view class="review-score"><input type="number" maxlength="3" value="{{teacherScoreInput}}" bindinput="onTeacherReviewScore" placeholder="0—100"/><text>分</text></view><text wx:if="{{teacherScoreError}}" class="notice">{{teacherScoreError}}</text></view>
+      <task-return-bar label="{{teacherReview ? '返回快速点评' : teacherPreview ? '返回内容选择' : '提交并返回任务详情'}}" bind:press="returnToTask"></task-return-bar>
+    </view>
+  </view>
+</g0-page-shell>

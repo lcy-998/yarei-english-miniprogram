@@ -14,6 +14,7 @@ export function createTeacherTextbookQueryFunction(dependencies: TeacherTextbook
       | Awaited<ReturnType<TeacherTextbookService['getCenterSettings']>>
       | Awaited<ReturnType<TeacherTextbookService['getClass']>>
       | Awaited<ReturnType<TeacherTextbookService['listTextbooks']>>
+      | Awaited<ReturnType<TeacherTextbookService['listTextbookFacets']>>
       | Awaited<ReturnType<TeacherTextbookService['getTextbook']>>>> => {
       if (input.action === 'getCenterSettings') return success(
         await dependencies.service.getCenterSettings(actor), createMeta(dependencies.clock, dependencies.requestIds));
@@ -21,7 +22,10 @@ export function createTeacherTextbookQueryFunction(dependencies: TeacherTextbook
         await dependencies.service.listClasses(actor), createMeta(dependencies.clock, dependencies.requestIds));
       if ('classId' in input) return success(
         await dependencies.service.getClass(actor, input.classId), createMeta(dependencies.clock, dependencies.requestIds));
-      if ('filters' in input) return success(
+      if (input.action === 'listTextbookFacets') return success(
+        await dependencies.service.listTextbookFacets(actor, input.filters, input.targetClassId),
+        createMeta(dependencies.clock, dependencies.requestIds));
+      if (input.action === 'listTextbooks') return success(
         await dependencies.service.listTextbooks(actor, input.filters, input.page, input.targetClassId),
         createMeta(dependencies.clock, dependencies.requestIds));
       if ('textbookId' in input) return success(

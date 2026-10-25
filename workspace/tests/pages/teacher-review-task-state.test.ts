@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { currentReviewTaskFirst, filterReviewRowsByClass, parseReviewScoreInput, reviewClassOptions, reviewQueueOverview, reviewTaskOptions, selectReviewRows, selectedReviewTaskId } from '../../miniprogram/pages/teacher/review-task/review-task-state'
-import type { ReviewAssignmentView } from '../../miniprogram/services/app-service'
+import { currentReviewTaskFirst, filterReviewRowsByClass, parseReviewScoreInput, reviewClassOptions, reviewQueueOverview, reviewTaskOptions, selectReviewRows, selectedReviewTaskId } from '../../miniprogram/shared/review-task-state'
+import type { ReviewAssignmentView } from '../../miniprogram/subpackages/teacher/services/app-service'
 
 const rows: ReviewAssignmentView[] = [
   { studentName: '小宇', assignmentId: 'a_pending', taskId: 'task', status: 'awaiting_review', submissionId: 's_pending', submissionVersion: 1 },

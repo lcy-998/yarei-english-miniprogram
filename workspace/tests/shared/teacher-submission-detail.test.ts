@@ -82,4 +82,24 @@ describe('教师作业详情展示口径', () => {
       result: '已提交录音', tone: 'success' }])
     expect(rows[0]?.detail).toContain('3 秒')
   })
+
+  it('媒体卡片反映当前提交的引用，不再固定显示等待逐项证据', () => {
+    const items = [
+      { id: 'listen', title: '听力', type: 'listening' as const, completionRule: {} },
+      { id: 'video', title: '视频', type: 'video' as const, completionRule: {} },
+      { id: 'dub', title: '配音', type: 'dubbing' as const, completionRule: {} },
+    ]
+    const rows = teacherSubmissionDetails(items, [
+      { itemId: 'listen', value: { kind: 'listening', mediaSessionId: 'session_1' } },
+      { itemId: 'video', value: { kind: 'video', mediaSessionId: 'session_2' } },
+      { itemId: 'dub', value: { kind: 'dubbing', mediaSessionId: 'session_3', finalWorkId: 'work_1' } },
+    ])
+    expect(rows.map(row => row.result)).toEqual(['已提交媒体作答', '已提交媒体作答', '已提交配音作品'])
+    expect(rows.every(row => row.detail.includes('点开原学生作业页'))).toBe(true)
+    expect(teacherSubmissionDetails(items, [
+      { itemId: 'dub', value: { kind: 'dubbing', mediaSessionId: 'session_3' } },
+    ]).map(row => row.result)).toEqual([
+      '本次提交未记录媒体证据', '本次提交未记录媒体证据', '本次提交未记录媒体证据',
+    ])
+  })
 })

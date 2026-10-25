@@ -51,8 +51,8 @@ describe('T-08 打开原学生作业页的教师只读模式', () => {
     expect(teacherExerciseView(null)).toMatchObject({ answerLabel: '未记录', verdict: '本次提交未记录逐题作答' })
   })
 
-  it('作业详情逐项打开原阅读、单词或任务页，点评输入留在原页', async () => {
-    const definition = await pageDefinition(() => import('../../miniprogram/pages/teacher/review-task/review-task'))
+  it('作业详情逐项打开原阅读、单词、任务或配音页，点评输入留在原页', async () => {
+    const definition = await pageDefinition(() => import('../../miniprogram/subpackages/teacher/review-task/review-task'))
     const navigateTo = vi.fn()
     vi.stubGlobal('wx', { navigateTo })
     const context: PageContext = { data: { activeRow: { assignmentId: 'assignment_demo' },
@@ -61,27 +61,34 @@ describe('T-08 打开原学生作业页的教师只读模式', () => {
       manualScoreRows: [], taskItems: [
         { id: 'read', type: 'reading' }, { id: 'word', type: 'vocabulary' },
         { id: 'quiz', type: 'exercise' }, { id: 'audio', type: 'recording' },
-      ], detailRows: [{ id: 'read' }, { id: 'word' }, { id: 'quiz' }, { id: 'audio' }] },
+        { id: 'listen', type: 'listening' }, { id: 'video', type: 'video' },
+        { id: 'dub', type: 'dubbing' },
+      ], detailRows: [{ id: 'read' }, { id: 'word' }, { id: 'quiz' }, { id: 'audio' },
+        { id: 'listen' }, { id: 'video' }, { id: 'dub' }] },
     setData(patch) { Object.assign(this.data, patch) } }
-    for (const id of ['read', 'word', 'quiz', 'audio']) {
+    for (const id of ['read', 'word', 'quiz', 'audio', 'listen', 'video', 'dub']) {
       definition.methods.openReviewItem.call(context, { currentTarget: { dataset: { id } } })
     }
     expect(navigateTo.mock.calls.map(call => call[0].url)).toEqual([
-      '/pages/student/reading-detail/reading-detail?teacherReview=1&submissionId=submission_demo&itemId=read',
-      '/pages/student/vocabulary/vocabulary?teacherReview=1&submissionId=submission_demo&itemId=word',
-      '/pages/student/task-detail/task-detail?teacherReview=1&submissionId=submission_demo&itemId=quiz',
-      '/pages/student/task-detail/task-detail?teacherReview=1&submissionId=submission_demo&itemId=audio',
+      '/subpackages/student/reading-detail/reading-detail?teacherReview=1&submissionId=submission_demo&itemId=read',
+      '/subpackages/student/vocabulary/vocabulary?teacherReview=1&submissionId=submission_demo&itemId=word',
+      '/subpackages/student/exercise-task/exercise-task?teacherReview=1&submissionId=submission_demo&itemId=quiz',
+      '/subpackages/student-media/recording-task/recording-task?teacherReview=1&submissionId=submission_demo&itemId=audio',
+      '/subpackages/student-media/listening-task/listening-task?teacherReview=1&submissionId=submission_demo&itemId=listen',
+      '/subpackages/student-media/video-task/video-task?teacherReview=1&submissionId=submission_demo&itemId=video',
+      '/subpackages/student-media/dubbing/dubbing?teacherReview=1&submissionId=submission_demo&itemId=dub',
     ])
     expect(context.data).toMatchObject({ comment: '继续努力', score: 85 })
   })
 
   it('教师在阅读页自由翻页，翻页和页图加载不保存学生进度', async () => {
-    const definition = await pageDefinition(() => import('../../miniprogram/pages/student/reading-detail/reading-detail'))
+    const definition = await pageDefinition(() => import('../../miniprogram/subpackages/student/reading-detail/reading-detail'))
     const context: PageContext = { data: { teacherReviewMode: true, reviewPageIndex: 0,
       reading: { pages: [
         { pageNumber: 4, chapterNumber: 1, imageUrl: '/four.jpg', thumbnailUrl: '/four-small.jpg' },
         { pageNumber: 8, chapterNumber: 2, imageUrl: '/eight.jpg', thumbnailUrl: '/eight-small.jpg' },
       ] } }, setData(patch) { Object.assign(this.data, patch) } }
+    Object.assign(context, definition.methods)
     await definition.methods.changePage.call(context, 1)
     expect(context.data).toMatchObject({ reviewPageIndex: 1, displayPageNumber: 8, pendingPageNumber: 0 })
     await definition.methods.imageLoaded.call(context)
@@ -91,19 +98,19 @@ describe('T-08 打开原学生作业页的教师只读模式', () => {
 
   it('教师阅读页使用与学生页一致的页图地址转换', () => {
     expect(displayPageImageUrl('demo/reading/zoo/page-01-image'))
-      .toBe('/assets/content/demo-zoo-picture-book-cover-v1.jpg')
+      .toBe('/subpackages/student/assets/content/demo-zoo-picture-book-cover-v1.jpg')
     expect(displayPageImageUrl('demo/reading/zoo/page-02-thumbnail'))
-      .toBe('/assets/content/demo-zoo-page-02-v1.jpg')
+      .toBe('/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg')
     expect(displayPageImageUrl('demo/page-01-image'))
-      .toBe('/assets/content/demo-zoo-picture-book-cover-v1.jpg')
-    expect(displayPageImageUrl('demo/image')).toBe('/assets/content/demo-zoo-page-02-v1.jpg')
+      .toBe('/subpackages/student/assets/content/demo-zoo-picture-book-cover-v1.jpg')
+    expect(displayPageImageUrl('demo/image')).toBe('/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg')
     expect(displayPageImageUrl('https://example.invalid/signed-page')).toBe('https://example.invalid/signed-page')
     expect(displayPageImageUrl('')).toBe('')
     expect(displayPageImageUrl('unknown-page')).toBe('')
   })
 
   it('教师在原单词词卡翻阅时保留学生首答，不能提交答案', async () => {
-    const definition = await pageDefinition(() => import('../../miniprogram/pages/student/vocabulary/vocabulary'))
+    const definition = await pageDefinition(() => import('../../miniprogram/subpackages/student/vocabulary/vocabulary'))
     const context: PageContext = { data: { teacherReviewMode: true, wordIndex: 0,
       pack: { words: [{ id: 'w1', word: 'sun', syllables: ['sun'] }, { id: 'w2', word: 'moon', syllables: ['moon'] }] },
       teacherEvidence: [

@@ -85,6 +85,14 @@ class TaskQueryDocumentRepository implements TaskQueryRepository {
     })).map((document) => decodeDocument<TaskAssignmentRecord>(document, true)));
   }
 
+  public async listStudentAssignments(organizationId: string, studentId: string): Promise<readonly TaskAssignmentRecord[]> {
+    return this.read(async (reader) => (await reader.find(TASK_CORE_COLLECTIONS.assignments, {
+      organizationId,
+      studentId,
+      deletedAt: null,
+    })).map((document) => decodeDocument<TaskAssignmentRecord>(document, true)));
+  }
+
   public async findAssignment(
     organizationId: string,
     taskId: string,

@@ -2,6 +2,8 @@ import { CloudAppService, createCloudAppService } from '../services/cloudbase-ap
 import { configureM1AppRepository, useMemoryM1AppRepository } from '../services/m1-app-service'
 import { createCloudBaseM1AppRepository } from './cloudbase/cloudbase-m1-app-repository'
 import { clearSession, getCurrentChildId } from '../session/session'
+import type { M1AppRepository } from './m1-app-repository'
+import type { ServiceResult } from '../domain/types'
 import {
   CloudAuthenticationPort,
   CloudClientContextProvider,
@@ -9,7 +11,7 @@ import {
   createCloudRepositoryClient,
 } from './cloudbase/protocol'
 
-export type RepositoryMode = 'memory' | 'cloudbase'
+export type RepositoryMode = 'memory' | 'cloudbase' | 'blocked'
 
 export interface CloudBaseRepositoryConfiguration {
   mode: 'cloudbase'
@@ -19,15 +21,34 @@ export interface CloudBaseRepositoryConfiguration {
 }
 
 export interface MemoryRepositoryConfiguration { mode: 'memory' }
+export interface BlockedRepositoryConfiguration { mode: 'blocked' }
 
-export type RepositoryConfiguration = MemoryRepositoryConfiguration | CloudBaseRepositoryConfiguration
+export type RepositoryConfiguration = MemoryRepositoryConfiguration | CloudBaseRepositoryConfiguration | BlockedRepositoryConfiguration
 
 let cloudService: CloudAppService | null = null
+let repositoryMode: RepositoryMode = 'memory'
+
+function unavailable<T>(): Promise<ServiceResult<T>> {
+  return Promise.resolve({ ok: false, error: {
+    code: 'SERVICE_UNAVAILABLE', message: '服务暂不可用，请稍后重试', retryable: true,
+  } })
+}
+
+function blockedMethods<T extends object>(): T {
+  return new Proxy({} as T, { get: () => unavailable })
+}
 
 export function configureRepositories(configuration: RepositoryConfiguration): void {
   if (configuration.mode === 'memory') {
     cloudService = null
+    repositoryMode = 'memory'
     useMemoryM1AppRepository()
+    return
+  }
+  if (configuration.mode === 'blocked') {
+    cloudService = blockedMethods<CloudAppService>()
+    repositoryMode = 'blocked'
+    configureM1AppRepository(blockedMethods<M1AppRepository>())
     return
   }
   const context: CloudClientContextProvider = () => {
@@ -48,6 +69,7 @@ export function configureRepositories(configuration: RepositoryConfiguration): v
       }),
     },
   }))
+  repositoryMode = 'cloudbase'
 }
 
 export function getCloudAppService(): CloudAppService | null {
@@ -55,5 +77,5 @@ export function getCloudAppService(): CloudAppService | null {
 }
 
 export function getRepositoryMode(): RepositoryMode {
-  return cloudService === null ? 'memory' : 'cloudbase'
+  return repositoryMode
 }

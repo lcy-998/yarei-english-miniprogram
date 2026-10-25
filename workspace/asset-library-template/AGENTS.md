@@ -18,7 +18,7 @@
 - 根目录与 `inbox/` 中的用户源文件是只读输入，不移动、不重命名、不覆盖、不删除。
 - 所有派生结果写入 `library/`；运行报告写入 `reports/`。
 - 资源发生变化时创建新版本，不覆盖旧版本。
-- 当前主项目仍是 M0。除非用户明确要求并且主项目里程碑允许，不把真实教材直接接入 `D:\app\workspace\miniprogram`。
+- 主项目当前里程碑以 `D:\app\DOCUMENTATION.md` 为准；后续资产可提前准备。除非用户明确要求并且主项目里程碑允许，不把真实教材直接接入 `D:\app\workspace\miniprogram`。
 - 最终交付目标是微信小程序。PDF、全量页面、音频、视频和 WAV 母版不得直接塞入小程序代码包；派生媒体进入云存储/CDN，小程序通过资源 ID 和 HTTPS URL 使用。
 - 用户已明确确认：放入本目录的现有及未来资料均不存在版权问题。统一记录 `rightsStatus=user_confirmed_cleared`，版权不作为本资产流水线的阻断项。
 
@@ -29,7 +29,7 @@
 1. 运行 `scripts\run-pipeline.ps1 run`。
 2. 检查 `reports\last-run.json`。
 3. 检查并处理 `NEEDS-REVIEW.md` 中的待办。
-4. 只有正文、章节、音频、点读/时间轴和必要词条均通过人工复核的资源，才可将清单状态改为 `publish_ready`。
+4. 只有对应资源类型的必需正文、章节、音频、点读/时间轴和必要词条均通过人工复核，且不可覆盖的版本化 `review/approved-content-vN.json` 经脚本验证后，才可由流水线将资源标为 `publish_ready`；纯阅读书不强制附带独立词包或习题。
 5. 每次处理后必须更新 `RESOURCE-CATALOG.md` 和 `library/catalog.json`；默认由脚本自动生成，不手工维护两份不一致的数据。
 
 ## 4. 不得猜测

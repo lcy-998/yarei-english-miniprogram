@@ -5,10 +5,12 @@
  */
 
 export type ContentRule =
-  | Readonly<{ kind: 'listening'; segmentIds: readonly string[]; questionIds: readonly string[] }>
+  | Readonly<{ kind: 'listening'; segmentIds: readonly string[]; questionIds: readonly string[];
+    objectiveQuestionIds?: readonly string[] }>
   | Readonly<{ kind: 'reading'; pageIds: readonly string[]; questionIds: readonly string[] }>
   | Readonly<{ kind: 'recording' }>
-  | Readonly<{ kind: 'video'; durationMs: number; questionIds: readonly string[] }>
+  | Readonly<{ kind: 'video'; durationMs: number; questionIds: readonly string[];
+    objectiveQuestionIds?: readonly string[] }>
   | Readonly<{ kind: 'vocabulary'; wordIds: readonly string[] }>
   | Readonly<{ kind: 'exercise'; questionIds: readonly string[]; objectiveQuestionIds: readonly string[] }>
   | Readonly<{ kind: 'dubbing' }>;
@@ -64,11 +66,18 @@ export function isTaskContentPublishableInM2(kind: ContentRule['kind']): boolean
 
 export function validateContentRule(rule: ContentRule): boolean {
   switch (rule.kind) {
-    case 'listening': return uniqueIds(rule.segmentIds) && uniqueIds(rule.questionIds);
+    case 'listening': return uniqueIds(rule.segmentIds) && uniqueIds(rule.questionIds)
+      && (rule.objectiveQuestionIds === undefined
+        || uniqueIdsOrEmpty(rule.objectiveQuestionIds)
+          && isSubset(rule.objectiveQuestionIds, rule.questionIds));
     case 'reading': return uniqueIds(rule.pageIds) && uniqueIdsOrEmpty(rule.questionIds);
     case 'recording':
     case 'dubbing': return true;
-    case 'video': return Number.isSafeInteger(rule.durationMs) && rule.durationMs > 0 && uniqueIdsOrEmpty(rule.questionIds);
+    case 'video': return Number.isSafeInteger(rule.durationMs) && rule.durationMs > 0
+      && uniqueIdsOrEmpty(rule.questionIds)
+      && (rule.objectiveQuestionIds === undefined
+        || uniqueIdsOrEmpty(rule.objectiveQuestionIds)
+          && isSubset(rule.objectiveQuestionIds, rule.questionIds));
     case 'vocabulary': return uniqueIds(rule.wordIds);
     case 'exercise': return uniqueIds(rule.questionIds)
       && uniqueIdsOrEmpty(rule.objectiveQuestionIds)
@@ -80,10 +89,12 @@ export function evaluateVerifiedContent(rule: ContentRule, evidence: ContentEvid
   if (!validateContentRule(rule) || rule.kind !== evidence.kind) return INCOMPLETE;
   switch (rule.kind) {
     case 'listening': {
+      const objectiveIds = rule.objectiveQuestionIds ?? rule.questionIds;
       if (evidence.kind !== 'listening' || !isExactSet(evidence.verifiedPlayedSegmentIds, rule.segmentIds)
-        || !validQuestionEvidence(evidence, rule.questionIds)
+        || !validQuestionEvidence(evidence, objectiveIds)
         || !isExactSet(evidence.answeredQuestionIds, rule.questionIds)) return INCOMPLETE;
-      return automatic(percent(evidence.correctQuestionIds.length, rule.questionIds.length));
+      return objectiveIds.length === rule.questionIds.length
+        ? automatic(percent(evidence.correctQuestionIds.length, rule.questionIds.length)) : manual();
     }
     case 'reading': {
       if (evidence.kind !== 'reading' || !isExactSet(evidence.completedPageIds, rule.pageIds)
@@ -94,10 +105,13 @@ export function evaluateVerifiedContent(rule: ContentRule, evidence: ContentEvid
     case 'recording':
       return evidence.kind === 'recording' && validRecording(evidence.recording) ? manual() : INCOMPLETE;
     case 'video': {
+      const objectiveIds = rule.objectiveQuestionIds ?? rule.questionIds;
       if (evidence.kind !== 'video' || coveredDuration(evidence.verifiedRanges, rule.durationMs) < rule.durationMs * 0.9
-        || !validQuestionEvidence(evidence, rule.questionIds)
+        || !validQuestionEvidence(evidence, objectiveIds)
         || !isExactSet(evidence.answeredQuestionIds, rule.questionIds)) return INCOMPLETE;
-      return rule.questionIds.length ? automatic(percent(evidence.correctQuestionIds.length, rule.questionIds.length)) : unscored();
+      return rule.questionIds.length === 0 ? unscored()
+        : objectiveIds.length === rule.questionIds.length
+          ? automatic(percent(evidence.correctQuestionIds.length, rule.questionIds.length)) : manual();
     }
     case 'vocabulary': {
       if (evidence.kind !== 'vocabulary' || !isExactSet(evidence.attemptedWordIds, rule.wordIds)

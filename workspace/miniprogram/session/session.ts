@@ -1,6 +1,9 @@
-import { Role, Session, TaskTemplateView } from '../domain/types'
+import { Role, Session, TaskItem, TaskTemplateView } from '../domain/types'
+import { clearDubbingLocalDraft } from '../shared/dubbing-local-draft'
+import { clearTaskMediaDraftMemory } from '../shared/task-media-draft'
 
 const SESSION_KEY = 'yarei_session'
+const PRIVATE_DRAFT_PREFIXES = ['task_media_answer_', 'pronunciation_local_'] as const
 let currentTaskId = ''
 let currentBookId = ''
 let currentStudentId = 'usr_student_xiaoyu'
@@ -12,7 +15,7 @@ export interface TeacherTaskCopy {
   description: string
   itemRefs: Array<{ id: string; resourceId: string; completionRule?: Record<string, unknown>;
     scoringRule?: Record<string, unknown>; order: number }>
-  items: Array<{ resourceId: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording' }>
+  items: Array<{ resourceId: string; title: string; type: TaskItem['type'] }>
 }
 let teacherTaskCopy: TeacherTaskCopy | null = null
 let teacherTemplateSeed: TaskTemplateView | null = null
@@ -21,12 +24,36 @@ let teacherStatsTargetStudentId = ''
 let teacherSelectedResourceIds: string[] = []
 let teacherCatalogInitialIds: string[] | null = null
 let teacherCatalogResultIds: string[] | null = null
+let teacherMediaInitialIds: string[] | null = null
 let teacherTextbookSelectedIds: string[] | null = null
 let teacherReadingSelection: { resourceId: string; pageIds?: string[]; targetClassId?: string } | null = null
 export interface TeacherReviewScoreDraft { submissionId: string; itemId: string; input: string }
 let teacherReviewScoreDraft: TeacherReviewScoreDraft | null = null
 
+function clearPrivateLocalDrafts(): void {
+  clearTaskMediaDraftMemory()
+  // Offline answers and recording drafts belong to the signed-in student, not the device.
+  if (typeof wx.getStorageInfoSync === 'function') {
+    try {
+      const keys = wx.getStorageInfoSync().keys
+      for (const key of keys) {
+        if (!PRIVATE_DRAFT_PREFIXES.some(prefix => key.startsWith(prefix))) continue
+        try { wx.removeStorageSync(key) } catch (_error: unknown) { /* Keep clearing other drafts. */ }
+      }
+    } catch (_error: unknown) {
+      // A storage failure must not prevent the session itself from being cleared.
+    }
+  }
+}
+
 export function saveSession(session: Session): void {
+  try {
+    const prior = wx.getStorageSync(SESSION_KEY) as Session | null
+    if (!prior || prior.sessionId !== session.sessionId || prior.user?.id !== session.user.id) {
+      clearPrivateLocalDrafts()
+      clearDubbingLocalDraft()
+    }
+  } catch (_error: unknown) { /* Keep login usable if old local storage cannot be read. */ }
   wx.setStorageSync(SESSION_KEY, session)
 }
 
@@ -35,7 +62,15 @@ export function getSession(): Session | null {
 }
 
 export function clearSession(): void {
+  clearPrivateLocalDrafts()
   wx.removeStorageSync(SESSION_KEY)
+  clearDubbingLocalDraft()
+  currentTaskId = ''
+  currentBookId = ''
+  currentStudentId = ''
+  currentChildId = ''
+  currentAssignmentId = ''
+  readingFavoritesOnly = false
   teacherTaskCopy = null
   teacherTaskTargetStudentId = ''
   teacherStatsTargetStudentId = ''
@@ -43,15 +78,16 @@ export function clearSession(): void {
   teacherSelectedResourceIds = []
   teacherCatalogInitialIds = null
   teacherCatalogResultIds = null
+  teacherMediaInitialIds = null
   teacherTextbookSelectedIds = null
   teacherReadingSelection = null
   teacherReviewScoreDraft = null
 }
 
 export function homePath(role: Role): string {
-  if (role === 'teacher') return '/pages/teacher/workbench/workbench'
-  if (role === 'parent') return '/pages/parent/home/home'
-  return '/pages/index/index'
+  if (role === 'teacher') return '/subpackages/teacher/workbench/workbench'
+  if (role === 'parent') return '/subpackages/parent/home/home'
+  return '/subpackages/student/home/index'
 }
 
 export function setCurrentTaskId(taskId: string): void { currentTaskId = taskId }
@@ -90,6 +126,14 @@ export function takeTeacherCatalogInitialIds(): readonly string[] { const ids = 
 export function setTeacherCatalogResultIds(resourceIds: readonly string[]): void { teacherCatalogResultIds = [...new Set(resourceIds)] }
 export function getTeacherCatalogResultIds(): readonly string[] | null { return teacherCatalogResultIds === null ? null : [...teacherCatalogResultIds] }
 export function clearTeacherCatalogResultIds(): void { teacherCatalogResultIds = null }
+export function setTeacherMediaInitialIds(ids: readonly string[]): void {
+  teacherMediaInitialIds = [...new Set(ids)]
+}
+export function takeTeacherMediaInitialIds(): readonly string[] {
+  const ids = teacherMediaInitialIds ?? []
+  teacherMediaInitialIds = null
+  return [...ids]
+}
 export function setTeacherTextbookSelectedIds(ids: readonly string[]): void { teacherTextbookSelectedIds = [...new Set(ids)] }
 export function takeTeacherTextbookSelectedIds(): readonly string[] | null {
   const ids = teacherTextbookSelectedIds

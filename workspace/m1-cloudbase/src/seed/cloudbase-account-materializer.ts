@@ -1,4 +1,5 @@
 import { NodePepperedSubjectDigest } from '../runtime/node-crypto-capabilities';
+import { cloudbaseUsernameSubject } from '../auth/trusted-actor';
 import type { SeedPackage } from './model';
 import { createCrossOrganizationSecuritySeedPackage } from './cross-organization-security-fixture';
 import {
@@ -123,7 +124,7 @@ export function materializeCloudRuntimeSeedPackages(
     const account = accountsByName.get(expected.name)![0]!;
     let providerSubjectDigest: string;
     try {
-      providerSubjectDigest = digest.digest(`cloudbase:username:${account.uid}`);
+      providerSubjectDigest = digest.digest(cloudbaseUsernameSubject(account.uid));
     } catch {
       return failure([{ code: 'CRYPTOGRAPHY_UNAVAILABLE', accountName: expected.name, message: '运行态身份摘要生成失败。' }]);
     }

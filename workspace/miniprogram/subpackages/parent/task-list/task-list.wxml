@@ -1,0 +1,27 @@
+<g0-page-shell nature="{{true}}" tone="parent"><view class="task-list-page">
+  <app-header title="孩子任务" back="{{true}}"></app-header>
+  <view class="task-list-content">
+    <view wx:if="{{hasChildren && childId}}" class="child-card" bindtap="openChildren" aria-role="button">
+      <view class="child-avatar">{{childAvatarText}}</view>
+      <view class="child-copy"><text class="child-name">{{childName}}</text><text class="child-class">{{childClassName}}</text></view>
+      <text class="child-switch">切换孩子 ›</text>
+    </view>
+    <view wx:elif="{{!hasChildren}}" class="empty-card"><text>还没有绑定孩子</text><button bindtap="openChildren">去绑定孩子</button></view>
+    <view wx:if="{{hasChildren && childId}}" class="filters">
+      <view class="status-tabs"><view wx:for="{{statusOptions}}" wx:key="value" class="status-tab {{statusGroup === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="chooseStatus" aria-role="button">{{item.label}}</view></view>
+      <picker range="{{dayOptions}}" value="{{dayIndex}}" bindchange="chooseDays"><view class="days-picker">近 {{days}} 天⌄</view></picker>
+    </view>
+    <state-panel wx:if="{{loading}}" state="loading" message="正在读取孩子任务"></state-panel>
+    <state-panel wx:elif="{{error && !rows.length}}" state="error" message="{{error}}" bind:retry="retry"></state-panel>
+    <view wx:elif="{{hasChildren && !rows.length}}" class="empty-card">这段时间暂无符合条件的任务。</view>
+    <view wx:elif="{{rows.length}}" class="task-cards">
+      <view wx:for="{{rows}}" wx:key="taskId" class="task-card" data-task-id="{{item.taskId}}" bindtap="openTask" aria-role="button">
+        <view class="task-icon"><g0-icon name="{{item.iconName}}" size="{{44}}"></g0-icon></view>
+        <view class="task-main"><text class="task-title">{{item.title}}</text><text class="task-type">{{item.typeLabel}}</text><text class="task-time">{{item.dueLabel}} 截止</text><text class="task-submitted">{{item.submittedLabel}}</text><view class="task-bottom"><text wx:if="{{item.score !== null}}" class="score">{{item.scoreLabel}}</text><text wx:if="{{item.feedbackId}}" class="feedback">已点评</text><text class="status {{item.status}}">{{item.statusLabel}}</text></view></view>
+        <text class="arrow">›</text>
+      </view>
+      <view wx:if="{{error}}" class="more-error" bindtap="retry" aria-role="button">{{error}}，点击重试</view>
+      <button wx:if="{{nextCursor}}" class="more" bindtap="loadMore" disabled="{{loadingMore}}">{{loadingMore ? '加载中…' : '加载更多'}}</button>
+    </view>
+  </view>
+</view></g0-page-shell>

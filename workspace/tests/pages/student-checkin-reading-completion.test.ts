@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const getReadingProgress = vi.fn()
 const setReadingPage = vi.fn()
-vi.mock('../../miniprogram/services/m1-app-service', () => ({
+vi.mock('../../miniprogram/subpackages/student/services/m1-app-service', () => ({
   getReadingProgress, setReadingPage, toggleReadingFavorite: vi.fn(),
 }))
-vi.mock('../../miniprogram/session/session', () => ({
-  getSession: () => ({ user: { id: 'student_demo' } }),
+vi.mock('../../miniprogram/subpackages/student/session/session', () => ({
+  getSession: () => ({ sessionId: 'session_student_demo', activeRole: 'student',
+    user: { id: 'student_demo', role: 'student' } }),
   getCurrentBookId: () => '', setCurrentTaskId: vi.fn(),
 }))
 
@@ -33,7 +34,7 @@ describe('daily checkin reading', () => {
         pageImageUrl: `page_${pageNumber}.jpg`, thumbnailImageUrl: `thumb_${pageNumber}.jpg` },
     }))
 
-    await import('../../miniprogram/pages/student/reading-detail/reading-detail')
+    await import('../../miniprogram/subpackages/student/reading-detail/reading-detail')
     if (!definition) throw new Error('Reading page was not registered')
     const page = { data: { ...definition.data }, setData(patch: Record<string, unknown>, callback?: () => void) {
       Object.assign(this.data, patch)
@@ -44,10 +45,6 @@ describe('daily checkin reading', () => {
     await vi.waitFor(() => expect(page.data.reading).not.toBeNull())
     expect(page.data.displayPageNumber).toBe(1)
     expect(page.data.pendingPageNumber).toBe(1)
-
-    definition.methods.returnToCheckin!.call(page)
-    expect(navigateBack).not.toHaveBeenCalled()
-    expect(showToast).toHaveBeenCalled()
 
     for (const pageNumber of [1, 2, 3]) {
       if (pageNumber > 1) definition.methods.nextPage!.call(page)

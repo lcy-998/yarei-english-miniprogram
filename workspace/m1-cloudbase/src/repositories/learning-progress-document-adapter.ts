@@ -1,4 +1,7 @@
 import type { JsonValue } from '../shared/protocol';
+import { findHistoricalTaskLearningItem } from '../org-content/historical-task-learning';
+import { hasActivePublicLearningSource } from '../org-content/public-learning-source';
+import { hasActiveLegacyGlobalSource } from '../global-assets/legacy-global-source';
 import type { LearningProgressRepository, LearningProgressTransaction } from '../learning-progress/repository';
 import {
   LearningProgressError,
@@ -102,19 +105,30 @@ class LearningProgressDocumentReader {
     studentId?: string,
   ): Promise<LearningResourceAccessRecord | null> {
     const document = await this.documents.get(LEARNING_PROGRESS_COLLECTIONS.resources, resourceId);
-    if (!isVisible(document, organizationId)) return null;
-    const resource = decodeResource(document);
-    if (document.allowedStudentIds !== undefined || studentId === undefined) return resource;
-    const visibility = requireObject(document.visibility);
-    const visibilityType = requireEnum(visibility.type, ['organization', 'classes'] as const);
-    const classIds = visibilityType === 'classes' ? requireStringArray(visibility.classIds) : [];
-    const memberships = await this.documents.find(LEARNING_PROGRESS_COLLECTIONS.memberships, {
-      organizationId, studentId, status: 'active', deletedAt: null,
-    });
-    const authorized = memberships.some(membership => isVisible(membership, organizationId)
-      && typeof membership.classId === 'string'
-      && (visibilityType === 'organization' || classIds.includes(membership.classId)));
-    return { ...resource, allowedStudentIds: authorized ? [studentId] : [] };
+    if (isVisible(document, organizationId)
+      && await hasActivePublicLearningSource(this.documents, document)
+      && await hasActiveLegacyGlobalSource(this.documents, document)) {
+      const resource = decodeResource(document);
+      // Published ordinary learning material is readable by every signed-in student
+      // in the organization; progress itself remains scoped to the current student.
+      return studentId === undefined ? resource : { ...resource, allowedStudentIds: [studentId] };
+    }
+    if (studentId) {
+      const historical = await findHistoricalTaskLearningItem(this.documents,
+        organizationId, studentId, { resourceId });
+      const origin = historical?.payload.assetLibrary;
+      if (historical && origin && typeof origin === 'object' && !Array.isArray(origin)
+        && typeof (origin as Record<string, unknown>).sourcePublicId === 'string') {
+        const frozen: VersionedDocument = { _id: resourceId, organizationId,
+          schemaVersion: 1, version: 1, deletedAt: null,
+          type: historical.type, status: 'published',
+          contentVersion: historical.contentVersion,
+          allowedStudentIds: [studentId], payload: historical.payload };
+        return decodeResource(frozen);
+      }
+      return null;
+    }
+    return null;
   }
 
   public async findReadingProgress(

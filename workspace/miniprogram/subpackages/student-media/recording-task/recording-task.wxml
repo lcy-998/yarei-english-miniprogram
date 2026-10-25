@@ -1,0 +1,20 @@
+<g0-page-shell nature="{{true}}" natureOpacity="{{0.68}}" tone="nature">
+  <view class="recording-page">
+    <app-header title="{{teacherReview ? '录音作业验收' : teacherPreview ? '录音预览' : '课堂录音'}}" back="{{true}}" backIntercept="{{true}}" bind:back="returnToTask"></app-header>
+    <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else class="recording-content">
+      <view class="recording-hero"><text class="recording-eyebrow">课堂录音</text><text class="recording-title">{{title}}</text><text class="recording-description">{{teacherReview ? '教师只读查看 · 第 ' + teacherReviewVersion + ' 次提交' : teacherPreview ? '按学员录音页面查看任务要求；预览不使用麦克风。' : '听清要求后录制，先试听再上传。上传后返回任务详情提交整份作业。'}}</text></view>
+      <view wx:if="{{!editable}}" class="recording-notice">{{unavailableReason}}</view>
+      <view class="recording-card"><text class="recording-card-title">录音要求</text><text class="recording-prompt">{{prompt}}</text><text class="recording-help">录音需在 1 秒至 5 分钟之间，上传后由老师评分。</text></view>
+      <view class="recording-card">
+        <view class="recording-status {{state === 'recording' ? 'recording-status--active' : ''}}"><text>{{teacherReview ? (recordingId ? '学生录音已提交' : '本次提交未记录录音') : state === 'recording' ? '正在录音' : state === 'uploading' ? '正在上传并核验' : state === 'submitted' ? '录音已上传，作业未提交' : state === 'invalid' ? '录音未通过校验' : state === 'local' ? '录音已保留在本机' : '等待录音'}}</text><text>{{durationLabel}}</text></view>
+        <text wx:if="{{message}}" class="recording-notice">{{message}}</text>
+        <view class="recording-actions"><button wx:if="{{teacherPreview}}" disabled="{{true}}">开始录音</button><button wx:if="{{state === 'idle' && editable}}" class="recording-primary" bindtap="startRecording">开始录音</button><button wx:if="{{state === 'recording'}}" class="recording-stop" bindtap="stopRecording">结束录音</button><button wx:if="{{(state === 'local' || state === 'invalid') && localPath}}" bindtap="playLocal">试听本机录音</button><button wx:if="{{state === 'submitted' && mediaAvailable}}" bindtap="playSubmitted">{{teacherReview ? '试听学生录音' : '试听已上传录音'}}</button><button wx:if="{{(state === 'local' || (state === 'invalid' && uploadRetryAllowed)) && editable}}" class="recording-primary" bindtap="uploadRecording">{{state === 'invalid' ? '重试上传' : '上传录音'}}</button><button wx:if="{{(state === 'local' || state === 'invalid' || state === 'submitted') && editable}}" bindtap="redoRecording">重录</button></view>
+        <text wx:if="{{mediaExpired}}" class="recording-help">录音已过保留期，提交和点评记录仍保留。</text>
+      </view>
+      <view wx:if="{{teacherReview && recordingId}}" class="recording-card"><text class="recording-card-title">本项评分草稿</text><view class="teacher-review-score"><input type="number" maxlength="3" value="{{teacherScoreInput}}" bindinput="onTeacherReviewScore" placeholder="0—100"/><text>分</text></view><text wx:if="{{teacherScoreError}}" class="recording-notice">{{teacherScoreError}}</text><text class="recording-help">返回快速点评后核对总分并正式发布。</text></view>
+      <task-return-bar label="{{teacherReview ? '返回快速点评' : teacherPreview ? '返回内容选择' : '提交并返回任务详情'}}" bind:press="returnToTask"></task-return-bar>
+    </view>
+  </view>
+</g0-page-shell>

@@ -23,7 +23,9 @@ function database(): FakeDocumentDatabase {
       id: 'material_animals', title: '动物配音', type: 'work', contentVersion: 'demo-v1', status: 'published',
       grade: '三年级', textbook: '演示教材', unit: 'Unit 1',
       visibility: { type: 'classes', classIds: [classId] },
-      payload: { demonstrationFileId: 'cloud://demo/materials/animals.mp4', subtitle: 'Animals are here.' },
+      payload: { demonstrationFileId: 'cloud://demo/materials/animals.mp4', subtitle: 'Animals are here.',
+        subtitleTimingStatus: 'verified', durationMs: 3000,
+        subtitleCues: [{ startMs: 500, endMs: 2500, text: 'Animals are here.' }] },
     })],
   });
 }
@@ -41,6 +43,9 @@ describe('M2 autonomous work document boundary', () => {
     const documents = database();
     const works = service(documents);
     expect((await works.listMaterials(actor)).map(item => item.id)).toEqual(['material_animals']);
+    expect(await works.getMaterial(actor, 'material_animals')).toMatchObject({
+      subtitleCues: [{ startMs: 500, endMs: 2500, text: 'Animals are here.' }],
+    });
     expect(await works.listMaterialFacets(actor)).toEqual([{ grade: '三年级', textbook: '演示教材', unit: 'Unit 1' }]);
     const draft = await works.beginDraft(actor, 'material_animals', 'operation_work_document_begin');
     expect(draft).toMatchObject({ status: 'draft', version: 1, studentId });

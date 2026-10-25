@@ -3,7 +3,7 @@ import type { TrustedActorContext } from '../auth/trusted-actor';
 import type { RecordingSealPort, StudentWorkTransaction, StudentWorkUnitOfWork, WorkPlaybackPort } from './repository';
 import { StudentWorkError, type StudentWork, type WorkMaterial, type WorkMaterialFacet,
   type WorkMaterialFilters, type WorkMaterialPage, type WorkMaterialView } from './types';
-import { originalAudioExpired } from '../media-retention/policy';
+import { dubbingAudioExpired } from '../media-retention/policy';
 
 export interface WorkClock { nowIso(): string }
 export interface WorkIds { next(prefix: string): string }
@@ -24,6 +24,7 @@ function visible(material: WorkMaterial, classId: string): boolean {
 function materialView(material: WorkMaterial): WorkMaterialView {
   return { id: material.id, title: material.title, contentVersion: material.contentVersion,
     subtitle: material.subtitle,
+    ...(material.subtitleCues ? { subtitleCues: material.subtitleCues.map(cue => ({ ...cue })) } : {}),
     ...(material.grade ? { grade: material.grade } : {}),
     ...(material.textbook ? { textbook: material.textbook } : {}),
     ...(material.unit ? { unit: material.unit } : {}) };
@@ -143,7 +144,8 @@ export class StudentWorkService {
       }
       const work = await transaction.findWork(actor.organizationId, input.workId);
       if (!work || work.studentId !== actor.actorUserId || work.classId !== classId) throw new StudentWorkError('NOT_FOUND');
-      if (work.status !== 'draft' || work.version !== expectedVersion) throw new StudentWorkError('CONFLICT');
+      if (work.status !== 'draft' || work.version !== expectedVersion
+        || dubbingAudioExpired(work.createdAt, this.clock.nowIso())) throw new StudentWorkError('CONFLICT');
       const material = await transaction.findMaterial(actor.organizationId, work.materialId);
       if (!material || !visible(material, classId) || material.contentVersion !== work.materialVersion) {
         throw new StudentWorkError('RESOURCE_OFFLINE');
@@ -169,7 +171,8 @@ export class StudentWorkService {
       const current = await transaction.findWork(actor.organizationId, input.workId);
       if (!current || current.studentId !== actor.actorUserId || current.classId !== classId
         || current.status !== 'draft' || current.version !== expectedVersion
-        || current.stagingPath !== prepared.work.stagingPath) throw new StudentWorkError('CONFLICT');
+        || current.stagingPath !== prepared.work.stagingPath
+        || dubbingAudioExpired(current.createdAt, this.clock.nowIso())) throw new StudentWorkError('CONFLICT');
       const material = await transaction.findMaterial(actor.organizationId, current.materialId);
       if (!material || !visible(material, classId) || material.contentVersion !== current.materialVersion) {
         throw new StudentWorkError('RESOURCE_OFFLINE');
@@ -219,8 +222,10 @@ export class StudentWorkService {
     return this.repository.transaction(async transaction => {
       await this.classId(transaction, actor);
       return (await transaction.listStudentWorks(actor.organizationId, actor.actorUserId))
+        .filter(work => work.status !== 'draft'
+          || !dubbingAudioExpired(work.createdAt, this.clock.nowIso()))
         .map(work => ({ ...work, mediaExpired: Boolean(work.mediaDeletedAt)
-          || originalAudioExpired(work.submittedAt, this.clock.nowIso()) }));
+          || dubbingAudioExpired(work.submittedAt, this.clock.nowIso()) }));
     });
   }
 
@@ -233,7 +238,7 @@ export class StudentWorkService {
       const work = await transaction.findWork(actor.organizationId, workId);
       if (!work || work.studentId !== actor.actorUserId || work.classId !== classId
         || work.status !== 'submitted' || !work.fileId || !work.contentSha256
-        || work.mediaDeletedAt || originalAudioExpired(work.submittedAt, this.clock.nowIso())) {
+        || work.mediaDeletedAt || dubbingAudioExpired(work.submittedAt, this.clock.nowIso())) {
         throw new StudentWorkError('NOT_FOUND');
       }
       return work.fileId;

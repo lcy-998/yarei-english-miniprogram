@@ -1,0 +1,41 @@
+<view class="page page--secondary">
+  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="孩子任务" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadTask"></state-panel>
+  <view wx:elif="{{detail}}" class="content">
+    <view class="card">
+      <text class="title">{{detail.task.title}}</text><text class="meta">{{statusLabel}}</text>
+      <text class="line">任务要求：{{detail.task.description}}</text>
+      <text class="line">提交记录：{{detail.submission ? '已提交' : '暂未提交'}}</text>
+      <text wx:if="{{detail.automaticScore !== null && detail.automaticScore !== undefined}}" class="line">系统自动分：{{detail.automaticScore}} 分</text>
+      <text wx:if="{{detail.submissionHistory && detail.submissionHistory.length > 1}}" class="line">历史提交：{{detail.submissionHistory.length}} 个版本，可在老师反馈中逐版查看。</text>
+      <view wx:for="{{evidenceRows}}" wx:key="key" class="line"><text>{{item.title}}：{{item.summary}}</text><text wx:if="{{item.note}}">　{{item.note}}</text><view wx:for="{{item.questions}}" wx:for-item="question" wx:key="key" class="line"><text>{{question.stem}}</text><text>　原答：{{question.response}}　{{question.result}}</text><button wx:if="{{item.kind === 'listening' && mediaItems.length}}" class="clip-button" data-item-id="{{item.itemId}}" data-question-id="{{question.questionId}}" bindtap="openTaskMedia">试听本题音频</button></view></view>
+      <view wx:if="{{readingItems.length}}">
+        <text class="line">已正式提交的跟读记录</text>
+        <button wx:for="{{readingItems}}" wx:key="itemId" class="primary" data-item-id="{{item.itemId}}" bindtap="openPronunciation" disabled="{{pronunciationLoading}}">查看{{item.title}}跟读记录</button>
+        <text wx:if="{{pronunciationLoading}}" class="line">正在核对跟读记录…</text>
+        <text wx:if="{{pronunciationError}}" class="line">{{pronunciationError}}</text>
+        <text wx:if="{{pronunciationItemTitle && !pronunciationLoading && !pronunciationError}}" class="line">{{pronunciationItemTitle}}：{{pronunciationRows.length ? '仅展示已提交状态，试验分不计正式成绩' : '暂无可核对的跟读记录'}}</text>
+        <view wx:for="{{pronunciationRows}}" wx:key="segmentId" class="line"><text>{{item.label}}：{{item.detail}}</text><text wx:if="{{item.mediaNote}}">　{{item.mediaNote}}</text></view>
+        <text wx:if="{{missingPronunciationCount}}" class="line">另有 {{missingPronunciationCount}} 条历史引用暂无法核对，未计入结果。</text>
+      </view>
+      <view wx:if="{{recordingItems.length}}">
+        <text class="line">已正式提交的课堂录音</text>
+        <button wx:for="{{recordingItems}}" wx:key="itemId" class="primary" data-item-id="{{item.itemId}}" bindtap="openRecording" disabled="{{recordingLoading}}">{{recordingPlayingItemId === item.itemId ? '停止试听' : '试听' + item.title}}</button>
+        <text wx:if="{{recordingLoading}}" class="line">正在核对当前绑定与提交版本…</text>
+        <text wx:if="{{recordingMessage}}" class="line">{{recordingMessage}}</text>
+      </view>
+      <view wx:if="{{mediaItems.length}}">
+        <text class="line">已正式提交的媒体任务</text>
+        <button wx:for="{{mediaItems}}" wx:key="itemId" class="primary" data-item-id="{{item.itemId}}" bindtap="openTaskMedia" disabled="{{mediaLoading}}">{{mediaPlayingItemId === item.itemId ? '停止回看' : (item.kind === 'dubbing' ? '试听' : '回看') + item.title}}</button>
+        <text wx:if="{{mediaLoading}}" class="line">正在核对当前绑定与提交版本…</text>
+        <text wx:if="{{mediaMessage}}" class="line">{{mediaMessage}}</text>
+        <video wx:if="{{mediaVideoUrl}}" id="parent-task-video" src="{{mediaVideoUrl}}" controls binderror="onTaskVideoError" bindended="onTaskVideoEnded"></video>
+      </view>
+      <text class="line">录音原件自正式提交起保留 180 天；到期后无法试听，提交、评分和点评记录仍保留。</text>
+    </view>
+    <button wx:if="{{hasFeedbackHistory}}" class="primary" bindtap="openFeedback">查看老师反馈</button>
+    <view wx:else class="waiting">老师尚未发布反馈，家长端仅可查看。</view>
+  </view>
+</view>

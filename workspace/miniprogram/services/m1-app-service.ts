@@ -14,7 +14,7 @@ export function createM1AppService(repository: M1AppRepository): M1AppService {
     getWordPractice: (userId) => repository.getWordPractice(userId),
     listReadingBooks: (userId, category, onlyFavorites) => repository.listReadingBooks(userId, category, onlyFavorites),
     toggleReadingFavorite: (userId, bookId) => repository.toggleReadingFavorite(userId, bookId),
-    getReadingProgress: (userId, bookId) => repository.getReadingProgress(userId, bookId),
+    getReadingProgress: (userId, bookId, task) => repository.getReadingProgress(userId, bookId, task),
     setReadingPage: (userId, bookId, pageNumber) => repository.setReadingPage(userId, bookId, pageNumber),
     listChildren: (parentId) => repository.listChildren(parentId),
     bindChild: (parentId, operationId, studentNumber, bindingCode) => repository.bindChild(parentId, operationId, studentNumber, bindingCode),
@@ -49,7 +49,8 @@ export const resetPassword = (mobile: string, code: string, password: string, co
 export const getWordPractice = (userId: string) => activeService.getWordPractice(userId)
 export const listReadingBooks = (userId: string, category?: ReadingCategory, onlyFavorites = false) => activeService.listReadingBooks(userId, category, onlyFavorites)
 export const toggleReadingFavorite = (userId: string, bookId: string) => activeService.toggleReadingFavorite(userId, bookId)
-export const getReadingProgress = (userId: string, bookId: string) => activeService.getReadingProgress(userId, bookId)
+export const getReadingProgress = (userId: string, bookId: string,
+  task?: Readonly<{ taskId: string; itemId: string }>) => activeService.getReadingProgress(userId, bookId, task)
 export const setReadingPage = (userId: string, bookId: string, pageNumber: number) => activeService.setReadingPage(userId, bookId, pageNumber)
 export const listChildren = (parentId: string) => activeService.listChildren(parentId)
 export const bindChild = (parentId: string, operationId: string, studentNumber: string, bindingCode: string) => activeService.bindChild(parentId, operationId, studentNumber, bindingCode)

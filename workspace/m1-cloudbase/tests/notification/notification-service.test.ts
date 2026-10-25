@@ -123,6 +123,23 @@ describe('MSG-001 station inbox', () => {
       .toEqual(['activity_published']);
   });
 
+  it('拒绝缺少孩子归属或跨角色目标的站内通知深链', async () => {
+    const { database, service } = fixture();
+    const parentDueId = `notice_${hashHex(JSON.stringify([org, 'parent', parentId, 'task_due',
+      'task_1:student_xiaoyu_demo:2026-09-26T12:00:00.000Z']))}`;
+    const malformed = document(parentDueId, { recipientUserId: parentId, recipientRole: 'parent',
+      sourceStudentId: studentId, kind: 'task_due', title: '孩子任务即将截止', summary: '动物主题听说练习',
+      occurredAt: '2026-09-26T01:00:00.000Z', target: { kind: 'parent_task', id: 'task_1' } });
+    await database.runTransaction(tx => tx.create('notification_events', malformed));
+    expect((await service.list(parent, 'task', 0, 20)).items.map(item => item.id)).not.toContain(parentDueId);
+    await expect(service.markRead(parent, parentDueId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const current = (await database.get('notification_events', parentDueId))!;
+    await database.runTransaction(tx => tx.replace('notification_events', parentDueId, current.version,
+      { ...current, version: current.version + 1,
+        target: { kind: 'parent_task', id: 'task_1', childId: studentId } }));
+    expect((await service.list(parent, 'task', 0, 20)).items.map(item => item.id)).toContain(parentDueId);
+  });
+
   it('keeps the publication notice visible while a closed activity remains readable', async () => {
     const { database, service } = fixture();
     const stored = (await database.get('checkin_activities', 'activity_1'))!;

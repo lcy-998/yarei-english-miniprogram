@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>雅睿英语 · 原生管理工作区审批图集</title>
+<style>
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#eaf4ff;color:#102c64;font-family:"Microsoft YaHei","PingFang SC",sans-serif}header{padding:32px 5vw;background:linear-gradient(130deg,#2e9bf8,#155fcd);color:#fff}h1{margin:0 0 10px;font-size:28px}header p{max-width:880px;line-height:1.6;margin:0}nav{position:sticky;top:0;z-index:5;padding:13px 5vw;background:#fffffff2;border-bottom:1px solid #d9e8fb;display:flex;gap:9px;flex-wrap:wrap}nav a{padding:7px 11px;border-radius:12px;background:#e8f3ff;color:#176cce;text-decoration:none;font-weight:700}main{padding:18px 5vw 56px}section{background:#fff;border:1px solid #d9e8fb;border-radius:20px;padding:20px;margin:20px 0;box-shadow:0 5px 20px #1c4f8511}section h2{margin:0 0 5px}section p{margin:0 0 16px;color:#536d92;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}.image-card{display:block;text-decoration:none;color:inherit}.image-card strong{display:block;margin:0 0 8px}.image-card img{display:block;width:100%;max-width:390px;height:auto;border:1px solid #d8e7f8;border-radius:14px;box-shadow:0 4px 14px #1f559c24}.note{margin-top:25px;color:#536d92;line-height:1.7}
+</style></head><body>
+<header><h1>A-01—A-08 手机视觉审批图集</h1><p>每页展示 390×844 与 375×812 的首屏和滚动末屏。点击图片可放大。以下均为静态候选稿，逐页审批前不进入正式微信原生页面样式。</p></header>
+<nav id="nav"></nav><main id="main"></main>
+<script>
+const pages=[['A-01','管理工作台'],['A-02','学校与班级'],['A-03','用户管理'],['A-04','权限管理'],['A-05','教材中心'],['A-06','学校习题库'],['A-07','任务与活动'],['A-08','音视频审核']];
+const states=[['no-access','无管理授权'],['conflict','并发版本冲突'],['media-reject','驳回原因必填'],['revoke','撤销授权确认']];
+const nav=document.getElementById('nav');const main=document.getElementById('main');
+nav.innerHTML=pages.map(([id])=>`<a href="#${id}">${id}</a>`).join('')+'<a href="#states">关键状态</a>';
+const card=(folder,id,label)=>`<a class="image-card" href="${folder}/${id}.png" target="_blank"><strong>${label}</strong><img loading="lazy" alt="${label}" src="${folder}/${id}.png"></a>`;
+main.innerHTML=pages.map(([id,name])=>`<section id="${id}"><h2>${id} ${name}</h2><p>首屏核对入口与范围；末屏核对详情、滚动内容和底部操作。</p><div class="grid">${card('png',id,'390×844 首屏')}${card('png',id+'-lower','390×844 末屏')}${card('png-375',id,'375×812 首屏')}${card('png-375',id+'-lower','375×812 末屏')}</div></section>`).join('')+`<section id="states"><h2>四张关键状态</h2><div class="grid">${states.map(([id,name])=>card('png',id,name+' · 390×844')+card('png-375',id,name+' · 375×812')).join('')}</div></section><p class="note">审批记录与功能边界见 docs/reviews/m3-native-admin-mobile-visual-review-2026-10-03.md。</p>`;
+</script></body></html>

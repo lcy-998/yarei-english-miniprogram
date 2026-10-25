@@ -7,13 +7,15 @@ export interface WorkMaterial {
   readonly visibility: Readonly<{ type: 'organization' }> | Readonly<{ type: 'classes'; classIds: readonly string[] }>;
   readonly demonstrationFileId: string;
   readonly subtitle: string;
+  readonly subtitleCues?: readonly Readonly<{ startMs: number; endMs: number; text: string;
+    translationText?: string }>[];
   readonly grade?: string;
   readonly textbook?: string;
   readonly unit?: string;
 }
 
 export type WorkMaterialView = Readonly<Pick<WorkMaterial, 'id' | 'title' | 'contentVersion' | 'subtitle'
-  | 'grade' | 'textbook' | 'unit'>>;
+  | 'subtitleCues' | 'grade' | 'textbook' | 'unit'>>;
 export type WorkMaterialFilters = Readonly<{ grade?: string; textbook?: string; unit?: string }>;
 export type WorkMaterialFacet = WorkMaterialFilters;
 export type WorkMaterialPage = Readonly<{ items: readonly WorkMaterialView[]; total: number; nextOffset: number | null }>;
@@ -43,7 +45,7 @@ export interface StudentWork {
   readonly recoveryState?: 'deleted' | 'active';
   /** Original audio was removed after its retention period; the work receipt remains. */
   readonly mediaDeletedAt?: string | null;
-  /** Derived at read time; playback ends at 180 days even if cleanup is delayed. */
+  /** Derived at read time; dubbing playback ends at 180 days even if cleanup is delayed. */
   readonly mediaExpired?: boolean;
 }
 

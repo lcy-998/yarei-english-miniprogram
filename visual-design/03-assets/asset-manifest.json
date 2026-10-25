@@ -1,7 +1,22 @@
 {
-  "version": "1.4.1",
-  "updatedAt": "2026-09-28",
+  "version": "1.4.2",
+  "updatedAt": "2026-10-06",
   "assets": [
+    {
+      "id": "listening-headphones-v1",
+      "source": "ImageGen generated on 2026-10-06 using visual-design/04-pages/current/S-09.png as style reference",
+      "workingCopy": "visual-design/03-assets/processed/listening-headphones-v1.png",
+      "production": "visual-design/03-assets/production/listening-headphones-v1.png",
+      "role": "student-listening-task-hero",
+      "productionDimensions": "1312x1199",
+      "runtimeCopy": "workspace/miniprogram/assets/g0/listening-headphones-v1.png",
+      "runtimeDimensions": "1312x1199",
+      "runtimeBytes": 788094,
+      "alpha": true,
+      "references": ["S-13"],
+      "constraints": "Single headphones illustration only; no UI, text, logo, people or task state embedded.",
+      "status": "production-ready"
+    },
     {
       "id": "brand-logo",
       "source": "asset/logo.png",

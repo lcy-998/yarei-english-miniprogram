@@ -1,0 +1,25 @@
+{
+  "deployable": false,
+  "reviewPackage": "docs/reviews/m3-vosk-cloud-only-benchmark-review-2026-10-02.md",
+  "function": {
+    "name": "pronunciation-inference",
+    "type": "Event",
+    "runtime": "Python3.11",
+    "handler": "main.main",
+    "timeout": 90,
+    "memorySize": 1024,
+    "installDependency": false,
+    "envVariables": {
+      "VOICE_INTERNAL_SECRET": "{{env.VOICE_INTERNAL_SECRET}}",
+      "VOICE_ALLOWED_MEDIA_HOST": "{{env.VOICE_ALLOWED_MEDIA_HOST}}",
+      "VOICE_MEDIA_DOWNLOAD_TIMEOUT_SEC": "30",
+      "VOICE_MODEL_PATH": "/var/task/model/vosk-model-small-en-us-0.15",
+      "VOICE_BENCHMARK_LOG": "1"
+    }
+  },
+  "securityRuleFragment": {
+    "pronunciation-inference": {
+      "invoke": false
+    }
+  }
+}

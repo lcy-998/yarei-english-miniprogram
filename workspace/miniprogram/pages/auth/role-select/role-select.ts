@@ -1,5 +1,5 @@
 import { Role } from '../../../domain/types'
-import { selectRole } from '../../../services/app-service'
+import { selectRole } from '../../../services/auth-service'
 import { defaultRoleSelection } from '../../../session/auth-flow'
 import { getSession, homePath, saveSession } from '../../../session/session'
 

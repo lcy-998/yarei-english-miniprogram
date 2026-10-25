@@ -1,5 +1,6 @@
 import type { DocumentDatabasePort, VersionedDocument } from '../repositories/document-database-port';
 import { ActivityService } from '../activity/activity-service';
+import { ActivityError } from '../activity/types';
 import { DocumentActivityRepository, projectActivity } from '../activity/document-repository';
 import type { TrustedActorContext } from '../auth/trusted-actor';
 import { eventId } from './service';
@@ -35,11 +36,6 @@ function localParts(at: string, timeZone: string): Readonly<{ date: string; hour
   const part = (name: string): string => parts.find(item => item.type === name)?.value ?? '';
   return { date: `${part('year')}-${part('month')}-${part('day')}`, hour: Number(part('hour')),
     minute: Number(part('minute')) };
-}
-function nextDay(date: string): string {
-  const day = new Date(`${date}T00:00:00.000Z`);
-  day.setUTCDate(day.getUTCDate() + 1);
-  return day.toISOString().slice(0, 10);
 }
 function previousDay(date: string): string {
   const day = new Date(`${date}T00:00:00.000Z`);
@@ -257,15 +253,16 @@ export class NotificationMaintenance {
         await this.resolveRecovery(org, activityId, now);
         return zero;
       }
-      if (local.date === nextDay(endsOn) && local.hour === 0 && local.minute <= 5) {
-        try {
-          await this.activity.finalizeActivity(org, activityId);
-          await this.resolveRecovery(org, activityId, now);
-          return { ...zero, finalized: 1 };
-        }
-        catch { return { ...zero, pending: await this.recordRecovery(org, activityId, now, 'finalization_failed') ? 1 : 0 }; }
+      try {
+        await this.activity.finalizeActivity(org, activityId);
+        await this.resolveRecovery(org, activityId, now);
+        return { ...zero, finalized: 1 };
       }
-      return { ...zero, pending: await this.recordRecovery(org, activityId, now, 'window_missed') ? 1 : 0 };
+      catch (error: unknown) {
+        const reason = error instanceof ActivityError && error.code === 'ACTIVITY_PENDING_REVIEW'
+          ? 'pending_review' : 'finalization_failed';
+        return { ...zero, pending: await this.recordRecovery(org, activityId, now, reason) ? 1 : 0 };
+      }
     }
     if (entity.status !== 'published' || local.date < startsOn || restDates.includes(local.date)
       || local.hour < 20) return zero;

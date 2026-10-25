@@ -9,16 +9,17 @@ afterEach(() => configureRepositories({ mode: 'memory' }))
 describe('T-15 school question service boundary', () => {
   it('lists searchable read-only summaries and keeps answers in authorized detail', async () => {
     configureRepositories({ mode: 'memory' })
-    const page = await listSchoolQuestions('usr_teacher_lin', { grade: '三年级', unit: 'Unit 3', keyword: 'animal' }, 1, 0)
-    expect(page).toMatchObject({ ok: true, data: { items: [{ id: 'res_exercise_bird_demo' }], nextOffset: null } })
+    const page = await listSchoolQuestions('usr_teacher_lin', { grade: '三年级', unit: 'Garden Week', keyword: 'garden' }, 1, 0)
+    expect(page).toMatchObject({ ok: true, data: { items: [{ id: 'res_exercise_garden_q1' }], nextOffset: 1 } })
     expect(JSON.stringify(page)).not.toContain('correctAnswer')
     expect(JSON.stringify(page)).not.toContain('Birds can fly.')
     expect(await listSchoolQuestionFacets('usr_teacher_lin')).toMatchObject({ ok: true, data: [
-      { grade: '三年级', unit: 'Unit 3', questionType: 'single_choice' },
-      { grade: '三年级', unit: 'Unit 3', questionType: 'fill' },
+      { grade: '三年级', unit: 'Garden Week', questionType: 'single_choice' },
+      { grade: '三年级', unit: 'Garden Week', questionType: 'fill' },
+      { grade: '三年级', unit: 'Garden Week', questionType: 'multiple_choice' },
     ] })
-    expect(await getSchoolQuestion('usr_teacher_lin', 'res_exercise_bird_demo')).toMatchObject({ ok: true, data: { correctAnswer: 'A. bird' } })
-    expect(await getSchoolQuestion('usr_parent_xiaoyu', 'res_exercise_bird_demo')).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+    expect(await getSchoolQuestion('usr_teacher_lin', 'res_exercise_garden_q1')).toMatchObject({ ok: true, data: { correctAnswer: 'Four' } })
+    expect(await getSchoolQuestion('usr_parent_xiaoyu', 'res_exercise_garden_q1')).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
     expect(await listSchoolQuestions('usr_teacher_lin', { targetClassIds: ['cls_other'] }, 20, 0)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
   })
 

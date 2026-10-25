@@ -15,7 +15,7 @@ export interface TaskRecordingUnitOfWork {
 export interface TaskRecordingSealPort {
   inspectAndSeal(input: Readonly<{ stagingFileId: string; stagingPath: string;
     organizationId: string; studentId: string; recordingId: string }>): Promise<Readonly<{
-      fileId: string; contentSha256: string; sizeBytes: number; durationMs: number; codec: 'mp3' }>>;
+      fileId: string; contentSha256: string; sizeBytes: number; durationMs: number; codec: 'mp3' | 'aac' }>>;
 }
 export interface TaskRecordingPlaybackPort { temporaryUrl(fileId: string): Promise<string> }
 export interface TaskRecordingAccessAuditPort {

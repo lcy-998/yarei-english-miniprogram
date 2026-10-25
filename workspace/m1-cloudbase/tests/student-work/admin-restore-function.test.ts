@@ -27,13 +27,13 @@ function entry(current = actor) {
   return { main, studentWorks };
 }
 
-describe('A-03 organization-admin recovery contract', () => {
-  it('dispatches only exact list and versioned restore payloads', async () => {
+describe('retired A-03 organization-admin recovery contract', () => {
+  it('rejects deleted-work listing and restore even for historical privileged sessions', async () => {
     const { main, studentWorks } = entry();
     const list = { apiVersion: 'm1.v1' as const, action: 'listDeletedWorkDrafts' as const,
       payload: { studentId: 'student_demo', page: { limit: 20, offset: 0 } } };
-    expect(await main(list)).toMatchObject({ ok: true, data: { items: [{ id: 'work_demo' }] } });
-    expect(studentWorks.listDeletedDrafts).toHaveBeenCalledWith(actor, 'student_demo', { limit: 20, offset: 0 });
+    expect(await main(list)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(studentWorks.listDeletedDrafts).not.toHaveBeenCalled();
     expect(await main({ ...list, operationId: 'operation_illegal_query' }))
       .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await main({ ...list, payload: { ...list.payload, organizationId: 'org_other' } }))
@@ -41,9 +41,8 @@ describe('A-03 organization-admin recovery contract', () => {
     const restore = { apiVersion: 'm1.v1' as const, action: 'restoreWorkDraft' as const,
       payload: { studentId: 'student_demo', workId: 'work_demo', reason: '核对误删记录' },
       expectedVersion: 2, operationId: 'operation_restore_function_1' };
-    expect(await main(restore)).toMatchObject({ ok: true, data: { id: 'work_demo', version: 3 } });
-    expect(studentWorks.restoreDraft).toHaveBeenCalledWith(actor, { action: 'restoreWorkDraft',
-      ...restore.payload, expectedVersion: 2, operationId: restore.operationId });
+    expect(await main(restore)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(studentWorks.restoreDraft).not.toHaveBeenCalled();
     expect(await main({ ...restore, payload: { ...restore.payload, stagingFileId: 'cloud://forged.mp3' } }))
       .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await main({ ...restore, expectedVersion: 0 }))

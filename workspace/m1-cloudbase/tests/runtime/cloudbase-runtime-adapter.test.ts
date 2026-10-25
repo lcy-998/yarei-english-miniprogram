@@ -101,6 +101,23 @@ describe('CloudBase runtime adapter', () => {
     }
   });
 
+  it('allows mini-program teachers and admin-console administrators only for native grant management', async () => {
+    const runtime = createCloudBaseRuntimeAdapter({ functionName: 'native-admin-command',
+      sdk: sdkContext({ UID: 'actor_demo' }),
+      businessSession: { getBusinessSessionId: (token, audience) => {
+        if (token === 'teacher-token' && audience === 'mini-program') return 'ses_teacher_demo';
+        if (token === 'admin-token' && audience === 'admin-console') return 'ses_admin_demo';
+        return null;
+      } } });
+    await expect(runtime.getBusinessSessionId({ businessSessionToken: 'teacher-token' }))
+      .resolves.toBe('ses_teacher_demo');
+    await expect(runtime.getBusinessSessionId({ businessSessionToken: 'admin-token' }))
+      .resolves.toBe('ses_admin_demo');
+    await expect(runtime.getBusinessSessionId({ businessSessionToken: 'wrong-audience-token' }))
+      .resolves.toBeNull();
+  });
+
+
   it('assembles trusted runtime, actor resolver and document port without an envId or SDK import', async () => {
     const nativeDatabase = new NativeDatabaseDouble();
     const identities = new InMemoryIdentityRepository({

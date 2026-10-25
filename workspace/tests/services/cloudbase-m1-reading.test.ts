@@ -14,6 +14,34 @@ const readingResource = {
 }
 
 describe('CloudBase M1 reading repository', () => {
+  it('opens a frozen task page through task and item IDs when the current source is offline', async () => {
+    const calls: M1FunctionRequest[] = []
+    const frozen = { ...readingResource, id: 'public_reading_projection',
+      title: 'Old frozen page', contentVersion: '1.1',
+      chapters: [{ ...readingResource.chapters[0], pages: [{
+        ...readingResource.chapters[0]!.pages[0]!,
+        imageAssetKey: 'https://example.invalid/old-page.jpg',
+        thumbnailAssetKey: 'https://example.invalid/old-thumb.jpg',
+      }] }] }
+    const repository = createCloudBaseM1AppRepository({ invoker: {
+      async invoke(_functionName, request) {
+        calls.push(request)
+        if (request.action === 'getHistoricalTaskLearning') return { ok: true,
+          data: { taskId: 'task_one', itemId: 'item_one',
+            resourceId: frozen.id, contentVersion: '1.1', reading: frozen }, meta }
+        if (request.action === 'getReadingProgress') return { ok: true, data: null, meta }
+        throw new Error(`Unexpected ${request.action}`)
+      },
+    } })
+    expect(await repository.getReadingProgress('student_two', frozen.id,
+      { taskId: 'task_one', itemId: 'item_one' })).toMatchObject({
+      ok: true, data: { book: { title: 'Old frozen page' },
+        pageImageUrl: 'https://example.invalid/old-page.jpg' },
+    })
+    expect(calls[0]).toEqual({ apiVersion: 'm1.v1', action: 'getHistoricalTaskLearning',
+      payload: { taskId: 'task_one', itemId: 'item_one' } })
+    expect(JSON.stringify(calls[0])).not.toContain(frozen.id)
+  })
   it('keeps real categories, favorite state, and saved progress in the reading list', async () => {
     const resources = [readingResource, { ...readingResource, id: 'res_original', category: 'original', title: 'Nature Walk' }]
     const repository = createCloudBaseM1AppRepository({ invoker: { async invoke(_functionName, request) {
@@ -40,9 +68,9 @@ describe('CloudBase M1 reading repository', () => {
       throw new Error(`Unexpected ${request.action}`)
     } } })
     const first = await repository.getReadingProgress('student', resource.id)
-    expect(first).toMatchObject({ ok: true, data: { pageNumber: 1, pageImageUrl: '/assets/content/demo-zoo-picture-book-cover-v1.jpg' } })
+    expect(first).toMatchObject({ ok: true, data: { pageNumber: 1, pageImageUrl: '/subpackages/student/assets/content/demo-zoo-picture-book-cover-v1.jpg' } })
     const second = await repository.setReadingPage('student', resource.id, 2)
-    expect(second).toMatchObject({ ok: true, data: { pageNumber: 2, pageImageUrl: '/assets/content/demo-zoo-page-02-v1.jpg' } })
+    expect(second).toMatchObject({ ok: true, data: { pageNumber: 2, pageImageUrl: '/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg' } })
   })
 
   it('maps the deployed vocabulary word shape into three selectable meanings', async () => {
@@ -65,7 +93,8 @@ describe('CloudBase M1 reading repository', () => {
 
     await expect(repository.getWordPractice('forged_student')).resolves.toMatchObject({
       ok: true,
-      data: { syllables: 'an-i-mal', correctOption: '动物', options: ['动物', '动物园', '雨天'] },
+      data: { syllables: 'an-i-mal', syllableParts: ['an', 'i', 'mal'],
+        correctOption: '动物', options: ['动物', '动物园', '雨天'] },
     })
   })
 
@@ -89,7 +118,7 @@ describe('CloudBase M1 reading repository', () => {
     })
 
     expect(await repository.getReadingProgress('forged_student_id', readingResource.id)).toMatchObject({
-      ok: true, data: { pageNumber: 1, pageImageUrl: '/assets/content/demo-zoo-page-02-v1.jpg', book: { favorite: false } },
+      ok: true, data: { pageNumber: 1, pageImageUrl: '/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg', book: { favorite: false } },
     })
     expect(await repository.setReadingPage('forged_student_id', readingResource.id, 1)).toMatchObject({ ok: true, data: { pageNumber: 1 } })
     expect(await repository.toggleReadingFavorite('forged_student_id', readingResource.id)).toMatchObject({ ok: true, data: { favorite: true } })

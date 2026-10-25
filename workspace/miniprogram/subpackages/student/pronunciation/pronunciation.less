@@ -1,0 +1,36 @@
+@import "../../../styles/m1-pages.less";
+
+.pronunciation-page { padding-bottom: 28px; }
+.pronunciation-content { display: flex; flex-direction: column; gap: 16px; padding: 0 16px 24px; }
+.pronunciation-content .m1-card { display: flex; flex-direction: column; gap: 14px; }
+.pronunciation-heading { display: block; color: @yr-text-primary; font-size: 19px; font-weight: 900; }
+.pronunciation-text { display: block; padding: 18px; border-radius: 18px; background: @yr-surface-blue; color: @yr-text-primary; font-size: 23px; font-weight: 800; line-height: 1.5; overflow-wrap: anywhere; }
+.pronunciation-muted { display: block; color: @yr-text-secondary; font-size: 13px; line-height: 1.6; }
+.pronunciation-duration { display: block; padding: 13px 16px; border-radius: 16px; background: @yr-surface-purple; color: @yr-accent-purple; font-size: 17px; font-weight: 800; }
+.pronunciation-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.pronunciation-actions button { flex: 1 1 140px; }
+.pronunciation-page button { min-height: 46px; margin: 0; border-radius: 22px; font-size: 15px; font-weight: 800; }
+.pronunciation-page button::after { border: 0; }
+.pronunciation-primary { background: @yr-brand-primary; color: #fff; }
+.pronunciation-stop { background: @yr-danger; color: #fff; }
+.pronunciation-secondary { border: 1px solid @yr-brand-primary; background: @yr-surface-blue; color: @yr-brand-primary; }
+.pronunciation-page button[disabled] { opacity: .55; }
+.pronunciation-error { display: block; color: @yr-danger; font-size: 13px; line-height: 1.5; }
+.pronunciation-status { color: @yr-text-primary; font-size: 17px; font-weight: 800; }
+.pronunciation-scores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pronunciation-scores > view { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 16px; background: @yr-surface-blue; color: @yr-text-primary; font-weight: 800; }
+.pronunciation-scores > view text:last-child { color: @yr-brand-primary; font-size: 23px; }
+.pronunciation-scores .pronunciation-total { grid-column: 1 / -1; background: @yr-surface-purple; }
+.pronunciation-scores .pronunciation-total text:last-child { color: @yr-accent-purple; font-size: 32px; }
+.pronunciation-history-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid @yr-border-subtle; color: @yr-text-primary; font-size: 13px; }
+.pronunciation-history-row:last-child { border-bottom: 0; }
+.pronunciation-history-row view { display: flex; flex-direction: column; gap: 3px; }
+.pronunciation-history-row view text:last-child { color: @yr-text-secondary; font-size: 12px; }
+.pronunciation-history-row button { flex: none; min-height: 36px; padding: 0 10px; border: 1px solid @yr-brand-primary; background: @yr-surface-blue; color: @yr-brand-primary; font-size: 12px; }
+.pronunciation-finish { width: 100%; }
+
+@media (orientation: landscape) {
+  .pronunciation-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .pronunciation-history { grid-column: 1 / -1; }
+  .pronunciation-finish { grid-column: 1 / -1; }
+}

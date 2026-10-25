@@ -20,6 +20,11 @@ export interface ActivityEntity {
   readonly updatedAt: string;
   readonly publishedAt: string | null;
   readonly closedAt: string | null;
+  readonly visibility?: 'visible' | 'recycled';
+  readonly recycledAt?: string | null;
+  readonly recycledBy?: string | null;
+  readonly recycleReason?: string | null;
+  readonly recoverableUntil?: string | null;
 }
 
 export interface ActivityRestDayChange {
@@ -60,6 +65,42 @@ export interface ActivityDayView {
   readonly supplemented: boolean;
   /** Present for a live day with verifiable evidence; historical snapshots only retain the aggregate. */
   readonly conditionProgress?: readonly ActivityConditionProgress[];
+}
+
+export interface VerifiedActivityDayEvent {
+  readonly activityId: string;
+  readonly activityTitle: string;
+  readonly classId: string;
+  readonly studentId: string;
+  readonly date: string;
+  readonly supplemented: boolean;
+}
+
+export interface VerifiedActivityDayPage {
+  readonly evidenceStatus: 'available' | 'partial';
+  readonly events: readonly VerifiedActivityDayEvent[];
+}
+
+export interface TeacherActivityProgressView {
+  readonly activityId: string;
+  readonly date: string;
+  readonly schoolToday: string;
+  readonly restDay: boolean;
+  readonly evidenceStatus: 'available' | 'not_available';
+  readonly completedCount: number | null;
+  readonly participantCount: number;
+  readonly updatedAt: string;
+  readonly rows: readonly Readonly<{
+    studentId: string;
+    displayNameMasked: string;
+    complete: boolean | null;
+    supplemented: boolean;
+    completedDays: number;
+    consecutiveDays: number;
+    missingConditions: readonly DailyCondition['kind'][];
+    evidenceDetailAvailable: boolean;
+  }>[];
+  readonly nextOffset: number | null;
 }
 
 export interface ActivityConditionProgress {
@@ -123,6 +164,9 @@ export interface ActivityFinalSnapshot {
   readonly leaderboard: ActivityLeaderboard;
   readonly completedDatesByStudent: Readonly<Record<string, readonly string[]>>;
   readonly supplementedDatesByStudent: Readonly<Record<string, readonly string[]>>;
+  /** Added in M3; older locked boards legitimately lack per-condition detail. */
+  readonly conditionDetailComplete?: true;
+  readonly conditionStatusByStudentDay?: Readonly<Record<string, readonly boolean[]>>;
 }
 
 export interface ActivityExerciseSource {
@@ -130,6 +174,16 @@ export interface ActivityExerciseSource {
   readonly assignment: TaskAssignmentRecord;
   readonly submission: SubmissionRecord;
   readonly feedback: ReviewFeedbackRecord | null;
+}
+
+/** A published classroom task that a participant can still submit for one daily exercise condition. */
+export interface ActivityExerciseOpportunity {
+  readonly taskId: string;
+  readonly resourceVersion: string;
+  readonly startsAt: string;
+  readonly dueAt: string;
+  readonly lateDays: number;
+  readonly studentIds: readonly string[];
 }
 
 export interface ActivityDraftInput {
@@ -146,13 +200,13 @@ export interface ActivityDraftInput {
 export interface ActivityOperationReceipt {
   readonly organizationId: string;
   readonly actorUserId: string;
-  readonly action: 'saveDraft' | 'publish' | 'addFutureRestDay';
+  readonly action: 'saveDraft' | 'publish' | 'addFutureRestDay' | 'close' | 'deleteDraft' | 'recycle';
   readonly operationId: string;
   readonly fingerprint: string;
   readonly result: ActivityEntity;
 }
 
-export type ActivityErrorCode = 'VALIDATION_ERROR' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'SERVICE_UNAVAILABLE';
+export type ActivityErrorCode = 'VALIDATION_ERROR' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'ACTIVITY_PENDING_REVIEW' | 'SERVICE_UNAVAILABLE';
 
 export class ActivityError extends Error {
   public constructor(public readonly code: ActivityErrorCode) {

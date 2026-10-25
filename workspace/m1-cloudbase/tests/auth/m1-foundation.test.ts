@@ -80,6 +80,31 @@ describe('M1 身份、授权和虚构种子基础', () => {
     expect(await resolver.resolve({ subject: 'teacher-subject', loginType: 'USERNAME', isAuthenticated: true }, 'task-query', null)).toBeNull();
   });
 
+  it('uses the separate admin-console audience only to bootstrap native teacher grants', async () => {
+    const adminFixture: AuthorizationFixture = {
+      ...fixture,
+      users: [...fixture.users, { _id: 'usr_admin', organizationId: 'org_demo',
+        authorizationVersion: 1, displayName: '测试管理员', displayNameMasked: '测试管理员',
+        status: 'active', version: 1, deletedAt: null }],
+      identities: [...fixture.identities, { _id: 'aid_admin', organizationId: 'org_demo',
+        userId: 'usr_admin', provider: 'cloudbase_uid', providerSubjectDigest: 'digest_admin-subject',
+        status: 'active', version: 1, deletedAt: null }],
+      roles: [...fixture.roles, { _id: 'role_admin', organizationId: 'org_demo', userId: 'usr_admin',
+        role: 'admin', status: 'active', permissions: ['authorization.manage', 'organization.read'],
+        scopeIds: ['org_demo'], version: 1, deletedAt: null }],
+    };
+    const identities = new InMemoryIdentityRepository(adminFixture);
+    const sessions = new InMemoryBusinessSessionRepository();
+    await sessions.startOrResume({ id: 'ses_admin_console', organizationId: 'org_demo',
+      userId: 'usr_admin', subjectDigest: 'digest_admin-subject', role: 'admin', authzVersion: 1,
+      recordVersion: 1, audience: 'admin-console', expiresAt: '2026-09-15T12:00:00.000Z', revokedAt: null }, now);
+    const resolver = new RepositoryTrustedActorResolver(identities, sessions, subjectDigest, clock, ids);
+    const identity = { subject: 'admin-subject', loginType: 'USERNAME' as const, isAuthenticated: true };
+    expect(await resolver.resolve(identity, 'native-admin-command', 'ses_admin_console'))
+      .toMatchObject({ actorUserId: 'usr_admin', actorRole: 'admin', permissions: ['authorization.manage', 'organization.read'] });
+    expect(await resolver.resolve(identity, 'native-admin-query', 'ses_admin_console')).toBeNull();
+  });
+
   it('同一幂等键只执行一次，不同请求摘要返回冲突', async () => {
     const records = new InMemoryIdempotencyRepository();
     const service = new IdempotencyService(records, clock, ids);

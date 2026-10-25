@@ -6,7 +6,9 @@ import type {
   SubmissionRecord,
   TaskAssignmentRecord,
   TaskRecord,
+  LearningResourceType,
 } from '../task-core/types';
+import type { StudentTaskMediaSnapshotView } from '../task-media/student-projection';
 
 export interface QueryTeacherGrantRecord {
   readonly id: string;
@@ -22,7 +24,7 @@ export interface QueryResourceOptionRecord {
   readonly id: string;
   readonly organizationId: string;
   readonly title: string;
-  readonly type: 'reading' | 'vocabulary' | 'exercise' | 'recording';
+  readonly type: LearningResourceType;
   readonly status: 'draft' | 'published' | 'offline';
   readonly allowedClassIds: readonly string[];
 }
@@ -62,6 +64,13 @@ export interface CompletionFilters {
 export interface StudentTaskFilters {
   readonly status?: AssignmentStatus;
   readonly keyword?: string;
+}
+
+export interface ParentTaskFilters extends StudentTaskFilters {
+  readonly statusGroup?: 'active' | 'awaiting_review' | 'completed';
+  /** Inclusive school-local due dates. */
+  readonly startsOn?: string;
+  readonly endsOn?: string;
 }
 
 export interface ReviewTaskFilters {
@@ -173,8 +182,10 @@ export interface StudentHomeView {
 }
 
 export interface ParentTaskListItem extends StudentTaskListItem {
+  readonly contentTypes: readonly string[];
   readonly feedbackId: string | null;
   readonly feedbackPublishedAt: string | null;
+  readonly score: number | null;
 }
 
 export interface ParentChildListItem {
@@ -200,11 +211,16 @@ export interface ParentHomeView {
   }>;
   readonly pendingTaskCount: number;
   readonly completedTaskCount: number;
+  readonly weeklyAssignedCount: number;
+  readonly weeklyCompletedCount: number;
+  readonly overdueTaskCount: number;
   readonly recentTasks: readonly ParentTaskListItem[];
   readonly recentFeedback: readonly Readonly<{
     feedbackId: string;
     taskId: string;
     taskTitle: string;
+    teacherName: string;
+    textComment: string | null;
     decision: ReviewFeedbackRecord['decision'];
     score: number | null;
     publishedAt: string;
@@ -228,6 +244,7 @@ export interface FeedbackDetailView {
     textComment: string | null;
     returnReason: string | null;
     publishedAt: string;
+    voiceComment?: Readonly<{ available: boolean; durationMs: number | null }>;
   }>;
 }
 
@@ -292,6 +309,8 @@ export interface ReviewSubmissionView {
     teacherScoreRequired: boolean; complete: boolean }>[];
   readonly readingPages: readonly Readonly<{ itemId: string; pageId: string; pageNumber: number; chapterTitle: string;
     imageAssetKey: string; thumbnailAssetKey: string }>[];
+  readonly readingPronunciationSegments: readonly Readonly<{ itemId: string; segmentId: string;
+    text: string; pageNumber?: number }>[];
   readonly answers: readonly SubmissionAnswer[];
   readonly automaticScore: number | null;
   readonly exerciseEvidence: readonly Readonly<{
@@ -300,6 +319,9 @@ export interface ReviewSubmissionView {
     questionType: 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
     stem: string;
     options: readonly string[];
+    exerciseSection?: Readonly<{ id: string; title: string; instruction: string;
+      studentMaterial: string; order: number; questionOrder: number; points: number }>;
+    rubric?: readonly Readonly<{ criterion: string; points: number }>[];
     studentResponse: JsonValue | null;
     correctAnswer: JsonValue;
     explanation: string;
@@ -330,6 +352,30 @@ export interface ReviewSubmissionView {
     overrideReason?: string | null;
     itemScores?: readonly Readonly<{ itemId: string; score: number }>[];
   }> | null;
+}
+
+/** T-08 reads one frozen media item from one authorized formal submission. */
+export interface TaskMediaReviewEvidenceView {
+  readonly taskId: string;
+  readonly assignmentId: string;
+  readonly submissionId: string;
+  readonly submissionVersion: number;
+  readonly itemId: string;
+  readonly title: string;
+  readonly kind: 'listening' | 'video' | 'dubbing';
+  readonly mediaVersion: number;
+  readonly durationMs: number;
+  readonly sourcePlayback: Readonly<{ available: boolean; temporaryUrl: string | null; expiresAt: string | null }>;
+  readonly questions: readonly Readonly<{ questionId: string; questionType: string; stem: string;
+    options: readonly string[]; studentResponse: JsonValue | null; correctAnswer: JsonValue | null;
+    explanation: string; isCorrect: boolean | null; recorded: boolean;
+    clip: Readonly<{ segmentId: string; startMs: number; endMs: number }> | null }> [];
+  readonly verifiedPlayedSegmentIds: readonly string[];
+  readonly verifiedRanges: readonly Readonly<{ startMs: number; endMs: number }>[];
+  readonly subtitleCues: readonly Readonly<{ startMs: number; endMs: number; text: string;
+    translationText?: string }>[];
+  readonly finalWork: Readonly<{ available: boolean; durationMs: number | null;
+    temporaryUrl: string | null; expiresAt: string | null }> | null;
 }
 
 export interface BatchReviewPreview {
@@ -377,12 +423,16 @@ export interface SafeTaskItemView {
   readonly vocabularyWordIds?: readonly string[];
   readonly vocabularyPack?: Readonly<{ id: string; title: string; grade: string; textbook?: string;
     unit: string; contentVersion: string; words: readonly Readonly<{ id: string; word: string; meaning: string;
-      syllables: readonly string[]; example?: string }>[] }>;
+      syllables: readonly string[]; example?: string; ipa?: string }>[] }>;
   readonly exerciseQuestion?: Readonly<{
     questionId: string;
+    exercisePackId?: string;
     questionType: 'single_choice' | 'multiple_choice' | 'fill' | 'subjective';
     stem: string;
     options: readonly string[];
+    exerciseSection?: Readonly<{ id: string; title: string; instruction: string;
+      studentMaterial: string; order: number; questionOrder: number; points: number }>;
   }>;
+  readonly mediaSnapshot?: StudentTaskMediaSnapshotView;
   readonly order: number;
 }

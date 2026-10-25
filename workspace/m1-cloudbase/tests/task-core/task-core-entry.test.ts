@@ -65,6 +65,20 @@ const saveTaskRequest = {
 } as const;
 
 describe('M1 task-core 可注入函数入口', () => {
+  it('允许媒体任务省略客户端完成规则，由发布服务冻结已审核媒体规则', async () => {
+    const handler = { saveTaskDraft: vi.fn(async () => ok({ action: 'saved' })) };
+    const main = createTaskCommandFunction({ ...createBoundary('task-command'),
+      handler: handler as unknown as Parameters<typeof createTaskCommandFunction>[0]['handler'] });
+    const request = { ...saveTaskRequest, payload: { ...saveTaskRequest.payload,
+      itemRefs: [{ id: 'item_real_listening', resourceId: 'real_listening_resource',
+        scoringRule: { kind: 'manual', maxScore: 100 }, order: 1 }] },
+      operationId: 'operation_save_real_media_0001' };
+    expect(await main(request)).toMatchObject({ ok: true, data: { action: 'saved' } });
+    const input = handler.saveTaskDraft.mock.calls[0]?.[1] as { itemRefs?: readonly Record<string, unknown>[] } | undefined;
+    expect(input?.itemRefs?.[0]).toMatchObject({ resourceId: 'real_listening_resource' });
+    expect(input?.itemRefs?.[0]).not.toHaveProperty('completionRule');
+  });
+
   it('按 action 分发任务草稿与发布，并只把 resolver 返回的 actor 交给 handler', async () => {
     const boundary = createBoundary('task-command');
     const handler = {
@@ -186,6 +200,24 @@ describe('M1 task-core 可注入函数入口', () => {
     expect(handler.submit).toHaveBeenCalledWith(actor, 'task_demo', [{ itemId: 'item_exercise', value: 'answer' }], 3, 2, 'operation_submission_0002');
   });
 
+  it('queues one background suggestion only after a successful formal submission', async () => {
+    const queueTeacherSuggestion = vi.fn(async () => undefined);
+    const submit = vi.fn(async () => ok({ submissionId: 'submission_demo', status: 'submitted' }));
+    const main = createSubmissionCommandFunction({ ...createBoundary('submission-command'),
+      handler: { saveSubmissionDraft: vi.fn(async () => ok({ status: 'draft' })), submit },
+      queueTeacherSuggestion });
+    const base = { apiVersion: 'm1.v1', payload: { taskId: 'task_demo', answers: [] },
+      expectedVersion: 1, operationId: 'operation_submission_demo' } as const;
+    await main({ ...base, action: 'saveDraft' });
+    expect(queueTeacherSuggestion).not.toHaveBeenCalled();
+    expect(await main({ ...base, action: 'submit' })).toMatchObject({ ok: true,
+      data: { submissionId: 'submission_demo' } });
+    expect(queueTeacherSuggestion).toHaveBeenCalledWith(actor.organizationId, 'submission_demo');
+    queueTeacherSuggestion.mockRejectedValueOnce(new Error('dispatch unavailable'));
+    expect(await main({ ...base, action: 'submit' })).toMatchObject({ ok: true,
+      data: { submissionId: 'submission_demo' } });
+  });
+
   it('分发人工点评和家长只读任务查询', async () => {
     const reviewHandler = {
       publishReview: vi.fn(async () => ok({ action: 'reviewed' })),
@@ -265,7 +297,15 @@ describe('M1 task-core 可注入函数入口', () => {
       getParentTaskResult: vi.fn(async () => ({ ok: true as const, data: parentData, meta: meta('req_parent') })),
       getFeedback: vi.fn(async () => ok({ action: 'parent-feedback' }, 'req_parent_feedback')),
     };
-    const parent = createParentQueryFunction({ ...createBoundary('parent-query', parentActor), handler: parentHandler });
+    const mediaPlayback = { getRecording: vi.fn(async () => ({ status: 'expired' as const,
+      durationMs: 1500, playback: null })) };
+    const feedbackVoice = { getPlayback: vi.fn(async () => ({ feedbackId: 'feedback_demo',
+      temporaryUrl: 'https://media.example.invalid/voice',
+      expiresAt: '2026-09-16T02:01:00.000Z', durationMs: 2300 })) };
+    const taskMediaPlayback = { getPlayback: vi.fn(async () => ({ kind: 'video' as const,
+      status: 'unavailable' as const, durationMs: 10000, playback: null })) };
+    const parent = createParentQueryFunction({ ...createBoundary('parent-query', parentActor),
+      handler: parentHandler, mediaPlayback, feedbackVoice, taskMediaPlayback });
     expect(await parent({ apiVersion: 'm1.v1', action: 'listChildren', payload: {} })).toMatchObject({
       ok: true, data: [{ childId: 'user_student', linkId: 'link_demo' }],
     });
@@ -285,6 +325,38 @@ describe('M1 task-core 可注入函数入口', () => {
     expect(parentHandler.listChildTasks).toHaveBeenCalledWith(parentActor, 'user_student', { status: 'completed' }, { limit: 20 });
     expect(await parent({ apiVersion: 'm1.v1', action: 'getFeedback', payload: { childId: 'user_student', feedbackId: 'feedback_demo' } })).toMatchObject({
       ok: true, data: { action: 'parent-feedback' },
+    });
+    expect(await parent({ apiVersion: 'm1.v1', action: 'getRecordingPlayback', payload: {
+      childId: 'user_student', taskId: 'task_demo', assignmentId: 'assignment_demo',
+      submissionVersion: 1, itemId: 'item_recording',
+    } })).toMatchObject({ ok: true, data: { status: 'expired', playback: null } });
+    expect(mediaPlayback.getRecording).toHaveBeenCalledWith(parentActor, {
+      action: 'getRecordingPlayback', childId: 'user_student', taskId: 'task_demo',
+      assignmentId: 'assignment_demo', submissionVersion: 1, itemId: 'item_recording',
+    });
+    expect(await parent({ apiVersion: 'm1.v1', action: 'getRecordingPlayback', payload: {
+      childId: 'user_student', taskId: 'task_demo', assignmentId: 'assignment_demo',
+      submissionVersion: 1, itemId: 'item_recording', recordingId: 'forged_private_id',
+    } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(await parent({ apiVersion: 'm1.v1', action: 'getChildFeedbackVoicePlayback', payload: {
+      childId: 'user_student', taskId: 'task_demo', assignmentId: 'assignment_demo',
+      submissionVersion: 1, feedbackId: 'feedback_demo',
+    } })).toMatchObject({ ok: true, data: { feedbackId: 'feedback_demo', durationMs: 2300 } });
+    expect(feedbackVoice.getPlayback).toHaveBeenCalledWith(parentActor, {
+      action: 'getChildFeedbackVoicePlayback', childId: 'user_student', taskId: 'task_demo',
+      assignmentId: 'assignment_demo', submissionVersion: 1, feedbackId: 'feedback_demo',
+    });
+    expect(await parent({ apiVersion: 'm1.v1', action: 'getChildFeedbackVoicePlayback', payload: {
+      childId: 'user_student', taskId: 'task_demo', assignmentId: 'assignment_demo',
+      submissionVersion: 1, feedbackId: 'feedback_demo', fileId: 'forged_private_file',
+    } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    expect(await parent({ apiVersion: 'm1.v1', action: 'getTaskMediaPlayback', payload: {
+      childId: 'user_student', taskId: 'task_demo', assignmentId: 'assignment_demo',
+      submissionVersion: 1, itemId: 'item_video',
+    } })).toMatchObject({ ok: true, data: { kind: 'video', status: 'unavailable' } });
+    expect(taskMediaPlayback.getPlayback).toHaveBeenCalledWith(parentActor, {
+      action: 'getTaskMediaPlayback', childId: 'user_student', taskId: 'task_demo',
+      assignmentId: 'assignment_demo', submissionVersion: 1, itemId: 'item_video',
     });
   });
 

@@ -168,8 +168,8 @@ describe('独立管理后台服务端会话', () => {
     });
     expect(await privilegedMain({ apiVersion: 'm1.v1', action: 'listDeletedWorkDrafts',
       payload: { studentId: 'student_demo', page: { limit: 20, offset: 0 } },
-      businessSessionToken: bootstrap.data.token })).toMatchObject({ ok: true,
-      data: { items: [], nextOffset: null } });
+      businessSessionToken: bootstrap.data.token })).toMatchObject({ ok: false,
+      error: { code: 'FORBIDDEN' } });
 
     const miniSessionId = 'ses_0123456789abcdef0123456789abcdef';
     await harness.sessions.startOrResume({

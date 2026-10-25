@@ -13,7 +13,7 @@ describe('M0 teacher-student-parent flow', () => {
     const publishResult = await publishClassroomTask(TEACHER_ID, '本周阅读练习', '完成阅读并写下学习记录')
     expect(publishResult.ok).toBe(true)
     if (!publishResult.ok) return
-    expect(publishResult.data.items.map((item) => item.type)).toEqual(['reading', 'vocabulary', 'exercise'])
+    expect(publishResult.data.items.map((item) => item.type)).toEqual(['reading', 'vocabulary'])
     expect(new Date(publishResult.data.dueAt).getTime()).toBeGreaterThan(new Date(publishResult.data.startsAt).getTime())
     expect(getState().assignments.filter((item) => item.taskId === publishResult.data.id)).toHaveLength(36)
 

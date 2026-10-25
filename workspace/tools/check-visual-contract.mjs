@@ -33,12 +33,13 @@ const requiredProductionAssets = [
 const requiredM2Pages = [
   'P-05', 'S-06', 'S-07', 'S-10', 'S-11', 'S-12', 'G-04', 'T-04',
   'T-09', 'T-10', 'T-11', 'T-12', 'T-13', 'T-14', 'T-15', 'T-16',
-  'T-18', 'A-05', 'A-06', 'A-07',
+  'T-18',
 ]
-const requiredM3ApprovedPages = ['S-05', 'T-20']
+const requiredM3ApprovedPages = ['S-05',
+  'A-01', 'A-02', 'A-03', 'A-04', 'A-05', 'A-06', 'A-07']
+const requiredM3NeedsRevisionPages = ['T-20', 'A-08']
 const requiredM3Candidates = [
   ['T-19', join(visualRoot, '04-pages', 'history', 'T-19', 'v001.png')],
-  ['A-08', join(visualRoot, '04-pages', 'history', 'A-08', 'v001.png')],
 ]
 const requiredComponentBoards = [
   'navigation.png', 'buttons-and-inputs.png', 'cards-and-lists.png',
@@ -48,6 +49,8 @@ const requiredComponentBoards = [
 const requiredStateBoards = [
   'common-loading-empty-error.png', 'permission-disabled-offline.png',
   'media-recording-ai.png', 'task-lifecycle.png',
+  'native-admin/no-access.png', 'native-admin/conflict.png',
+  'native-admin/media-reject.png', 'native-admin/revoke.png',
 ]
 const requiredResponsiveBoards = [
   ['landscape', 'S-04.png'], ['landscape', 'S-05.png'], ['landscape', 'S-07.png'],
@@ -105,6 +108,14 @@ for (const pageId of [...requiredM2Pages, ...requiredM3ApprovedPages]) {
   if (existsSync(pagePath)) expect(statSync(pagePath).size > 10_000, `M2/M3 页面主稿文件异常：${pageId}`)
   const row = register.match(new RegExp(`\\| ${pageId} \\|[^\\n]*\\| (已批准) \\|`))
   expect(Boolean(row), `视觉页面台账未将 ${pageId} 标记为“已批准”`)
+}
+
+for (const pageId of requiredM3NeedsRevisionPages) {
+  const oldPath = join(currentPagesRoot, `${pageId}.png`)
+  expect(existsSync(oldPath) && statSync(oldPath).size > 10_000,
+    `缺少 M3 需修改页面的历史主稿：${pageId}`)
+  const row = register.match(new RegExp(`\\| ${pageId} \\|[^\\n]*\\| (需修改) \\|`))
+  expect(Boolean(row), `视觉页面台账未将 ${pageId} 标记为“需修改”`)
 }
 
 for (const [pageId, candidatePath] of requiredM3Candidates) {
@@ -195,4 +206,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('视觉交付检查通过：M0 基线及 M2/M3 施工基础包（主稿、状态板、响应式、令牌、图标、组件契约和生产素材）完整。')
+console.log('视觉静态契约通过：已批准页面及基础包完整；T-19 待审批，T-20/A-08 旧稿需修改，不计运行视觉验收。')

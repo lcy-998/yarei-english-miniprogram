@@ -3,45 +3,93 @@
     "pages/auth/login/login",
     "pages/auth/role-select/role-select",
     "pages/auth/forgot-password/forgot-password",
-    "pages/profile/profile",
-    "pages/notifications/notifications",
-    "pages/index/index",
-    "pages/student/vocabulary/vocabulary",
-    "pages/student/phonics/phonics",
-    "pages/student/dubbing/dubbing",
-    "pages/student/my-works/my-works",
-    "pages/student/word-practice/word-practice",
-    "pages/student/reading-library/reading-library",
-    "pages/student/reading-detail/reading-detail",
-    "pages/student/class-home/class-home",
-    "pages/student/checkin-leaderboard/checkin-leaderboard",
-    "pages/student/checkin-detail/checkin-detail",
-    "pages/student/task-list/task-list",
-    "pages/student/task-detail/task-detail",
-    "pages/teacher/workbench/workbench",
-    "pages/teacher/student-list/student-list",
-    "pages/teacher/student-detail/student-detail",
-    "pages/teacher/learning-stats/learning-stats",
-    "pages/teacher/task-center/task-center",
-    "pages/teacher/task-review-list/task-review-list",
-    "pages/teacher/publish-task/publish-task",
-    "pages/teacher/content-selector/content-selector",
-    "pages/teacher/checkin-activities/checkin-activities",
-    "pages/teacher/task-templates/task-templates",
-    "pages/teacher/school-questions/school-questions",
-    "pages/teacher/materials-home/materials-home",
-    "pages/teacher/class-textbooks/class-textbooks",
-    "pages/teacher/class-textbook-detail/class-textbook-detail",
-    "pages/teacher/synchronized-textbooks/synchronized-textbooks",
-    "pages/teacher/reading-selector/reading-selector",
-    "pages/teacher/review-task/review-task",
-    "pages/teacher/completion/completion",
-    "pages/parent/home/home",
-    "pages/parent/children/children",
-    "pages/parent/learning-report/learning-report",
-    "pages/parent/task-detail/task-detail",
-    "pages/parent/feedback/feedback",
     "pages/logs/logs"
+  ],
+  "subPackages": [
+    {
+      "root": "subpackages/student",
+      "pages": [
+        "vocabulary/vocabulary",
+        "phonics/phonics",
+        "my-works/my-works",
+        "word-practice/word-practice",
+        "reading-library/reading-library",
+        "reading-detail/reading-detail",
+        "pronunciation/pronunciation",
+        "class-home/class-home",
+        "checkin-leaderboard/checkin-leaderboard",
+        "checkin-detail/checkin-detail",
+        "exercise-task/exercise-task",
+        "home/index",
+        "task-list/task-list",
+        "task-detail/task-detail"
+      ]
+    },
+    {
+      "root": "subpackages/teacher",
+      "pages": [
+        "student-list/student-list",
+        "student-detail/student-detail",
+        "learning-stats/learning-stats",
+        "task-center/task-center",
+        "task-review-list/task-review-list",
+        "publish-task/publish-task",
+        "content-selector/content-selector",
+        "media-library/media-library",
+        "my-videos/my-videos",
+        "private-video-editor/private-video-editor",
+        "media-preview/media-preview",
+        "checkin-activities/checkin-activities",
+        "task-templates/task-templates",
+        "school-questions/school-questions",
+        "materials-home/materials-home",
+        "class-textbooks/class-textbooks",
+        "class-textbook-detail/class-textbook-detail",
+        "synchronized-textbooks/synchronized-textbooks",
+        "reading-selector/reading-selector",
+        "review-task/review-task",
+        "completion/completion",
+        "workbench/workbench"
+      ]
+    },
+    {
+      "root": "subpackages/parent",
+      "pages": [
+        "task-list/task-list",
+        "children/children",
+        "learning-report/learning-report",
+        "task-detail/task-detail",
+        "feedback/feedback",
+        "home/home"
+      ]
+    },
+    {
+      "root": "subpackages/admin",
+      "pages": [
+        "organizations/organizations",
+        "users/users",
+        "permissions/permissions",
+        "questions/questions",
+        "media-review/media-review",
+        "workbench/workbench"
+      ]
+    },
+    {
+      "root": "subpackages/common",
+      "pages": [
+        "profile/profile",
+        "notifications/notifications"
+      ]
+    },
+    {
+      "root": "subpackages/student-media",
+      "pages": [
+        "dubbing/dubbing",
+        "listening-task/listening-task",
+        "video-task/video-task",
+        "recording-task/recording-task"
+      ]
+    }
   ],
   "window": {
     "navigationBarTextStyle": "black",

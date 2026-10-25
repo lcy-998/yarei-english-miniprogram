@@ -1,7 +1,9 @@
 import type { TrustedActorContext } from '../auth/trusted-actor';
+import { dubbingAudioExpired } from '../media-retention/policy';
 import { readExerciseQuestionSnapshot } from '../task-core/exercise-evidence';
 import { automaticTaskScore, manualTaskItemIds, taskScoringItems } from '../task-core/task-score';
-import { selectedReadingPageIds } from '../task-core/reading-range';
+import { readingPageIdsFromPayload, selectedReadingPageIds } from '../task-core/reading-range';
+import { approvedReadingPronunciation } from '../task-core/reading-pronunciation-gate';
 import { summarizeVocabularyFirstAttempts, vocabularyWordIds } from '../vocabulary-evidence/summary';
 import { failure, success, type RequestIdGenerator, type ResultClock } from '../shared/result';
 import type { JsonObject, JsonValue, ServiceResult } from '../shared/protocol';
@@ -12,6 +14,9 @@ import {
   type BatchReviewEligibleSubmission,
 } from '../task-core/batch-review-preview';
 import type { TaskQueryRepository } from './repository';
+import { taskLifecycleStatusAt } from './lifecycle-status';
+import { projectTaskMediaSnapshotForStudent } from '../task-media/student-projection';
+import type { SealedTaskDubbingWork } from '../task-media/submission-evidence';
 import type {
   BatchReviewPreview,
   CompletionFilters,
@@ -23,6 +28,7 @@ import type {
   QueryResourceOptionRecord,
   QueryTeacherGrantRecord,
   ReviewSubmissionView,
+  TaskMediaReviewEvidenceView,
   ReviewTaskFilters,
   ReviewTaskListItem,
   SafeTaskItemView,
@@ -51,6 +57,12 @@ export interface QueryServiceDependencies {
   readonly batchReviewPreviewCodec?: BatchReviewPreviewCodec;
 }
 
+export interface TaskMediaReviewAccess {
+  temporaryUrl(fileId: string): Promise<string>;
+  findTaskDubbingWork(workId: string): Promise<SealedTaskDubbingWork | null>;
+  appendAudit(actor: TrustedActorContext, submissionId: string, itemId: string): Promise<boolean>;
+}
+
 export class TeacherTaskQueryService {
   private readonly cursorCodec: CursorCodec;
 
@@ -75,7 +87,7 @@ export class TeacherTaskQueryService {
     const visibleTasks = tasks
       .filter((task) => task.status !== 'draft' && task.visibility !== 'recycled' && isTaskVisibleInClasses(task, assignments, classIds))
       .filter((task) => task.startsAt.slice(0, 10) <= date && task.dueAt.slice(0, 10) >= date);
-    const taskItems = await Promise.all(visibleTasks.map((task) => buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository)));
+    const taskItems = await Promise.all(visibleTasks.map((task) => buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository, this.dependencies.clock.nowIso())));
     taskItems.sort((left, right) => left.dueAt.localeCompare(right.dueAt) || left.taskId.localeCompare(right.taskId));
     return success({
       date,
@@ -102,9 +114,9 @@ export class TeacherTaskQueryService {
     ]);
     const filtered = tasks
       .filter((task) => task.visibility !== 'recycled' && isTaskVisibleInClasses(task, assignments, classIds))
-      .filter((task) => filters.status === undefined || task.status === filters.status)
+      .filter((task) => filters.status === undefined || taskLifecycleStatusAt(task, this.dependencies.clock.nowIso()) === filters.status)
       .filter((task) => filters.keyword === undefined || task.title.toLocaleLowerCase().includes(filters.keyword.toLocaleLowerCase()));
-    const items = await Promise.all(filtered.map((task) => buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository)));
+    const items = await Promise.all(filtered.map((task) => buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository, this.dependencies.clock.nowIso())));
     items.sort((left, right) => right.dueAt.localeCompare(left.dueAt) || left.taskId.localeCompare(right.taskId));
     return this.page(actor, 'teacher-tasks', filters, page, items);
   }
@@ -243,7 +255,7 @@ export class TeacherTaskQueryService {
     }));
     const countedAssignments = assignments.filter((item) => item.taskId === taskId && classIds.includes(item.classId));
     const counts = Object.fromEntries(COMPLETION_STATUSES.map((status) => [status, countedAssignments.filter((item) => item.status === status).length])) as Readonly<Record<AssignmentStatus, number>>;
-    const taskItem = await buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository);
+    const taskItem = await buildTeacherTaskItem(task, assignments, submissions, classIds, this.dependencies.repository, this.dependencies.clock.nowIso());
     return success({ task: taskItem, counts, assignments: { ...paged.value, items: visibleItems } }, this.meta());
   }
 
@@ -413,7 +425,7 @@ export class ReviewQueryService {
     for (const task of tasks) {
       if (!isTaskVisibleInClasses(task, assignments, allowedClassIds)) continue;
       if (filters.keyword !== undefined && !task.title.toLocaleLowerCase().includes(filters.keyword.toLocaleLowerCase())) continue;
-      const base = await buildTeacherTaskItem(task, assignments, submissions, allowedClassIds, this.dependencies.repository);
+      const base = await buildTeacherTaskItem(task, assignments, submissions, allowedClassIds, this.dependencies.repository, this.dependencies.clock.nowIso());
       const scoped = assignments.filter((item) => item.taskId === task.id && allowedClassIds.includes(item.classId));
       let reviewedCount = 0;
       for (const assignment of scoped) {
@@ -452,6 +464,86 @@ export class ReviewQueryService {
     return success(reviewSubmission(task, assignment, submission, feedback, vocabularyEvidence,
       history.map(item => ({ id: item.id, version: item.submissionVersion,
         status: item.status, submittedAt: item.submittedAt as string }))), this.meta());
+  }
+
+  public async getTaskMediaReviewEvidence(actor: TrustedActorContext, submissionId: string,
+    itemId: string, access: TaskMediaReviewAccess): Promise<ServiceResult<TaskMediaReviewEvidenceView>> {
+    const authorized = await this.getSubmissionForReview(actor, submissionId);
+    if (!authorized.ok) return failure(authorized.error.code, this.meta());
+    const task = await this.dependencies.repository.findTask(actor.organizationId, authorized.data.taskId);
+    const item = task?.items.find(candidate => candidate.id === itemId);
+    const snapshot = item?.mediaSnapshot;
+    if (!task || !item || !snapshot || !['listening', 'video', 'dubbing'].includes(snapshot.kind)
+      || item.resourceSnapshot.type !== snapshot.kind) return failure('NOT_FOUND', this.meta());
+    const answer = authorized.data.answers.find(candidate => candidate.itemId === itemId);
+    const value = answer?.value;
+    const evidence = isJsonRecord(value) && value.kind === snapshot.kind ? value : null;
+    const rawResponses = evidence && Array.isArray(evidence.questionResponses)
+      ? evidence.questionResponses : [];
+    const responseById = new Map<string, JsonValue>();
+    for (const row of rawResponses) {
+      if (isJsonRecord(row) && typeof row.questionId === 'string' && row.response !== undefined) {
+        responseById.set(row.questionId, row.response);
+      }
+    }
+    const correctIds = evidence && Array.isArray(evidence.correctQuestionIds)
+      ? evidence.correctQuestionIds.filter((id): id is string => typeof id === 'string') : [];
+    const playedSegmentIds = evidence && Array.isArray(evidence.verifiedPlayedSegmentIds)
+      ? evidence.verifiedPlayedSegmentIds.filter((id): id is string => typeof id === 'string') : [];
+    const verifiedRanges = evidence && Array.isArray(evidence.verifiedRanges)
+      ? evidence.verifiedRanges.flatMap(range => isJsonRecord(range)
+        && typeof range.startMs === 'number' && typeof range.endMs === 'number'
+        && Number.isSafeInteger(range.startMs) && Number.isSafeInteger(range.endMs)
+        && range.startMs >= 0 && range.startMs < range.endMs && range.endMs <= snapshot.durationMs
+        ? [{ startMs: range.startMs, endMs: range.endMs }] : []) : [];
+    const now = Date.parse(this.dependencies.clock.nowIso());
+    if (!Number.isFinite(now)) return failure('SERVICE_UNAVAILABLE', this.meta());
+    const expiresAt = new Date(now + 60000).toISOString();
+    const signed = async (fileId: string): Promise<string | null> => {
+      if (!fileId.startsWith('cloud://')) return null;
+      try { const url = await access.temporaryUrl(fileId); return url.startsWith('https://') ? url : null; }
+      catch { return null; }
+    };
+    const sourceUrl = await signed(snapshot.mediaAssetKey);
+    let finalWork: TaskMediaReviewEvidenceView['finalWork'] = null;
+    if (snapshot.kind === 'dubbing') {
+      const workId = evidence?.finalWorkId;
+      const work = typeof workId === 'string' ? await access.findTaskDubbingWork(workId) : null;
+      const valid = work !== null && work.status === 'submitted'
+        && work.organizationId === actor.organizationId && work.studentId === authorized.data.studentId
+        && work.assignmentId === authorized.data.assignmentId
+        && work.round === authorized.data.submissionVersion && work.taskId === task.id
+        && work.itemId === itemId && work.mediaId === snapshot.mediaId
+        && work.mediaVersion === snapshot.mediaVersion && work.mediaDeletedAt == null
+        && !dubbingAudioExpired(authorized.data.submittedAt, this.dependencies.clock.nowIso());
+      const workUrl = valid ? await signed(work.fileId) : null;
+      finalWork = { available: workUrl !== null,
+        durationMs: valid ? work.recording.durationMs : null,
+        temporaryUrl: workUrl, expiresAt: workUrl === null ? null : expiresAt };
+    }
+    if (!await access.appendAudit(actor, submissionId, itemId)) return failure('SERVICE_UNAVAILABLE', this.meta());
+    return success({ taskId: task.id, assignmentId: authorized.data.assignmentId,
+      submissionId, submissionVersion: authorized.data.submissionVersion,
+      itemId, title: item.resourceSnapshot.title, kind: snapshot.kind,
+      mediaVersion: snapshot.mediaVersion, durationMs: snapshot.durationMs,
+      sourcePlayback: { available: sourceUrl !== null, temporaryUrl: sourceUrl,
+        expiresAt: sourceUrl === null ? null : expiresAt },
+      questions: snapshot.questions.map(question => {
+        const key = snapshot.answerKeys.find(candidate => candidate.questionId === question.questionId);
+        const response = responseById.get(question.questionId);
+        const clip = snapshot.clips.find(candidate => candidate.questionId === question.questionId);
+        return { questionId: question.questionId, questionType: question.questionType,
+          stem: question.stem, options: [...question.options],
+          studentResponse: response ?? null, correctAnswer: key?.correctAnswer ?? null,
+          explanation: key?.explanation ?? '', recorded: response !== undefined,
+          isCorrect: response === undefined || key?.correctAnswer == null ? null
+            : correctIds.includes(question.questionId),
+          clip: clip ? { segmentId: clip.segmentId, startMs: clip.startMs, endMs: clip.endMs } : null };
+      }),
+      verifiedPlayedSegmentIds: playedSegmentIds,
+      verifiedRanges,
+      subtitleCues: snapshot.subtitleCues?.map(cue => ({ ...cue })) ?? [],
+      finalWork }, this.meta());
   }
 
   public async previewBatchComment(
@@ -573,6 +665,7 @@ async function buildTeacherTaskItem(
   _submissions: readonly SubmissionRecord[],
   classIds: readonly string[],
   repository: TaskQueryRepository,
+  nowIso: string,
 ): Promise<TeacherTaskListItem> {
   const scoped = assignments.filter((item) => item.taskId === task.id && classIds.includes(item.classId));
   let pendingReviewCount = 0;
@@ -585,7 +678,7 @@ async function buildTeacherTaskItem(
   return {
     taskId: task.id,
     title: task.title,
-    status: task.status,
+    status: taskLifecycleStatusAt(task, nowIso),
     startsAt: task.startsAt,
     dueAt: task.dueAt,
     classIds: [...new Set(scoped.map((item) => item.classId).concat(task.targetClassIds.filter((item) => classIds.includes(item))))],
@@ -684,6 +777,34 @@ function studentSafeSubmissionAnswer(task: TaskRecord, answer: SubmissionAnswer,
       ...(revealJudgement && typeof value.correctQuestionCount === 'number'
         ? { correctQuestionCount: value.correctQuestionCount } : {}) } };
   }
+  if ((item.resourceSnapshot.type === 'listening' || item.resourceSnapshot.type === 'video')
+    && value.kind === item.resourceSnapshot.type
+    && typeof value.mediaSessionId === 'string' && value.mediaSessionId.trim()
+    && item.mediaSnapshot?.kind === item.resourceSnapshot.type) {
+    const allowedQuestionIds = new Set(item.mediaSnapshot.questionIds);
+    const seenQuestionIds = new Set<string>();
+    const questionResponses = Array.isArray(value.questionResponses)
+      ? value.questionResponses.flatMap((entry) => {
+        if (!isJsonRecord(entry) || typeof entry.questionId !== 'string'
+          || !allowedQuestionIds.has(entry.questionId) || seenQuestionIds.has(entry.questionId)) return [];
+        const response = typeof entry.response === 'string' && entry.response.trim()
+          ? entry.response
+          : Array.isArray(entry.response) && entry.response.length > 0
+            && entry.response.every((part) => typeof part === 'string' && part.trim())
+            ? [...entry.response] : null;
+        if (response === null) return [];
+        seenQuestionIds.add(entry.questionId);
+        return [{ questionId: entry.questionId, response,
+          ...(revealJudgement && typeof entry.isCorrect === 'boolean'
+            ? { isCorrect: entry.isCorrect } : {}) }];
+      }) : [];
+    if (item.resourceSnapshot.type === 'listening' && questionResponses.length === 0) {
+      return { itemId: answer.itemId, value: '' };
+    }
+    return { itemId: answer.itemId, value: { kind: value.kind,
+      mediaSessionId: value.mediaSessionId,
+      ...(questionResponses.length > 0 ? { questionResponses } : {}) } };
+  }
   return { itemId: answer.itemId, value: '' };
 }
 
@@ -742,21 +863,38 @@ function reviewSubmission(
 ): ReviewSubmissionView {
   const readingPages = task.items.flatMap((item) => {
     if (item.resourceSnapshot.type !== 'reading') return [];
-    const selectedIds = selectedReadingPageIds(item.completionRule);
     const chapters = item.resourceSnapshot.payload.chapters;
-    if (selectedIds === null || !Array.isArray(chapters)) return [];
+    if (!Array.isArray(chapters)) return [];
+    const selectedIds = item.completionRule.pageIds === undefined
+      ? readingPageIdsFromPayload(item.resourceSnapshot.payload)
+      : selectedReadingPageIds(item.completionRule);
+    if (selectedIds === null) return [];
     const pages = chapters.flatMap((rawChapter) => {
       if (!isJsonRecord(rawChapter) || !Array.isArray(rawChapter.pages)) return [];
       return rawChapter.pages.flatMap((rawPage) => {
         if (!isJsonRecord(rawPage) || typeof rawPage.id !== 'string'
           || typeof rawPage.pageNumber !== 'number' || !Number.isSafeInteger(rawPage.pageNumber)
-          || typeof rawPage.imageAssetKey !== 'string' || typeof rawPage.thumbnailAssetKey !== 'string') return [];
+          || typeof rawPage.imageAssetKey !== 'string' || !rawPage.imageAssetKey.trim()) return [];
+        const thumbnailAssetKey = typeof rawPage.thumbnailAssetKey === 'string' && rawPage.thumbnailAssetKey.trim()
+          ? rawPage.thumbnailAssetKey : rawPage.imageAssetKey;
         return [{ itemId: item.id, pageId: rawPage.id, pageNumber: rawPage.pageNumber,
           chapterTitle: typeof rawChapter.title === 'string' ? rawChapter.title : '',
-          imageAssetKey: rawPage.imageAssetKey, thumbnailAssetKey: rawPage.thumbnailAssetKey }];
+          imageAssetKey: rawPage.imageAssetKey, thumbnailAssetKey }];
       });
     });
     return selectedIds.flatMap(id => pages.find(page => page.pageId === id) ?? []);
+  });
+  const readingPronunciationSegments = task.items.flatMap((item) => {
+    if (item.resourceSnapshot.type !== 'reading'
+      || !approvedReadingPronunciation(item.resourceSnapshot.payload, item.resourceVersion)) return [];
+    const pronunciation = item.resourceSnapshot.payload.pronunciation;
+    if (!isJsonRecord(pronunciation) || !Array.isArray(pronunciation.segments)) return [];
+    return pronunciation.segments.flatMap((rawSegment) => {
+      if (!isJsonRecord(rawSegment) || typeof rawSegment.id !== 'string'
+        || typeof rawSegment.text !== 'string') return [];
+      return [{ itemId: item.id, segmentId: rawSegment.id, text: rawSegment.text,
+        ...(typeof rawSegment.pageNumber === 'number' ? { pageNumber: rawSegment.pageNumber } : {}) }];
+    });
   });
   const exerciseEvidence = task.items.flatMap((item) => {
     if (item.resourceSnapshot.type !== 'exercise') return [];
@@ -771,6 +909,8 @@ function reviewSubmission(
     return [{
       itemId: item.id, questionId: question.questionId, questionType: question.questionType,
       stem: question.stem, options: [...question.options],
+      ...(question.exerciseSection === undefined ? {} : { exerciseSection: question.exerciseSection }),
+      ...(question.rubric === undefined ? {} : { rubric: question.rubric }),
       studentResponse: recorded ? response.response! : null,
       correctAnswer: question.correctAnswer, explanation: question.explanation,
       isCorrect: response?.isCorrect === true ? true : response?.isCorrect === false ? false : null,
@@ -793,6 +933,7 @@ function reviewSubmission(
         ? { recordingPrompt: item.resourceSnapshot.payload.promptText } : {}) })),
     scoringItems: taskScoringItems(task, submission),
     readingPages,
+    readingPronunciationSegments,
     answers: submission.answers,
     automaticScore: automaticTaskScore(task, submission),
     exerciseEvidence,
@@ -844,6 +985,11 @@ function isJsonRecord(value: JsonValue | undefined): value is JsonObject {
 function safeTaskItem(item: TaskRecord['items'][number], references: TaskRecord['itemRefs']): SafeTaskItemView {
   const question = item.resourceSnapshot.type === 'exercise'
     ? readExerciseQuestionSnapshot(item.resourceSnapshot.payload) : null;
+  const questionOrigin = item.resourceSnapshot.type === 'exercise'
+    && isJsonRecord(item.resourceSnapshot.payload.assetLibrary)
+    ? item.resourceSnapshot.payload.assetLibrary : null;
+  const exercisePackId = typeof questionOrigin?.exercisePackId === 'string'
+    ? questionOrigin.exercisePackId : undefined;
   const vocabularyWords = item.resourceSnapshot.type === 'vocabulary' && item.snapshotSchemaVersion === 2
     ? item.resourceSnapshot.payload.words : null;
   const vocabularyWordIds = Array.isArray(vocabularyWords)
@@ -868,8 +1014,13 @@ function safeTaskItem(item: TaskRecord['items'][number], references: TaskRecord[
     ...(vocabularyPack === null ? {} : { vocabularyPack }),
     ...(question === null ? {} : { exerciseQuestion: {
       questionId: question.questionId, questionType: question.questionType,
+      ...(exercisePackId === undefined ? {} : { exercisePackId }),
       stem: question.stem, options: [...question.options],
+      ...(question.exerciseSection === undefined ? {} : { exerciseSection: question.exerciseSection }),
     } }),
+    ...(item.mediaSnapshot === undefined ? {} : {
+      mediaSnapshot: projectTaskMediaSnapshotForStudent(item.mediaSnapshot),
+    }),
     order: item.order,
   };
 }
@@ -888,12 +1039,14 @@ function safeVocabularyPack(item: TaskRecord['items'][number]): SafeTaskItemView
   if (item.resourceSnapshot.type !== 'vocabulary' || item.snapshotSchemaVersion !== 2) return null;
   const payload = item.resourceSnapshot.payload;
   if (!Array.isArray(payload.words) || typeof payload.grade !== 'string' || typeof payload.unit !== 'string') return null;
-  const words: Array<{ id: string; word: string; meaning: string; syllables: string[]; example?: string }> = [];
+  const words: Array<{ id: string; word: string; meaning: string; syllables: string[]; example?: string;
+    ipa?: string }> = [];
   for (const raw of payload.words) {
     if (!isJsonRecord(raw) || typeof raw.id !== 'string' || typeof raw.word !== 'string'
       || typeof raw.meaning !== 'string' || !Array.isArray(raw.syllables)
       || !raw.syllables.every((part) => typeof part === 'string' && part.trim())) return null;
     words.push({ id: raw.id, word: raw.word, meaning: raw.meaning, syllables: [...raw.syllables],
+      ...(typeof raw.ipa === 'string' && /^\/[^/]{1,120}\/$/u.test(raw.ipa) ? { ipa: raw.ipa } : {}),
       ...(typeof raw.example === 'string' ? { example: raw.example } : {}) });
   }
   return { id: item.resourceId, title: item.resourceSnapshot.title, grade: payload.grade,

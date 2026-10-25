@@ -10,7 +10,7 @@
 | T-01 | `student-public-natural-background-v1.png` | 按用户确认复用为教师工作台环境背景，通过教师页遮罩降低装饰密度 | 不承载吉祥物、业务文字或数据 |
 | S-05 | `mascot-speaking-pink.png` | 顶部口语引导；直接使用官方透明素材 | 不从效果图裁切，不修改身份、服装、颜色或面部 |
 | T-19、A-08 | `media-library-empty-v1.png` | 媒体列表空状态 | 正常有数据主稿不展示；不得烘焙说明文字或按钮 |
-| S-05、S-07、T-20 | `recording-ai-retry-v1.png` | 录音保留、AI/上传重试等复杂空状态 | 不代替状态文字、进度或真实录音波形 |
+| S-05、S-07 | `recording-ai-retry-v1.png` | 录音保留、AI/上传重试等复杂空状态 | 不代替状态文字、进度或真实录音波形；T-20 教师只读预览不使用上传重试图 |
 | S-07 | `recording-ai-retry-thumb-v1.png` | 仅在作品提交失败时显示的轻量运行时缩略图，保留错误文字和重试操作 | 不在无素材的正常空状态中误报故障 |
 | S-03、S-04、T-16、T-18 | `demo-zoo-picture-book-cover-v1.png` | 虚构《A Day at the Zoo》封面缩略图 | 不把书名烘焙进封面；标题由组件渲染 |
 | T-16、T-18 | `demo-zoo-cover-thumb-v1.png` | 仅对既有虚构绘本 ID 显示透明运行时缩略图 | 不将虚构封面套用到其他授权书籍 |
@@ -23,6 +23,8 @@
 | G-01、A-01 | 无位图依赖 | 用令牌、SVG/代码图标与 CSS 表面实现 | 不从效果图裁切卡片、图标、文字或统计图 |
 
 M0 次级任务页允许复用 `student-public-natural-background-v1.png` 作为统一环境底图，但必须通过公共暖白遮罩保持内容可读；T-05/T-07 任务中心可保留更完整景深，S-08/S-09、G-03/G-05、T-06/T-08/T-17 使用“顶部天空与底部植物清晰、中部暖白”的统一次级页规则。
+
+S-13 听力任务的顶部耳机插画使用 `workspace/miniprogram/assets/g0/listening-headphones-v1.png`，以已批准 S-09 主稿的蓝黄圆润卡通风格生成；页面文字、进度条、题目与按钮仍由 WXML/Less 绘制。S-13 独立页面主稿和运行截图待视觉确认。
 
 上表原始生产素材的相对路径以 `visual-design/03-assets/production/` 为根；带 `thumb` 的运行时缩略图位于 `workspace/miniprogram/assets/content/` 或 `workspace/miniprogram/assets/g0/`，并已在资产清单中登记。页面不得引用 `asset/` 原始文件或 `04-pages/current/` 效果图。
 

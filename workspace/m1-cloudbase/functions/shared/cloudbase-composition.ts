@@ -20,6 +20,13 @@ import {
   createOrgContentDocumentRepository,
 } from '../../src/repositories/org-content-document-adapter';
 import { createTaskCoreDocumentRepository } from '../../src/repositories/task-core-document-adapter';
+import { TASK_MEDIA_COLLECTIONS, projectTaskMediaSession } from '../../src/task-media/document-playback-port';
+import { DocumentTaskDubbingWorkPort } from '../../src/task-media/document-work-port';
+import { TaskMediaSubmissionEvidenceService } from '../../src/task-media/submission-evidence';
+import { CloudBaseReviewVoiceSeal } from '../../src/review-voice/cloudbase-seal';
+import { DocumentReviewVoicePort } from '../../src/review-voice/document-port';
+import { ReviewVoiceCommentService } from '../../src/review-voice/service';
+import type { CloudBaseWorkStoragePort } from '../../src/student-work/cloudbase-recording-seal';
 import { createTaskQueryDocumentRepository } from '../../src/repositories/task-query-document-adapter';
 import type { DocumentDatabasePort } from '../../src/repositories/document-database-port';
 import {
@@ -46,6 +53,7 @@ import { TeacherStudentQueryService } from '../../src/teacher-students/service';
 import type { AuthSessionFunctionDependencies } from '../auth-session/function-entry';
 import type { AdminSessionFunctionDependencies } from '../admin-session/function-entry';
 import type { TrustedFunctionDependencies } from './trusted-function';
+import type { TeacherSuggestionStore } from '../../src/teacher-ai/types';
 
 export interface CloudBaseServerSdkPort extends CloudBasePlatformSdkPort {
   database(): CloudBaseNativeDatabasePort;
@@ -81,6 +89,9 @@ export interface CloudBaseTaskCoreCompositionOptions extends CommonCompositionOp
   readonly functionName: 'task-command' | 'submission-command' | 'review-command';
   readonly identifiers: IdentifierGenerator;
   readonly batchReviewPreviewCodec?: BatchReviewPreviewCodec;
+  readonly reviewVoiceStorage?: CloudBaseWorkStoragePort;
+  readonly environmentId?: string;
+  readonly teacherSuggestionVerifier?: Pick<TeacherSuggestionStore, 'findById'>;
 }
 
 export interface CloudBaseLearningProgressCompositionOptions extends CommonCompositionOptions {
@@ -89,7 +100,7 @@ export interface CloudBaseLearningProgressCompositionOptions extends CommonCompo
 }
 
 export interface CloudBaseTaskQueryCompositionOptions extends CommonCompositionOptions {
-  readonly functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query';
+  readonly functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query' | 'teacher-suggestion-command';
   readonly cursorCodec: CursorCodec;
   readonly batchReviewPreviewCodec?: BatchReviewPreviewCodec;
 }
@@ -129,6 +140,7 @@ export interface CloudBaseAdminSessionFunctionInfrastructure extends AdminSessio
 
 export interface CloudBaseTaskCoreFunctionInfrastructure extends CloudBaseTrustedFunctionInfrastructure {
   readonly handler: TaskCoreService;
+  readonly reviewVoice?: ReviewVoiceCommentService;
 }
 
 export interface CloudBaseLearningProgressFunctionInfrastructure extends CloudBaseTrustedFunctionInfrastructure {
@@ -242,15 +254,29 @@ export function createCloudBaseTaskCoreFunctionInfrastructure(
   options: CloudBaseTaskCoreCompositionOptions,
 ): CloudBaseTaskCoreFunctionInfrastructure {
   const infrastructure = createCloudBaseTrustedFunctionInfrastructure(options);
+  const taskRepository = createTaskCoreDocumentRepository(infrastructure.documents);
+  const reviewVoice = options.functionName === 'review-command'
+    && options.reviewVoiceStorage && options.environmentId
+    ? new ReviewVoiceCommentService(new DocumentReviewVoicePort(taskRepository,
+      infrastructure.documents, new CloudBaseReviewVoiceSeal(options.reviewVoiceStorage,
+        options.environmentId, { maxDurationMs: 300000, maxBytes: 20 * 1024 * 1024 })),
+    infrastructure.clock, { maxDurationMs: 300000, maxBytes: 20 * 1024 * 1024 }) : undefined;
   return {
     ...infrastructure,
+    ...(reviewVoice === undefined ? {} : { reviewVoice }),
     handler: new TaskCoreService(
-      createTaskCoreDocumentRepository(infrastructure.documents),
+      taskRepository,
       options.identities,
       infrastructure.clock,
       options.identifiers,
       infrastructure.requestIds,
       options.batchReviewPreviewCodec,
+      options.functionName === 'submission-command'
+        ? new TaskMediaSubmissionEvidenceService({ findSession: async sessionId =>
+          projectTaskMediaSession(await infrastructure.documents.get(TASK_MEDIA_COLLECTIONS.sessions, sessionId)) },
+        new DocumentTaskDubbingWorkPort(infrastructure.documents)) : undefined,
+      reviewVoice,
+      options.teacherSuggestionVerifier,
     ),
   };
 }

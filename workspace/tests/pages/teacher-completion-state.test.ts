@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_COMPLETION_FILTER, filterCompletionRows, isBatchReviewable, isCompletedSubmission, scoreCaption, selectedBatchCounts, toggleCompletionSelection } from '../../miniprogram/pages/teacher/completion/completion-state'
+import { DEFAULT_COMPLETION_FILTER, filterCompletionRows, isBatchReviewable, isCompletedSubmission, scoreCaption, selectedBatchCounts, toggleCompletionSelection } from '../../miniprogram/subpackages/teacher/completion/completion-state'
 
 const rows = [
   { assignmentId: 'a1', taskId: 'task', studentName: '小宇', studentNumber: '0321', status: 'awaiting_review', submissionId: 's1', submissionVersion: 1, selected: false },

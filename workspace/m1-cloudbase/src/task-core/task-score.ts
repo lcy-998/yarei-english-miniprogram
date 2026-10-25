@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from '../shared/protocol';
-import { calculateTaskScore, type ContentEvaluation, type TaskItemEvaluation } from './content-rules';
+import { calculateTaskScore, evaluateVerifiedContent,
+  type ContentEvaluation, type TaskItemEvaluation } from './content-rules';
 import { evaluateExerciseSubmission, readExerciseQuestionSnapshot } from './exercise-evidence';
 import type { SubmissionRecord, TaskRecord } from './types';
 
@@ -62,8 +63,10 @@ export function scoreTaskWithManualItems(task: TaskRecord, submission: Submissio
 /** Recomputes an automatic total from the immutable published task snapshot. */
 export function automaticTaskScore(task: TaskRecord, submission: SubmissionRecord): number | null {
   if (submission.taskId !== task.id || submission.status === 'draft') return null;
-  if (!task.items.some((item) => item.resourceSnapshot.type === 'exercise'
-    && item.resourceSnapshot.payload.questionIds !== undefined)) return null;
+  if (!task.items.some((item) => item.resourceSnapshot.type === 'vocabulary'
+    || item.resourceSnapshot.type === 'listening'
+    || item.resourceSnapshot.type === 'video' && (item.mediaSnapshot?.questionIds.length ?? 0) > 0
+    || item.resourceSnapshot.type === 'exercise' && item.resourceSnapshot.payload.questionIds !== undefined)) return null;
   const result = calculateTaskScore(evaluationsFor(task, submission), scoreWeights(task));
   return result.validWeights && result.complete && !result.needsTeacherScore ? result.score : null;
 }
@@ -89,6 +92,8 @@ function evaluateItem(item: TaskRecord['items'][number], value: JsonValue | unde
       && typeof value.recordingId === 'string' && value.recordingId.trim().length > 0
       ? manual() : incomplete();
   }
+  if (item.resourceSnapshot.type === 'listening' || item.resourceSnapshot.type === 'video'
+    || item.resourceSnapshot.type === 'dubbing') return mediaEvaluation(item, value);
   const snapshot = readExerciseQuestionSnapshot(item.resourceSnapshot.payload);
   if (item.resourceSnapshot.payload.questionIds !== undefined && snapshot === null) return incomplete();
   if (snapshot !== null) {
@@ -104,6 +109,51 @@ function evaluateItem(item: TaskRecord['items'][number], value: JsonValue | unde
   return value.kind === 'exercise' && count(value.answeredQuestionCount) !== null
     && count(rule.requiredQuestionCount) !== null && (value.answeredQuestionCount as number) >= (rule.requiredQuestionCount as number)
     ? manual() : incomplete();
+}
+
+function mediaEvaluation(item: TaskRecord['items'][number], value: JsonObject): ContentEvaluation {
+  const snapshot = item.mediaSnapshot;
+  if (!snapshot || value.kind !== snapshot.kind || value.mediaId !== snapshot.mediaId
+    || value.mediaVersion !== snapshot.mediaVersion
+    || typeof value.mediaSessionId !== 'string' || !value.mediaSessionId.trim()) return incomplete();
+  if (snapshot.kind === 'dubbing') {
+    const recording = isObject(value.recording) ? value.recording : null;
+    return evaluateVerifiedContent({ kind: 'dubbing' }, { kind: 'dubbing',
+      finalWorkId: typeof value.finalWorkId === 'string' ? value.finalWorkId : null,
+      recording: recording && typeof recording.mediaId === 'string'
+        && typeof recording.durationMs === 'number' && typeof recording.sizeBytes === 'number'
+        && typeof recording.serverReadable === 'boolean'
+        ? { mediaId: recording.mediaId, durationMs: recording.durationMs,
+          sizeBytes: recording.sizeBytes, serverReadable: recording.serverReadable } : null });
+  }
+  const answeredQuestionIds = stringArray(value.answeredQuestionIds);
+  const correctQuestionIds = stringArray(value.correctQuestionIds);
+  if (!answeredQuestionIds || !correctQuestionIds) return incomplete();
+  const objectiveQuestionIds = snapshot.questions.filter(question => question.questionType !== 'subjective')
+    .map(question => question.questionId);
+  if (snapshot.kind === 'listening') {
+    const verifiedPlayedSegmentIds = stringArray(value.verifiedPlayedSegmentIds);
+    if (!verifiedPlayedSegmentIds) return incomplete();
+    return evaluateVerifiedContent({ kind: 'listening',
+      segmentIds: snapshot.clips.map(clip => clip.segmentId), questionIds: snapshot.questionIds,
+      objectiveQuestionIds },
+    { kind: 'listening', verifiedPlayedSegmentIds, answeredQuestionIds, correctQuestionIds });
+  }
+  const rawRanges = value.verifiedRanges;
+  if (!Array.isArray(rawRanges) || !rawRanges.every(range => isObject(range)
+    && typeof range.startMs === 'number' && Number.isSafeInteger(range.startMs)
+    && typeof range.endMs === 'number' && Number.isSafeInteger(range.endMs))) return incomplete();
+  const verifiedRanges = rawRanges.map(range => ({
+    startMs: (range as JsonObject).startMs as number,
+    endMs: (range as JsonObject).endMs as number,
+  }));
+  return evaluateVerifiedContent({ kind: 'video', durationMs: snapshot.durationMs,
+    questionIds: snapshot.questionIds, objectiveQuestionIds },
+  { kind: 'video', verifiedRanges, answeredQuestionIds, correctQuestionIds });
+}
+
+function stringArray(value: JsonValue | undefined): string[] | null {
+  return Array.isArray(value) && value.every(item => typeof item === 'string') ? value as string[] : null;
 }
 
 function incomplete(): ContentEvaluation { return { complete: false, automaticScore: null, teacherScoreRequired: false }; }

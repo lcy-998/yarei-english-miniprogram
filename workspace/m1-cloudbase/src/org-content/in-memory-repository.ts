@@ -303,6 +303,11 @@ export class InMemoryOrgContentRepository implements OrgContentRepository, OrgCo
     return clone(this.resources.find((item) => item.organizationId === organizationId && item.id === resourceId) ?? null);
   }
 
+  public async hasStudentTaskResource(_organizationId: string, _studentId: string,
+    _resourceId: string): Promise<boolean> {
+    return false;
+  }
+
   public async transaction<T>(work: (transaction: OrgContentTransaction) => Promise<T>): Promise<T> {
     let release: () => void = () => undefined;
     const previous = this.transactionTail;

@@ -5,6 +5,7 @@ import type { LearningResourceAccessRecord } from '../../src/learning-progress/t
 import type { JsonValue } from '../../src/shared/protocol';
 import type { VersionedDocument } from '../../src/repositories/document-database-port';
 import { FakeDocumentDatabase } from '../../src/repositories/fake-document-database';
+import { publicLearningContentSha256 } from '../../src/org-content/public-learning-source';
 import {
   LEARNING_PROGRESS_COLLECTIONS,
   createLearningProgressDocumentRepository,
@@ -51,7 +52,7 @@ const vocabularyResource: LearningResourceAccessRecord = {
 };
 
 describe('learning progress document repository', () => {
-  it('reads M2 chapter pages only for active members of an authorized class', async () => {
+  it('reads published ordinary pages for any student in the organization, regardless of old class visibility', async () => {
     const resourceId = 'reading_m2_class_resource';
     const resource: VersionedDocument = {
       _id: resourceId, organizationId: ORGANIZATION_ID, schemaVersion: 1, version: 1, deletedAt: null,
@@ -76,12 +77,57 @@ describe('learning progress document repository', () => {
       favorite: false, expectedVersion: 0, operationId: 'm2_class_page',
     })).resolves.toMatchObject({ resourceId, pageNumber: 2 });
     await expect(progress.getReadingProgress({ ...student, actorUserId: 'other_student' }, resourceId))
-      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+      .resolves.toBeNull();
     const inactive = new FakeDocumentDatabase({
       [LEARNING_PROGRESS_COLLECTIONS.resources]: [resource],
       [LEARNING_PROGRESS_COLLECTIONS.memberships]: [{ ...membership, status: 'transferred' }],
     });
-    await expect(service(inactive).getReadingProgress(student, resourceId))
+    await expect(service(inactive).getReadingProgress(student, resourceId)).resolves.toBeNull();
+    await expect(service(inactive).getReadingProgress({ ...student, organizationId: 'other_org' }, resourceId))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('lets a student open and record a page from an active public reading projection', async () => {
+    const origin = {
+      kind: 'central_asset_library', catalogScope: 'all_teachers', reviewStatus: 'approved',
+      version: 'v1', sourceSha256: 'a'.repeat(64), manifestSha256: 'b'.repeat(64),
+      copyrightEvidenceSha256: 'c'.repeat(64), reviewId: 'review_public_reading',
+    };
+    const payload = { audioMode: 'page_only',
+      audioAvailabilityNote: '点读、跟读与示范音频暂未开放', chapters: [{ id: 'chapter_public',
+        pages: [{ id: 'page_public', pageNumber: 1, role: 'content',
+          imageAssetKey: 'cloud://page-public', thumbnailAssetKey: 'cloud://thumb-public' }] }] };
+    const source: VersionedDocument = {
+      _id: 'source_public_reading', organizationId: 'public_catalog', schemaVersion: 1,
+      version: 1, deletedAt: null, type: 'reading', status: 'published', title: '测试阅读',
+      contentVersion: 'v1', copyrightStatus: 'verified', visibility: { type: 'organization' },
+      publicCatalogSource: true, teacherCatalogOnly: true, audioMode: 'page_only',
+      audioAvailabilityNote: payload.audioAvailabilityNote,
+      payload: { ...payload, assetLibrary: { ...origin, resourceId: 'source_public_reading' } },
+    };
+    const contentSha256 = publicLearningContentSha256(source);
+    const approvedSource = { ...source, payload: { ...payload, assetLibrary: {
+      ...origin, resourceId: source._id, contentSha256 } } };
+    const projection: VersionedDocument = {
+      ...approvedSource, _id: 'projected_public_reading', organizationId: ORGANIZATION_ID,
+      publicCatalogSource: false, publicLearningProjection: true,
+      payload: { ...payload, assetLibrary: { ...origin, sourcePublicId: source._id, contentSha256 } },
+    };
+    const database = new FakeDocumentDatabase({
+      [LEARNING_PROGRESS_COLLECTIONS.resources]: [approvedSource, projection],
+    });
+    const progress = service(database);
+    await expect(progress.getReadingProgress(student, projection._id)).resolves.toBeNull();
+    await expect(progress.saveReadingProgress(student, {
+      resourceId: projection._id, chapterId: 'chapter_public', pageId: 'page_public',
+      pageNumber: 1, favorite: false, expectedVersion: 0, operationId: 'public_checkin_page',
+    })).resolves.toMatchObject({ resourceId: projection._id, pageNumber: 1 });
+    await expect(progress.getReadingProgress({ ...student, organizationId: 'other_org' }, projection._id))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const offline = new FakeDocumentDatabase({
+      [LEARNING_PROGRESS_COLLECTIONS.resources]: [{ ...approvedSource, status: 'offline' }, projection],
+    });
+    await expect(service(offline).getReadingProgress(student, projection._id))
       .rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
@@ -94,6 +140,8 @@ describe('learning progress document repository', () => {
     const database = new FakeDocumentDatabase({ [LEARNING_PROGRESS_COLLECTIONS.resources]: [legacy] });
     const progress = service(database);
     await expect(progress.getReadingProgress(student, legacy._id)).resolves.toBeNull();
+    await expect(progress.getReadingProgress({ ...student, actorUserId: 'other_student' }, legacy._id))
+      .resolves.toBeNull();
     await expect(progress.saveReadingProgress(student, {
       resourceId: legacy._id, chapterId: 'chapter_legacy', pageId: 'page_legacy', pageNumber: 1,
       favorite: false, expectedVersion: 0, operationId: 'legacy_reading_page',

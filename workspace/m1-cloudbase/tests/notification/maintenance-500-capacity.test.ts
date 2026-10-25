@@ -121,7 +121,7 @@ describe('M2 500-person activity finalization capacity and recovery', () => {
     expect((await activityService.getLeaderboard(actor, ACTIVITY)).evidenceStatus).toBe('available');
   }, 120000);
 
-  it('records an indexed-legacy miss for recovery without inventing a late ranking', async () => {
+  it('finishes an indexed legacy activity on a later maintenance pass', async () => {
     const { database, maintenance, activityService, actor, setNow } = fixture({ activitiesAhead: 150, legacyIndex: true });
     for (let minute = 0; minute <= 5; minute += 1) {
       setNow(`2026-09-28T16:${String(minute).padStart(2, '0')}:00.000Z`);
@@ -130,12 +130,8 @@ describe('M2 500-person activity finalization capacity and recovery', () => {
     expect(database.snapshot().checkin_final_boards ?? []).toHaveLength(0);
     setNow(CLOCK_MISSED);
     const late = await maintenance.run();
-    expect(late).toMatchObject({ finalizedActivities: 0, pendingRecoveryActivities: 1 });
-    expect(database.snapshot().checkin_finalization_recovery).toMatchObject([
-      { activityId: ACTIVITY, status: 'pending', reason: 'window_missed' },
-    ]);
-    expect((await activityService.getLeaderboard(actor, ACTIVITY)).evidenceStatus).toBe('not_available');
-    await expect(activityService.finalizeActivity(ORG, ACTIVITY)).rejects.toMatchObject({ code: 'CONFLICT' });
-    expect(database.snapshot().checkin_final_boards ?? []).toHaveLength(0);
+    expect(late).toMatchObject({ finalizedActivities: 1, pendingRecoveryActivities: 0 });
+    expect((await activityService.getLeaderboard(actor, ACTIVITY)).evidenceStatus).toBe('available');
+    expect(database.snapshot().checkin_final_boards ?? []).toHaveLength(1);
   }, 120000);
 });

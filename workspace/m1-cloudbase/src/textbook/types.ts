@@ -11,6 +11,8 @@ export interface TextbookSummary {
   readonly term: string;
   readonly edition: string;
   readonly contentVersion: string;
+  readonly audioMode?: 'page_only' | 'chapter_audio' | 'partial_pointread';
+  readonly audioAvailabilityNote?: string;
   readonly chapters: readonly TextbookChapter[];
 }
 

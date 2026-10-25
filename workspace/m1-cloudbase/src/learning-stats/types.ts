@@ -28,18 +28,37 @@ export interface StatsSummary {
   readonly taskSubmissionCount: number;
   readonly averageScore: number | null;
   readonly learningMinutes: null;
-  readonly practiceAccuracy: null;
+  readonly phonicsPracticeCount: number | null;
+  readonly practiceAccuracy: number | null;
+  readonly checkinCompletedDays: number | null;
+  readonly checkinEvidenceStatus: 'available' | 'partial' | 'unavailable';
   readonly dubbingCount: number | null;
   readonly shadowingCount: null;
+}
+
+export interface StatsLearningEvent {
+  readonly kind: 'phonics' | 'checkin';
+  readonly sourceId: string;
+  readonly sourceTitle: string;
+  readonly studentId: string;
+  readonly studentName: string;
+  readonly classId: string;
+  readonly className: string;
+  readonly occurredOn: string;
+  readonly occurredAt: string | null;
+  readonly firstCorrect?: boolean;
+  readonly supplemented?: boolean;
 }
 
 export interface StatsView {
   readonly filters: StatsFilters;
   readonly periodBasis: 'taskDueDate';
+  readonly learningPeriodBasis: 'eventSchoolDate';
   readonly classes: readonly Readonly<{ id: string; name: string }>[];
   readonly students: readonly Readonly<{ id: string; name: string; classId: string }>[];
   readonly summary: StatsSummary;
   readonly details: readonly StatsTaskDetail[];
+  readonly learningEvents: readonly StatsLearningEvent[];
   readonly canExport: boolean;
 }
 

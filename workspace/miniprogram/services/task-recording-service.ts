@@ -1,5 +1,5 @@
 import type { ServiceResult } from '../domain/types'
-import type { RecordingPromptPage, RecordingPromptView, TaskRecordingMediaState, TaskRecordingPlayback, TaskRecordingView } from '../domain/task-recording'
+import type { RecordingPromptFacet, RecordingPromptPage, RecordingPromptView, TaskRecordingMediaState, TaskRecordingPlayback, TaskRecordingView } from '../domain/task-recording'
 import { getCloudAppService } from '../repositories/repository-factory'
 
 function unavailable<T>(): ServiceResult<T> {
@@ -7,9 +7,14 @@ function unavailable<T>(): ServiceResult<T> {
     message: '录音任务需要可信云端封存服务，当前演示模式不可提交', retryable: false } }
 }
 export async function listRecordingPrompts(userId: string, targetClassIds?: string[], keyword = '',
-  limit = 20, offset = 0): Promise<ServiceResult<RecordingPromptPage>> {
+  limit = 20, offset = 0, filters?: { grade?: string; unit?: string }): Promise<ServiceResult<RecordingPromptPage>> {
   const cloud = getCloudAppService()
-  return cloud ? cloud.listRecordingPrompts(userId, targetClassIds, keyword, limit, offset) : unavailable()
+  return cloud ? cloud.listRecordingPrompts(userId, targetClassIds, keyword, limit, offset, filters) : unavailable()
+}
+export async function listRecordingPromptFacets(userId: string,
+  targetClassIds?: string[]): Promise<ServiceResult<RecordingPromptFacet[]>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.listRecordingPromptFacets(userId, targetClassIds) : unavailable()
 }
 export async function getRecordingPrompt(userId: string, promptId: string,
   targetClassIds?: string[]): Promise<ServiceResult<RecordingPromptView>> {

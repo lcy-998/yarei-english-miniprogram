@@ -93,19 +93,9 @@ export function createOrganizationAdminFunction(dependencies: OrganizationAdminF
       if (actor.actorRole !== 'admin') throw new OrgContentError('FORBIDDEN');
       switch (input.action) {
         case 'listDeletedWorkDrafts':
-          return success(await dependencies.studentWorks.listDeletedDrafts(actor, input.studentId, input.page),
-            createMeta(dependencies.clock, dependencies.requestIds));
+          return failure('FORBIDDEN', createMeta(dependencies.clock, dependencies.requestIds));
         case 'restoreWorkDraft': {
-          try {
-            return success(await dependencies.studentWorks.restoreDraft(actor, input),
-              createMeta(dependencies.clock, dependencies.requestIds));
-          } catch (error: unknown) {
-            if (error instanceof StudentWorkAdminError && error.fieldMessage) {
-              return failure(error.code, createMeta(dependencies.clock, dependencies.requestIds),
-                { workId: error.fieldMessage });
-            }
-            throw error;
-          }
+          return failure('FORBIDDEN', createMeta(dependencies.clock, dependencies.requestIds));
         }
         case 'listAdminQuestions':
           return success(await dependencies.questions.list(actor, input.filters, input.page), createMeta(dependencies.clock, dependencies.requestIds));

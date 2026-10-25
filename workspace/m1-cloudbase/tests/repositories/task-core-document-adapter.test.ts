@@ -81,6 +81,28 @@ describe('TaskCore document database adapter contract', () => {
     });
   });
 
+  it('projects a top-level vocabulary document into the immutable task payload', async () => {
+    const resourceId = 'res_real_vocabulary_demo';
+    const words = [{ id: 'word_one', word: 'hello', meaning: '你好',
+      example: 'Hello!', syllables: ['hel', 'lo'], audioAssetKey: 'cloud://demo/hello.mp3' }];
+    const database = new FakeDocumentDatabase({
+      [TASK_CORE_COLLECTIONS.resources]: [createDocument(resourceId, ORGANIZATION_ID, 1, {
+        organizationId: ORGANIZATION_ID, type: 'vocabulary', title: '真实词包',
+        contentVersion: 2, status: 'published', visibility: { type: 'classes', classIds: [CLASS_ID] },
+        grade: '三年级', unit: 'Unit 2', words,
+      })],
+    });
+    const repository = createTaskCoreDocumentRepository(database);
+    const resource = await repository.findResource(ORGANIZATION_ID, resourceId);
+    expect(resource?.payload).toMatchObject({ grade: '三年级', unit: 'Unit 2', words });
+    await repository.runTransaction(scope({ resourceIds: [resourceId] }), async transaction => {
+      expect((await transaction.findResource(ORGANIZATION_ID, resourceId))?.payload)
+        .toMatchObject({ grade: '三年级', unit: 'Unit 2', words });
+    });
+    words[0]!.word = 'changed locally';
+    expect(resource?.payload.words).toMatchObject([{ word: 'hello' }]);
+  });
+
   it('reads only the current student learning progress inside the submission transaction', async () => {
     const reading = { id: 'reading_demo', organizationId: ORGANIZATION_ID, studentId: STUDENT_ID, resourceId: 'resource_reading',
       chapterId: 'chapter_demo', pageId: 'page_2', pageNumber: 2, favorite: false, version: 1, updatedAt: '2026-09-16T01:00:00.000Z' };

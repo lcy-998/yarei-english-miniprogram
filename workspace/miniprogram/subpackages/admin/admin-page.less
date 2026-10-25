@@ -1,0 +1,86 @@
+@import "../../styles/design-tokens.less";
+.native-admin { min-height: 100vh; padding-bottom: calc(116px + env(safe-area-inset-bottom)); box-sizing: border-box; background: linear-gradient(180deg,#b7e7ff 0,#eaf5ff 250px,#f5f8fb 100%); color: #102c67; }
+.native-admin button { display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center; line-height: 1.3; }
+.native-admin button::after { border: 0; }
+.native-admin__header { padding: 0 0 16px; }
+.native-admin__eyebrow { display: block; margin-top: 8px; color: #51739a; font-size: 13px; font-weight: 700; }
+.native-admin__title { display: block; margin-top: 12px; font-size: 30px; font-weight: 900; line-height: 1.25; }
+.native-admin__hero { margin: 0 20px 14px; padding: 20px 18px; border-radius: 26px; background: linear-gradient(130deg,#238ef1,#1261d6); color: white; box-shadow: 0 12px 24px rgba(38,102,194,.18); }
+.native-admin__hero-title { display: block; font-size: 21px; font-weight: 900; line-height: 1.35; }
+.native-admin__hero-note { display: block; margin-top: 10px; font-size: 13px; line-height: 1.5; }
+.native-admin__scope { display: inline-block; max-width: 100%; box-sizing: border-box; margin-top: 14px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.18); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.native-admin__search { margin: 0 20px 14px; padding: 0 14px; min-height: 48px; display: flex; align-items: center; border: 1px solid #d4e5fa; border-radius: 12px; background: white; }
+.native-admin__search input { flex: 1 1 0; width: 0; min-width: 0; min-height: 48px; font-size: 14px; }
+.native-admin__filter-panel { margin: -4px 20px 14px; padding: 12px; border: 1px solid #d9e8fb; border-radius: 14px; background: rgba(255,255,255,.88); }
+.native-admin__filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.native-admin__filter-row .native-admin__module-note { flex-basis: 100%; }
+.native-admin__filter-row button { flex: 0 0 auto; width: auto; min-width: 0; min-height: 40px; margin: 0; padding: 6px 12px; border-radius: 14px; background: #edf4fc; color: #435e80; font-size: 14px; line-height: 1.3; white-space: normal; }
+.native-admin__filter-row button.active { background: #dceeff; color: #096cdb; }
+.native-admin__date-filter { min-height: 32px; padding: 0 10px; border: 1px solid #d4e5fa; border-radius: 10px; background: #fff; color: #527195; font-size: 12px; line-height: 32px; }
+.native-admin__filter-submit { width: 100%; min-height: 44px; margin: 0; border-radius: 10px; background: #eaf3ff; color: #0b58b5; font-size: 14px; }
+.native-admin__card { margin: 0 20px 14px; padding: 18px 16px; border: 1px solid #d9e8fb; border-radius: 22px; background: #fffdfa; box-shadow: 0 8px 20px rgba(25,74,143,.08); }
+.native-admin__card-title { display: block; margin-bottom: 8px; font-size: 19px; font-weight: 900; }
+.native-admin__module { display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 10px 0; border-top: 1px solid #e2edfa; }
+.native-admin__module:first-of-type { border-top: 0; }
+.native-admin__icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 12px; background: #e5f6ea; color: #16a663; font-size: 18px; font-weight: 900; }
+.native-admin__module-copy { flex: 1; min-width: 0; }
+.native-admin__module-title { display: block; min-width: 0; overflow-wrap: anywhere; font-size: 15px; font-weight: 850; }
+.native-admin__module-note { display: block; min-width: 0; overflow-wrap: anywhere; margin-top: 3px; color: #47617f; font-size: 13px; line-height: 1.5; }
+.native-admin__chevron { flex: none; max-width: 72px; color: #0b58b5; font-size: 14px; font-weight: 700; line-height: 1.4; text-align: right; }
+.native-admin__notice { display: block; width: auto; min-width: 0; box-sizing: border-box; margin: 14px 20px; padding: 14px; border-radius: 14px; background: #fff0e5; color: #934b26; font-size: 13px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.native-admin__card .native-admin__notice { margin: 12px 0; }
+.native-admin__notice + .native-admin__form-actions { margin-top: 14px; }
+.native-admin__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.native-admin__metrics view { min-height: 78px; padding: 14px; border-radius: 15px; background: #eaf3ff; box-sizing: border-box; }
+.native-admin__metrics view:nth-child(2) { background: #e8f7ee; }
+.native-admin__metrics view:nth-child(3) { background: #fff1e8; }
+.native-admin__metrics view:nth-child(4) { background: #f0edff; }
+.native-admin__metrics text { display: block; color: #607ca2; font-size: 13px; }
+.native-admin__metrics text:last-child { margin-top: 7px; color: #1979e6; font-size: 23px; font-weight: 900; }
+.native-admin__class-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.native-admin__class-chips button { flex: 0 0 auto; width: auto; min-width: 0; margin: 0; padding: 7px 12px; min-height: 40px; border-radius: 15px; background: #edf4fc; color: #435e80; font-size: 14px; line-height: 1.3; white-space: normal; }
+.native-admin__class-chips button.active { background: #dceeff; color: #096cdb; }
+.native-admin__form-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.native-admin__form-heading .native-admin__card-title { min-width: 0; overflow-wrap: anywhere; }
+.native-admin__form-heading button { flex: none; width: auto; min-width: 0; min-height: 38px; margin: 0; padding: 6px 11px; border-radius: 10px; background: #eaf3ff; color: #0b58b5; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.native-admin__field { display: block; width: 100%; min-height: 42px; margin-top: 12px; padding: 10px 12px; box-sizing: border-box; border: 1px solid #c9dff8; border-radius: 12px; background: white; font-size: 14px; }
+.native-admin__choice-trigger { display: block; width: 100%; min-height: 48px; margin: 12px 0 0; padding: 11px 14px; box-sizing: border-box; border: 1px solid #b9d6f6; border-radius: 12px; background: #eaf3ff; color: #0b58b5; font-size: 14px; font-weight: 800; line-height: 1.45; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.native-admin__option-picker .native-admin__option-search { margin: 12px 0; }
+.native-admin__option-search button { width: auto; min-width: 72px; min-height: 44px; margin: 0; padding: 8px 12px; border-radius: 10px; background: #eaf3ff; color: #0b58b5; font-size: 14px; }
+.native-admin__option-row { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; width: 100%; min-height: 48px; margin: 8px 0 0; padding: 10px 12px; box-sizing: border-box; border: 1px solid #d4e5fa; border-radius: 12px; background: #fff; color: #102c67; text-align: left; line-height: 1.4; white-space: normal; }
+.native-admin__option-row text { display: block; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.native-admin__option-row text:first-child { font-size: 14px; font-weight: 800; }
+.native-admin__option-row text:last-child { color: #47617f; font-size: 12px; }
+.native-admin__option-row.active { border-color: #1f7ce7; background: #eaf3ff; }
+.native-admin__form-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.native-admin__form-actions button { flex: 1 1 110px; width: auto; min-width: 0; margin: 0; min-height: 46px; padding: 8px 12px; border-radius: 12px; background: #1f7ce7; color: white; font-size: 14px; font-weight: 800; line-height: 1.3; white-space: normal; }
+.native-admin__form-actions button[data-action="offline"],
+.native-admin__form-actions button[data-action="stop"],
+.native-admin__form-actions button[data-action="unpublish"] { background: #fff0e9; color: #a33e1e; }
+.native-admin__secondary { margin: 8px 0 0; min-height: 40px; padding: 7px 12px; background: #eaf3ff; color: #0b58b5; font-size: 14px; }
+.native-admin__row-actions { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.native-admin__row-actions button { margin: 0; padding: 5px 9px; min-height: 38px; border-radius: 8px; background: #eaf3ff; color: #0b58b5; font-size: 13px; line-height: 1.3; white-space: normal; }
+.native-admin__module--class { display: grid; grid-template-columns: 40px minmax(0,1fr); align-items: start; gap: 8px 12px; }
+.native-admin__module--class .native-admin__module-copy { grid-column: 2; min-width: 0; }
+.native-admin__module--class .native-admin__row-actions { grid-column: 2; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; min-width: 0; }
+.native-admin__module--class .native-admin__row-actions button { flex: 0 0 auto; width: auto; max-width: 100%; min-width: 0; padding: 4px 9px; line-height: 1.3; white-space: normal; }
+.native-admin__evidence-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; padding: 12px 0; border-top: 1px solid #e2edfa; font-size: 13px; }
+.native-admin__evidence-row text:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; color: #47617f; }
+.native-admin__evidence-row text:last-child { max-width: 55%; min-width: 0; overflow-wrap: anywhere; color: #102c67; font-weight: 800; text-align: right; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .native-admin { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
+  .native-admin__header { padding-bottom: 4px !important; }
+  .native-admin__hero, .native-admin__search, .native-admin__filter-panel, .native-admin__card, .native-admin__notice {
+    margin-left: max(42px, env(safe-area-inset-left)) !important;
+    margin-right: max(42px, env(safe-area-inset-right)) !important;
+    margin-bottom: 8px;
+  }
+  .native-admin__hero { display: flex; align-items: center; gap: 10px; min-height: 48px; box-sizing: border-box; padding: 7px 12px !important; border-radius: 14px; }
+  .native-admin__hero-title { font-size: 17px; line-height: 1.2; }
+  .native-admin__hero-note { flex: 1; min-width: 0; margin-top: 0 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 1.3; }
+  .native-admin__scope { flex: none; margin-top: 0 !important; padding: 4px 8px; font-size: 11px; line-height: 1.25; }
+  .native-admin__search { min-height: 40px; }
+  .native-admin__search input { min-height: 40px; }
+  .native-admin__card { padding: 12px 14px; border-radius: 15px; }
+  .native-admin__card-title { font-size: 17px; }
+}

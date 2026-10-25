@@ -1,15 +1,15 @@
 interface RoleTab { key: string; label: string; url: string }
 
 const TEACHER_TABS: RoleTab[] = [
-  { key: 'workbench', label: '工作台', url: '/pages/teacher/workbench/workbench' },
-  { key: 'tasks', label: '任务', url: '/pages/teacher/task-center/task-center' },
+  { key: 'workbench', label: '工作台', url: '/subpackages/teacher/workbench/workbench' },
+  { key: 'tasks', label: '任务', url: '/subpackages/teacher/task-center/task-center' },
   { key: 'materials', label: '教材', url: '' },
   { key: 'students', label: '学员', url: '' },
   { key: 'mine', label: '我的', url: '' },
 ]
 
 const PARENT_TABS: RoleTab[] = [
-  { key: 'home', label: '首页', url: '/pages/parent/home/home' },
+  { key: 'home', label: '首页', url: '/subpackages/parent/home/home' },
   { key: 'children', label: '孩子', url: '' },
   { key: 'report', label: '报告', url: '' },
   { key: 'mine', label: '我的', url: '' },

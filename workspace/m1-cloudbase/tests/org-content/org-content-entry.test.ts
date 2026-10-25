@@ -264,6 +264,100 @@ describe('M1 content-query 可注入函数入口', () => {
     ] });
   });
 
+  it('跟读示范音频只返回 60 秒签发地址，签发失败不泄露云文件标识', async () => {
+    const source = { resourceId: 'read_zoo', sourceVersion: 'reviewed-v1', segments: [
+      { id: 'segment_1', text: 'A tiger is at the zoo.', pageNumber: 1,
+        demonstrationAudioAssetKey: 'cloud://private/demo.mp3' },
+    ] };
+    const signed = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getReadingPronunciationSegments: vi.fn(async () => source) },
+      readingMediaStorage: { async getTempFileURL(input) { return { fileList: input.fileList.map(item => ({
+        fileID: item.fileID, tempFileURL: 'https://media.example.test/short.mp3', code: 'SUCCESS',
+      })) }; } } });
+    const result = await signed({ apiVersion: 'm1.v1', action: 'getReadingPronunciationSegments',
+      payload: { resourceId: 'read_zoo' } });
+    expect(result).toMatchObject({ ok: true, data: { segments: [{ id: 'segment_1',
+      demonstrationAudio: { temporaryUrl: 'https://media.example.test/short.mp3' } }] } });
+    expect(JSON.stringify(result)).not.toContain('cloud://private');
+    const unsigned = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getReadingPronunciationSegments: vi.fn(async () => source) } });
+    const denied = await unsigned({ apiVersion: 'm1.v1', action: 'getReadingPronunciationSegments',
+      payload: { resourceId: 'read_zoo' } });
+    expect(denied).toMatchObject({ ok: false, error: { code: 'SERVICE_UNAVAILABLE' } });
+    expect(JSON.stringify(denied)).not.toContain('cloud://private');
+  });
+
+  it('页图点读只签发当前授权章节音频，响应不包含私有文件 ID', async () => {
+    const source = { resourceId: 'read_zoo', sourceVersion: 'reviewed-v1', chapterId: 'chapter_demo',
+      durationMs: 5000, audioAssetKey: 'cloud://private/chapter.mp3', segments: [{
+        id: 'segment_1', pageId: 'page_1', pageNumber: 1, text: 'A tiger is at the zoo.',
+        rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.1 }, startMs: 1000, endMs: 3000,
+      }] };
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getReadingAudioMap: vi.fn(async () => source) },
+      readingMediaStorage: { async getTempFileURL(input) { return { fileList: input.fileList.map(item => ({
+        fileID: item.fileID, tempFileURL: 'https://media.example.test/chapter.mp3', code: 'SUCCESS',
+      })) }; } } });
+    const result = await main({ apiVersion: 'm1.v1', action: 'getReadingAudioMap',
+      payload: { resourceId: 'read_zoo', chapterId: 'chapter_demo' } });
+    expect(result).toMatchObject({ ok: true, data: { playback: {
+      temporaryUrl: 'https://media.example.test/chapter.mp3' }, segments: [{ id: 'segment_1' }] } });
+    expect(JSON.stringify(result)).not.toContain('cloud://private');
+    expect(await main({ apiVersion: 'm1.v1', action: 'getReadingAudioMap',
+      payload: { resourceId: 'read_zoo', chapterId: 'chapter_demo', actorRole: 'teacher' } }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+  });
+
+  it('逐页真人音频可单独签发给已审核点读，私有文件 ID 不进入学生响应', async () => {
+    const signedIds: string[] = [];
+    const source = { resourceId: 'read_zoo', sourceVersion: 'reviewed-v1', chapterId: 'chapter_demo',
+      durationMs: 9000, audioAssetKey: 'cloud://private/full.mp3', segments: [{
+        id: 'sentence_1', pageId: 'page_1', pageNumber: 1, text: 'A tiger is at the zoo.',
+        rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.1 }, startMs: 0, endMs: 2000,
+        clipAudioAssetKey: 'cloud://private/page-01.mp3', clipDurationMs: 2400,
+      }] };
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getReadingAudioMap: vi.fn(async () => source) },
+      readingMediaStorage: { async getTempFileURL(input) {
+        signedIds.push(...input.fileList.map(item => item.fileID));
+        return { fileList: input.fileList.map(item => ({ fileID: item.fileID,
+          tempFileURL: `https://media.example.test/${item.fileID.endsWith('full.mp3') ? 'full' : 'page-01'}.mp3`,
+          code: 'SUCCESS' })) };
+      } } });
+    const result = await main({ apiVersion: 'm1.v1', action: 'getReadingAudioMap',
+      payload: { resourceId: 'read_zoo', chapterId: 'chapter_demo' } });
+    expect(signedIds).toEqual(['cloud://private/full.mp3', 'cloud://private/page-01.mp3']);
+    expect(result).toMatchObject({ ok: true, data: { segments: [{ id: 'sentence_1',
+      clipDurationMs: 2400, clipPlayback: { temporaryUrl: 'https://media.example.test/page-01.mp3' } }] } });
+    expect(JSON.stringify(result)).not.toContain('cloud://private');
+  });
+
+  it('单词词包逐词签发 60 秒标准发音地址，不向客户端泄露私有文件 ID', async () => {
+    const source = { ...vocabularyPack, words: [{ id: 'word_mum', word: 'mum', meaning: '妈妈',
+      example: 'This is my mum.', syllables: ['mum'], ipa: '/mʌm/',
+      audioAssetKey: 'cloud://private/mum.mp3' }] };
+    const getVocabularyPack = vi.fn(async () => source);
+    const getTempFileURL = vi.fn(async (input: Readonly<{
+      fileList: readonly Readonly<{ fileID: string; maxAge: number }>[];
+    }>) => ({ fileList: input.fileList.map(item => ({ fileID: item.fileID,
+      tempFileURL: 'https://media.example.test/mum.mp3', code: 'SUCCESS' })) }));
+    const main = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getVocabularyPack }, readingMediaStorage: { getTempFileURL } });
+    const result = await main({ apiVersion: 'm1.v1', action: 'getVocabularyPack',
+      payload: { resourceId: 'vocab_animals' } });
+    expect(result).toMatchObject({ ok: true, data: { words: [{ id: 'word_mum', ipa: '/mʌm/',
+      pronunciationUrl: 'https://media.example.test/mum.mp3',
+      pronunciationExpiresAt: '2026-09-16T03:01:00.000Z' }] } });
+    expect(getTempFileURL).toHaveBeenCalledWith({ fileList: [{ fileID: 'cloud://private/mum.mp3', maxAge: 60 }] });
+    expect(JSON.stringify(result)).not.toContain('cloud://private');
+    const unsigned = createContentQueryFunction({ ...createBoundary('content-query', studentActor),
+      handler: { ...contentHandler(), getVocabularyPack } });
+    const denied = await unsigned({ apiVersion: 'm1.v1', action: 'getVocabularyPack',
+      payload: { resourceId: 'vocab_animals' } });
+    expect(denied).toMatchObject({ ok: false, error: { code: 'SERVICE_UNAVAILABLE' } });
+    expect(JSON.stringify(denied)).not.toContain('cloud://private');
+  });
+
   it('私有云页图无法签发时明确失败，不把 cloud:// 地址发给页面', async () => {
     const handler = { ...contentHandler(), getReadingResource: vi.fn(async (): Promise<ReadingResourceView> => ({
       ...readingDetail, chapters: [{ id: 'chapter_real_sample', title: 'Sample', order: 1,
@@ -324,7 +418,15 @@ describe('M1 content-query 可注入函数入口', () => {
     expect(await main({ apiVersion: 'm1.v1', action: 'listTaskCatalogFacets', payload: {
       type: 'reading', targetClassIds: ['class_grade3_2'],
     } })).toMatchObject({ ok: true, data: [] });
-    expect(handler.listTaskCatalogFacets).toHaveBeenCalledWith(teacherActor, 'reading', ['class_grade3_2']);
+    expect(handler.listTaskCatalogFacets).toHaveBeenCalledWith(teacherActor, 'reading', ['class_grade3_2'], undefined);
+    expect(await main({ apiVersion: 'm1.v1', action: 'listTaskCatalogFacets', payload: {
+      type: 'reading', category: 'picture_book', targetClassIds: ['class_grade3_2'],
+    } })).toMatchObject({ ok: true, data: [] });
+    expect(handler.listTaskCatalogFacets).toHaveBeenLastCalledWith(teacherActor, 'reading',
+      ['class_grade3_2'], 'picture_book');
+    expect(await main({ apiVersion: 'm1.v1', action: 'listTaskCatalogFacets', payload: {
+      type: 'vocabulary', category: 'picture_book',
+    } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await main({ apiVersion: 'm1.v1', action: 'getSchoolQuestion', payload: { resourceId: 'question_1' } }))
       .toMatchObject({ ok: true, data: { correctAnswer: '猫' } });
     expect(await main({ apiVersion: 'm1.v1', action: 'listSchoolQuestions', payload: {

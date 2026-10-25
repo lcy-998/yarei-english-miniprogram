@@ -6,13 +6,12 @@ import { TEXTBOOK_DASHBOARD_FIELDS, type TextbookCenterLayout } from './admin-ty
 export interface TextbookClock { nowIso(): string }
 export interface TextbookListFilters { readonly grade?: string; readonly term?: string; readonly edition?: string;
   readonly unit?: string; readonly lesson?: string; readonly keyword?: string }
+export interface TextbookFacetValues { readonly grade: readonly string[]; readonly term: readonly string[];
+  readonly edition: readonly string[]; readonly unit: readonly string[]; readonly lesson: readonly string[] }
 export interface TextbookSaveInput { readonly classId: string; readonly textbooks: readonly ClassTextbookItem[]; readonly note: string }
 function copy<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 function validOperation(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/.test(value); }
 function validId(value: string): boolean { return typeof value === 'string' && !!value.trim() && value.length <= 128; }
-function visible(book: TextbookRecord, classId: string): boolean {
-  return book.visibility === 'organization' || book.allowedClassIds.includes(classId);
-}
 function safeBook(book: TextbookRecord): TextbookSummary {
   const { visibility: ignoredVisibility, allowedClassIds: ignoredClasses, ...summary } = book;
   void ignoredVisibility; void ignoredClasses;
@@ -48,15 +47,14 @@ export class TeacherTextbookService {
 
   public async listTextbooks(actor: TrustedActorContext, filters: TextbookListFilters,
     page: Readonly<{ limit: number; offset: number }>, targetClassId?: string): Promise<Readonly<{ items: readonly TextbookSummary[]; nextOffset: number | null }>> {
-    this.requireTeacher(actor);
+    this.requireMaterialReader(actor);
     if (!Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 50 || !Number.isSafeInteger(page.offset)
       || page.offset < 0 || page.offset > 10000 || (filters.keyword?.length ?? 0) > 100) throw new TextbookError('VALIDATION_ERROR');
     return this.repository.transaction(async transaction => {
-      const settings = await this.centerSettings(transaction, actor);
-      if (!settings.synchronizedTextbooksEnabled) throw new TextbookError('FORBIDDEN');
-      const classes = await transaction.listTeacherClasses(actor.organizationId, actor.actorUserId);
-      const authorized = classes.filter(item => actor.scopeIds.includes(item.id) && settings.visibleClassIds.includes(item.id));
-      if (!authorized.length || (targetClassId && !authorized.some(item => item.id === targetClassId))) throw new TextbookError('FORBIDDEN');
+      if ((await transaction.findPublishedCenterLayout(actor.organizationId))?.synchronizedTextbooksEnabled === false) {
+        throw new TextbookError('FORBIDDEN');
+      }
+      void targetClassId;
       const keyword = filters.keyword?.trim().toLocaleLowerCase() ?? '';
       const items: TextbookSummary[] = [];
       let offset = page.offset;
@@ -70,8 +68,6 @@ export class TeacherTextbookService {
         for (const book of batch.items) {
           offset += 1;
           if (book === null) continue;
-          if (!authorized.some(item => item.grade === book.grade && visible(book, item.id)
-            && (!targetClassId || item.id === targetClassId))) continue;
           if ((filters.grade && book.grade !== filters.grade) || (filters.term && book.term !== filters.term)
             || (filters.edition && book.edition !== filters.edition)
             || (filters.unit && !book.chapters.some(chapter => chapter.title.includes(filters.unit!)))
@@ -88,17 +84,59 @@ export class TeacherTextbookService {
     });
   }
 
+  public async listTextbookFacets(actor: TrustedActorContext, selected: TextbookListFilters,
+    targetClassId?: string): Promise<TextbookFacetValues> {
+    this.requireMaterialReader(actor);
+    if (Object.values(selected).some(value => value !== undefined && value.length > 100)) throw new TextbookError('VALIDATION_ERROR');
+    return this.repository.transaction(async transaction => {
+      if ((await transaction.findPublishedCenterLayout(actor.organizationId))?.synchronizedTextbooksEnabled === false) {
+        throw new TextbookError('FORBIDDEN');
+      }
+      void targetClassId;
+      const values = { grade: new Set<string>(), term: new Set<string>(), edition: new Set<string>(),
+        unit: new Set<string>(), lesson: new Set<string>() };
+      let offset = 0;
+      while (true) {
+        if (offset > 10000) throw new TextbookError('SERVICE_UNAVAILABLE');
+        const page = await transaction.listTextbookPage(actor.organizationId, { limit: 50, offset });
+        if (!page.items.length) break;
+        for (const book of page.items) {
+          if (book === null) continue;
+          const keyword = selected.keyword?.trim().toLocaleLowerCase();
+          if (keyword && !`${book.title} ${book.edition} ${book.chapters.map(chapter => chapter.title).join(' ')}`
+            .toLocaleLowerCase().includes(keyword)) continue;
+          values.grade.add(book.grade);
+          if (selected.grade && book.grade !== selected.grade) continue;
+          values.term.add(book.term);
+          if (selected.term && book.term !== selected.term) continue;
+          values.edition.add(book.edition);
+          if (selected.edition && book.edition !== selected.edition) continue;
+          for (const chapter of book.chapters) {
+            values.unit.add(chapter.title);
+            if (selected.unit && chapter.title !== selected.unit) continue;
+            for (const lesson of chapter.lessons) values.lesson.add(lesson.title);
+          }
+        }
+        if (page.nextOffset === null) break;
+        if (page.nextOffset <= offset) throw new TextbookError('SERVICE_UNAVAILABLE');
+        offset = page.nextOffset;
+      }
+      const sorted = (set: Set<string>) => [...set].filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+      return { grade: sorted(values.grade), term: sorted(values.term), edition: sorted(values.edition),
+        unit: sorted(values.unit), lesson: sorted(values.lesson) };
+    });
+  }
+
   public async getTextbook(actor: TrustedActorContext, textbookId: string, targetClassId?: string): Promise<TextbookSummary> {
-    this.requireTeacher(actor);
+    this.requireMaterialReader(actor);
     if (!validId(textbookId)) throw new TextbookError('VALIDATION_ERROR');
     return this.repository.transaction(async transaction => {
-      const settings = await this.centerSettings(transaction, actor);
-      if (!settings.synchronizedTextbooksEnabled) throw new TextbookError('FORBIDDEN');
-      const classes = await transaction.listTeacherClasses(actor.organizationId, actor.actorUserId);
+      if ((await transaction.findPublishedCenterLayout(actor.organizationId))?.synchronizedTextbooksEnabled === false) {
+        throw new TextbookError('FORBIDDEN');
+      }
+      void targetClassId;
       const book = await transaction.findTextbook(actor.organizationId, textbookId);
-      if (!book || !classes.some(item => item.grade === book.grade && visible(book, item.id)
-        && settings.visibleClassIds.includes(item.id) && actor.scopeIds.includes(item.id)
-        && (!targetClassId || item.id === targetClassId))) throw new TextbookError('NOT_FOUND');
+      if (!book) throw new TextbookError('NOT_FOUND');
       return safeBook(book);
     });
   }
@@ -114,7 +152,7 @@ export class TeacherTextbookService {
     return this.repository.transaction(async transaction => {
       const settings = await this.centerSettings(transaction, actor);
       if (!settings.classTextbooksEnabled || !settings.visibleClassIds.includes(input.classId)) throw new TextbookError('FORBIDDEN');
-      const target = await this.authorizedClass(transaction, actor, input.classId);
+      await this.authorizedClass(transaction, actor, input.classId);
       if (!actor.permissions.includes('task.publish')
         || !await transaction.hasClassPermission(actor.organizationId, actor.actorUserId, input.classId, 'task.publish')) {
         throw new TextbookError('FORBIDDEN');
@@ -128,7 +166,7 @@ export class TeacherTextbookService {
       if ((previous?.version ?? 0) !== expectedVersion) throw new TextbookError('CONFLICT');
       for (const item of input.textbooks) {
         const book = await transaction.findTextbook(actor.organizationId, item.textbookId);
-        if (!book || book.grade !== target.grade || !visible(book, input.classId) || !validId(item.textbookId)
+        if (!book || !validId(item.textbookId)
           || item.contentVersion !== book.contentVersion || !Array.isArray(item.chapterIds)
           || !Array.isArray(item.lessonIds) || new Set(item.chapterIds).size !== item.chapterIds.length
           || new Set(item.lessonIds).size !== item.lessonIds.length) throw new TextbookError('RESOURCE_OFFLINE');
@@ -156,6 +194,9 @@ export class TeacherTextbookService {
 
   private requireTeacher(actor: TrustedActorContext): void {
     if (actor.actorRole !== 'teacher' || !actor.permissions.includes('content.read')) throw new TextbookError('FORBIDDEN');
+  }
+  private requireMaterialReader(actor: TrustedActorContext): void {
+    if (!['student', 'parent', 'teacher', 'admin'].includes(actor.actorRole)) throw new TextbookError('FORBIDDEN');
   }
   private async centerSettings(transaction: TextbookTransaction, actor: TrustedActorContext): Promise<TextbookCenterLayout> {
     const classIds = await transaction.listTeacherClassIds(actor.organizationId, actor.actorUserId);

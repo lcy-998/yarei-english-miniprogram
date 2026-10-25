@@ -1,20 +1,20 @@
 # 英语资产资源表
 
-> 自动生成时间：2026-09-11T08:22:26.319759+00:00  
+> 自动生成时间：2026-10-01T12:58:19.453333+00:00  
 > 机器目录：`library/catalog.json`  
 > 版权策略：用户已确认本目录资料无版权问题
 
 ## 现有资源
 
-| 资源 ID | 类型 | 标题 | 源文件 | 版本 | 处理状态 | 文字覆盖 | 待补齐 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| book-join-in-5a-2026 | textbook | Join in 英语五年级上册 | 2026Join in新五上电子课本26-6-26.pdf | v1 | needs_review | 97.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-join-in-6a-2026 | textbook | Join in 英语六年级上册 | 2026秋外研Join in六年级上册 英语.pdf | v1 | needs_review | 95.8% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-unknown-3a | textbook | 三年级英语上册（版本待确认） | 1.三年级上册英语课本电子版（最新正式版）.pdf | v1 | needs_ocr | 0.0% | ocr_text, chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-pep-7a-2022 | textbook | 人教版英语七年级上册 | 【人教版】七上英语 电子课本（根据2022年版课程标准修订）.pdf | v1 | needs_review | 99.3% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-pep-9a-2022 | textbook | 人教版英语九年级上册 | 【人教版】九上英语 电子课本（根据2022年版课程标准修订）.pdf | v1 | needs_ocr | 0.0% | ocr_text, chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-pep-8a-2025 | textbook | 人教版英语八年级上册 | 2025秋季人教版八上英语新教材官方高清彩版.pdf | v1 | needs_review | 98.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
-| book-pep-4a | textbook | 人教版英语四年级上册 | 人教版英语·电子课本·四上.pdf | v1 | needs_review | 100.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| 资源 ID | 类型 | 标题 | 源文件 | 版本 | 处理状态 | 页面图 | 缩略图 | 坐标页 | 文字覆盖 | 待补齐 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| book-join-in-5a-2026 | textbook | Join in 英语五年级上册 | 2026Join in新五上电子课本26-6-26.pdf | v1 | needs_review | 2 | 2 | 3 | 97.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-join-in-6a-2026 | textbook | Join in 英语六年级上册 | 2026秋外研Join in六年级上册 英语.pdf | v1 | needs_review | 2 | 2 | 3 | 95.8% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-unknown-3a | textbook | 三年级英语上册（版本待确认） | 1.三年级上册英语课本电子版（最新正式版）.pdf | v1 | needs_ocr | 1 | 1 | 0 | 0.0% | ocr_text, chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-pep-7a-2022 | textbook | 人教版英语七年级上册 | 【人教版】七上英语 电子课本（根据2022年版课程标准修订）.pdf | v1 | needs_review | 1 | 1 | 3 | 99.3% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-pep-9a-2022 | textbook | 人教版英语九年级上册 | 【人教版】九上英语 电子课本（根据2022年版课程标准修订）.pdf | v1 | needs_ocr | 1 | 1 | 0 | 0.0% | ocr_text, chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-pep-8a-2025 | textbook | 人教版英语八年级上册 | 2025秋季人教版八上英语新教材官方高清彩版.pdf | v1 | needs_review | 1 | 1 | 3 | 98.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
+| book-pep-4a | textbook | 人教版英语四年级上册 | 人教版英语·电子课本·四上.pdf | v1 | needs_review | 3 | 3 | 93 | 100.0% | chapter_structure, chapter_audio, sentence_timeline, follow_read_text, structured_vocabulary, structured_questions |
 
 ## 未加入或未识别资源
 

@@ -86,6 +86,32 @@ describe('M2 activity CloudBase document boundary', () => {
     expect(JSON.stringify(snapshot[ACTIVITY_COLLECTIONS.activities])).not.toContain('student_inactive');
   });
 
+  it('M3 文档事务保留关闭榜单、软回收和审计，草稿删除使用精确 CAS', async () => {
+    const documents = database();
+    const setup = new ActivityService(new DocumentActivityRepository(documents), clock, ids);
+    const unused = await setup.saveDraft(teacher, input, 0, 'operation_document_delete_draft_save');
+    await setup.deleteDraft(teacher, unused.id, unused.version,
+      '清理未发布虚构活动', 'operation_document_delete_draft');
+    expect(documents.snapshot()[ACTIVITY_COLLECTIONS.activities] ?? []).toHaveLength(0);
+    const draft = await setup.saveDraft(teacher, input, 0, 'operation_document_close_draft');
+    const published = await setup.publish(teacher, draft.id, draft.version,
+      'operation_document_close_publish');
+    const service = new ActivityService(new DocumentActivityRepository(documents),
+      { nowIso: () => '2026-09-27T10:00:00+08:00' }, ids);
+    const closed = await service.close(teacher, draft.id, published.version,
+      '教学安排提前结束', 'operation_document_close');
+    const recycled = await service.recycle(teacher, draft.id, closed.version,
+      '回收已关闭活动', 'operation_document_recycle');
+    expect(recycled).toMatchObject({ visibility: 'recycled', status: 'closed' });
+    const snapshot = documents.snapshot();
+    expect(snapshot[ACTIVITY_COLLECTIONS.activities]?.[0]).toMatchObject({ payload: {
+      visibility: 'recycled', recycleReason: '回收已关闭活动' } });
+    expect(snapshot[ACTIVITY_COLLECTIONS.finalBoards]).toHaveLength(1);
+    expect(snapshot[ACTIVITY_COLLECTIONS.audit]?.map(item => item.action))
+      .toEqual(['checkin.draft.deleted', 'checkin.close', 'checkin.recycle']);
+    expect(await service.getLeaderboard(teacher, draft.id)).toMatchObject({ leaderboard: { finalized: true } });
+  });
+
   it('commits a future rest-day change, its receipt and its daily-instance removal atomically', async () => {
     const documents = database();
     const publishing = new ActivityService(new DocumentActivityRepository(documents), clock, ids);
@@ -291,14 +317,28 @@ describe('M2 activity CloudBase document boundary', () => {
         status: 'published', contentVersion: 1, visibility: { type: 'classes', classIds: [classId] },
         payload: { questionIds: [questionId] } }));
       await transaction.create(ACTIVITY_COLLECTIONS.tasks, document('task_exercise_demo', { id: 'task_exercise_demo',
-        status: 'active', publishedAt: '2026-09-26T00:00:00+08:00', items: [{ id: 'item_bird', resourceId: questionId,
+        status: 'active', publishedAt: '2026-09-26T00:00:00+08:00', visibility: 'visible',
+        startsAt: '2026-09-27T00:00:00+08:00', dueAt: '2026-09-28T00:00:00+08:00',
+        latePolicy: { allowLate: true, lateDays: 7 }, items: [{ id: 'item_bird', resourceId: questionId,
           resourceVersion: 1, resourceSnapshot: { title: '鸟类题', type: 'exercise', payload: {
             questionIds: [questionId], questionType: 'single_choice', stem: 'Which animal can fly?',
             options: ['bird', 'lion'], correctAnswer: 'bird', explanation: 'Birds can fly.' } } }] }));
       await transaction.create(ACTIVITY_COLLECTIONS.assignments,
         document(assignmentByIdDocumentId(organizationId, 'assignment_exercise_demo'), { id: 'assignment_exercise_demo',
-          taskId: 'task_exercise_demo', studentId, classId, status: 'awaiting_review',
-          latestSubmissionId: 'submission_exercise_demo', latestSubmissionVersion: 1 }));
+          taskId: 'task_exercise_demo', studentId, classId, status: 'not_started',
+          latestSubmissionId: null, latestSubmissionVersion: 0 }));
+    });
+    const service = new ActivityService(new DocumentActivityRepository(documents), clock, ids);
+    const draft = await service.saveDraft(teacher, { ...input, endsOn: '2026-09-27', restDates: [],
+      conditions: [{ kind: 'exercise', resourceId: questionId, minimumScore: 60 }] }, 0, 'operation_doc_exercise_draft');
+    await service.publish(teacher, draft.id, 1, 'operation_doc_exercise_publish');
+    await documents.runTransaction(async transaction => {
+      const assignmentId = assignmentByIdDocumentId(organizationId, 'assignment_exercise_demo');
+      const before = await transaction.get(ACTIVITY_COLLECTIONS.assignments, assignmentId);
+      if (!before) throw new Error('missing assignment fixture');
+      await transaction.replace(ACTIVITY_COLLECTIONS.assignments, assignmentId, before.version,
+        { ...before, version: before.version + 1, status: 'awaiting_review',
+          latestSubmissionId: 'submission_exercise_demo', latestSubmissionVersion: 1 });
       await transaction.create(ACTIVITY_COLLECTIONS.submissions,
         document(submissionByIdDocumentId(organizationId, 'submission_exercise_demo'), { id: 'submission_exercise_demo',
           taskId: 'task_exercise_demo', assignmentId: 'assignment_exercise_demo', studentId,
@@ -306,10 +346,6 @@ describe('M2 activity CloudBase document boundary', () => {
           answers: [{ itemId: 'item_bird', value: { kind: 'exercise', answeredQuestionCount: 1,
             correctQuestionCount: 1, questionResponses: [{ questionId, response: 'bird', isCorrect: true }] } }] }));
     });
-    const service = new ActivityService(new DocumentActivityRepository(documents), clock, ids);
-    const draft = await service.saveDraft(teacher, { ...input,
-      conditions: [{ kind: 'exercise', resourceId: questionId, minimumScore: 60 }] }, 0, 'operation_doc_exercise_draft');
-    await service.publish(teacher, draft.id, 1, 'operation_doc_exercise_publish');
     expect(await service.getMyDay(student, draft.id, '2026-09-27')).toMatchObject({ complete: true,
       evidenceStatus: 'available', verifiedConditions: 1 });
     const boardService = new ActivityService(new DocumentActivityRepository(documents),
@@ -340,9 +376,8 @@ describe('M2 activity CloudBase document boundary', () => {
     const draft = await service.saveDraft(teacher, { ...input,
       conditions: [{ kind: 'exercise', resourceId: questionId, minimumScore: 60 }] }, 0,
     'operation_legacy_exercise_draft');
-    await service.publish(teacher, draft.id, 1, 'operation_legacy_exercise_publish');
-    expect(await service.getLeaderboard(student, draft.id)).toMatchObject({ evidenceStatus: 'available',
-      leaderboard: { ranks: [{ studentId, completedDays: 0, rank: 1 }] } });
+    await expect(service.publish(teacher, draft.id, 1, 'operation_legacy_exercise_publish'))
+      .rejects.toMatchObject({ code: 'RESOURCE_OFFLINE' });
   });
 
   it('reads active users once when publishing a 500-person activity', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultItemWeights, itemWeightError, updateItemWeight } from '../../miniprogram/pages/teacher/publish-task/score-weights'
+import { defaultItemWeights, itemWeightError, updateItemWeight } from '../../miniprogram/subpackages/teacher/publish-task/score-weights'
 
 const items = ['read', 'words', 'quiz'].map(id => ({ id, resourceId: id,
   type: 'reading' as const, requiredCount: 1, maxScore: 100 }))

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { parseBuffer } from 'music-metadata';
 import type { RecordingSealPort } from './repository';
 import { StudentWorkError, type SealedRecording } from './types';
+import { transcodeWebmOpusToMp3 } from '../task-recording/webm-opus-transcode';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_DURATION_MS = 5 * 60 * 1000;
@@ -13,7 +14,7 @@ export interface CloudBaseWorkStoragePort {
 
 export interface AudioMetadataReader {
   read(buffer: Buffer): Promise<Readonly<{ durationSeconds: number | null; codec: string | null;
-    container?: string | null }>>;
+    container?: string | null; numberOfChannels?: number | null }>>;
 }
 
 const defaultMetadataReader: AudioMetadataReader = {
@@ -21,7 +22,7 @@ const defaultMetadataReader: AudioMetadataReader = {
     const parsed = await parseBuffer(buffer, { size: buffer.length },
       { duration: true, skipCovers: true });
     return { durationSeconds: parsed.format.duration ?? null, codec: parsed.format.codec ?? null,
-      container: parsed.format.container ?? null };
+      container: parsed.format.container ?? null, numberOfChannels: parsed.format.numberOfChannels ?? null };
   },
 };
 
@@ -56,16 +57,26 @@ export class CloudBaseRecordingSeal implements RecordingSealPort {
     try { parsed = await this.metadata.read(buffer); }
     catch { throw new StudentWorkError('MEDIA_INVALID'); }
     const codec = parsed.codec?.toLowerCase() ?? '';
-    const durationMs = parsed.durationSeconds === null ? NaN : Math.round(parsed.durationSeconds * 1000);
-    const normalizedCodec = codec.includes('mp3') || codec.includes('layer 3') ? 'mp3'
+    const container = parsed.container?.toLowerCase() ?? '';
+    let durationMs = parsed.durationSeconds === null ? NaN : Math.round(parsed.durationSeconds * 1000);
+    let normalizedCodec: 'mp3' | 'aac' | null = codec.includes('mp3') || codec.includes('layer 3') ? 'mp3'
       : codec.includes('aac') ? 'aac' : null;
+    if (codec === 'opus' && (container.includes('webm') || container.includes('ebml'))) {
+      if (parsed.numberOfChannels !== 1 && parsed.numberOfChannels !== 2) throw new StudentWorkError('MEDIA_INVALID');
+      try {
+        const converted = await transcodeWebmOpusToMp3(buffer, parsed.numberOfChannels);
+        buffer = converted.buffer;
+        durationMs = converted.durationMs;
+        normalizedCodec = 'mp3';
+      } catch { throw new StudentWorkError('MEDIA_INVALID'); }
+    }
     if (normalizedCodec === null) throw new StudentWorkError('MEDIA_INVALID');
-    if (!Number.isSafeInteger(durationMs) || durationMs < 1000 || durationMs > MAX_DURATION_MS) {
+    if (buffer.length < 1 || buffer.length > MAX_BYTES
+      || !Number.isSafeInteger(durationMs) || durationMs < 1000 || durationMs > MAX_DURATION_MS) {
       throw new StudentWorkError('MEDIA_INVALID');
     }
     const contentSha256 = createHash('sha256').update(buffer).digest('hex');
     const ownerDigest = createHash('sha256').update(JSON.stringify([input.organizationId, input.studentId])).digest('hex');
-    const container = parsed.container?.toLowerCase() ?? '';
     const extension = normalizedCodec === 'mp3' ? 'mp3'
       : container.includes('m4a') || container.includes('mp4') || container.includes('mpeg-4') ? 'm4a' : 'aac';
     const privatePath = `student-works/private/${ownerDigest}/${input.workId}/${contentSha256}.${extension}`;

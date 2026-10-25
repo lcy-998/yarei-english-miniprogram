@@ -3,6 +3,9 @@ import { LearningStatsService } from '../../src/learning-stats/service';
 import { createOrgContentDocumentRepository } from '../../src/repositories/org-content-document-adapter';
 import { createTaskQueryDocumentRepository } from '../../src/repositories/task-query-document-adapter';
 import { DocumentStudentWorkRepository } from '../../src/student-work/document-repository';
+import { DocumentPhonicsRepository } from '../../src/phonics/document-repository';
+import { ActivityService } from '../../src/activity/activity-service';
+import { DocumentActivityRepository } from '../../src/activity/document-repository';
 import { createDefaultCloudBaseFunction } from '../shared/default-cloudbase-function';
 import { createUnconfiguredFunction } from '../shared/unconfigured-function';
 import { createLearningStatsQueryFunction } from './function-entry';
@@ -21,6 +24,9 @@ export const main = createDefaultCloudBaseFunction('learning-stats-query', unava
       organization: createOrgContentDocumentRepository(infrastructure.documents),
       tasks: createTaskQueryDocumentRepository(infrastructure.documents),
       works: new DocumentStudentWorkRepository(infrastructure.documents),
+      phonics: new DocumentPhonicsRepository(infrastructure.documents),
+      activities: new ActivityService(new DocumentActivityRepository(infrastructure.documents),
+        infrastructure.clock, capabilities.identifiers),
       identities: capabilities.identities,
       clock: infrastructure.clock,
       requestIds: infrastructure.requestIds,

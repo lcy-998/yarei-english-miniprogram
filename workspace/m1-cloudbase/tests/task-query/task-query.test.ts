@@ -75,6 +75,194 @@ function fixture() {
 }
 
 describe('M1 本地只读任务查询', () => {
+  it('keeps an assigned question and prior response readable from the frozen task after source goes offline', async () => {
+    const work = task('task_frozen_question', 'class_a', { items: [{
+      id: 'item_frozen_question', resourceId: 'question_public', resourceVersion: 1,
+      snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '已布置的虚构题目', type: 'exercise', payload: {
+        questionIds: ['question_public'], questionType: 'single_choice', stem: 'Choose the animal',
+        options: ['cat', 'dog'], correctAnswer: 'cat', explanation: 'private answer',
+      } }, completionRule: { kind: 'exercise_questions', requiredQuestionCount: 1 },
+      scoringRule: {}, order: 1,
+    }] });
+    const prior = { ...submission('submission_frozen_question', 'assignment_frozen_question',
+      work.id, 'student_a'), answers: [{ itemId: 'item_frozen_question', value: {
+        kind: 'exercise', answeredQuestionCount: 1,
+        questionResponses: [{ questionId: 'question_public', response: 'dog' }],
+      } }] };
+    const repository = new InMemoryTaskQueryRepository({ tasks: [work],
+      resources: [{ id: 'question_public', organizationId: 'org_demo', title: '已下架源',
+        type: 'exercise', status: 'offline', allowedClassIds: [] }],
+      assignments: [assignment('assignment_frozen_question', work.id, 'student_a',
+        'class_a', 'awaiting_review', prior.id)], submissions: [prior] });
+    const result = await new StudentTaskQueryService({ repository, clock, requestIds })
+      .getMyTask(studentA, work.id);
+    expect(result).toMatchObject({ ok: true, data: { items: [{
+      exerciseQuestion: { questionId: 'question_public', stem: 'Choose the animal',
+        options: ['cat', 'dog'] } }], submissionHistory: [{ answers: [{ value: {
+          questionResponses: [{ response: 'dog' }],
+        } }] }] } });
+    expect(JSON.stringify(result)).not.toContain('private answer');
+  });
+
+  it('教师媒体证据绑定正式提交、班级和任务项，试听仅签短链并记录审计', async () => {
+    const mediaTask = task('task_review_media', 'class_a', { items: [{
+      id: 'item_media', resourceId: 'media_demo', resourceVersion: 2, snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '虚构听力', type: 'listening', payload: {} },
+      completionRule: { kind: 'listening', questionIds: ['question_1'], segmentIds: ['segment_1'] },
+      scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1,
+      mediaSnapshot: { mediaId: 'media_demo', kind: 'listening', mediaVersion: 2, reviewVersion: 2,
+        mediaAssetKey: 'cloud://private/audio.mp3', mediaSha256: 'a'.repeat(64), durationMs: 2000,
+        questionIds: ['question_1'], questions: [{ questionId: 'question_1', questionType: 'single_choice',
+          stem: 'Which animal?', options: ['cat', 'dog'] }],
+        answerKeys: [{ questionId: 'question_1', correctAnswer: 'cat', explanation: 'The sound is cat.' }],
+        clips: [{ questionId: 'question_1', segmentId: 'segment_1', startMs: 0, endMs: 2000 }],
+        continuousPlaybackEnforced: true },
+    }] });
+    const formal: SubmissionRecord = { ...submission('submission_media', 'assignment_media', mediaTask.id, 'student_a'),
+      answers: [{ itemId: 'item_media', value: { kind: 'listening',
+        mediaSessionId: 'private_session', questionResponses: [{ questionId: 'question_1', response: 'dog' }],
+        verifiedPlayedSegmentIds: ['segment_1'], answeredQuestionIds: ['question_1'],
+        correctQuestionIds: [] } }] };
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [mediaTask],
+      resources: [{ id: 'media_demo', organizationId: 'org_demo', title: '已下架媒体源',
+        type: 'listening', status: 'offline', allowedClassIds: [] }],
+      assignments: [assignment('assignment_media', mediaTask.id, 'student_a', 'class_a', 'awaiting_review', formal.id)],
+      submissions: [formal] });
+    const service = new ReviewQueryService({ repository, clock, requestIds });
+    const signed: string[] = [];
+    const audited: string[] = [];
+    const access = { temporaryUrl: async (fileId: string) => {
+      signed.push(fileId); return 'https://example.invalid/media?ttl=60';
+    }, findTaskDubbingWork: async () => null,
+    appendAudit: async (_actor: TrustedActorContext, submissionId: string, itemId: string) => {
+      audited.push(`${submissionId}/${itemId}`); return true;
+    } };
+    const result = await service.getTaskMediaReviewEvidence(teacher, formal.id, 'item_media', access);
+    expect(result).toMatchObject({ ok: true, data: { submissionVersion: 1, kind: 'listening',
+      sourcePlayback: { available: true, temporaryUrl: 'https://example.invalid/media?ttl=60' },
+      questions: [{ studentResponse: 'dog', correctAnswer: 'cat', isCorrect: false,
+        clip: { segmentId: 'segment_1', startMs: 0, endMs: 2000 } }],
+      verifiedPlayedSegmentIds: ['segment_1'] } });
+    expect(signed).toEqual(['cloud://private/audio.mp3']);
+    expect(audited).toEqual([`${formal.id}/item_media`]);
+    expect(JSON.stringify(result)).not.toContain('cloud://');
+    expect(JSON.stringify(result)).not.toContain('private_session');
+    expect(await service.getTaskMediaReviewEvidence(studentA, formal.id, 'item_media', access))
+      .toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(await service.getTaskMediaReviewEvidence(teacher, formal.id, 'wrong_item', access))
+      .toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    expect(await service.getTaskMediaReviewEvidence({ ...teacher, scopeIds: [] }, formal.id, 'item_media', access))
+      .toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    expect(signed).toHaveLength(1);
+  });
+  it('任务配音只试听本次提交绑定且未过期的最终作品', async () => {
+    const mediaTask = task('task_review_dubbing', 'class_a', { items: [{
+      id: 'item_dubbing', resourceId: 'media_dubbing', resourceVersion: 3, snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '虚构配音', type: 'dubbing', payload: {} },
+      completionRule: { kind: 'dubbing' }, scoringRule: { kind: 'manual', maxScore: 100 }, order: 1,
+      mediaSnapshot: { mediaId: 'media_dubbing', kind: 'dubbing', mediaVersion: 3, reviewVersion: 3,
+        mediaAssetKey: 'cloud://private/source.mp4', mediaSha256: 'b'.repeat(64), durationMs: 3000,
+        questionIds: [], questions: [], answerKeys: [], clips: [],
+        subtitleAssetKey: 'cloud://private/subtitle.vtt', subtitleCues: [
+          { startMs: 0, endMs: 3000, text: 'Hello' }], continuousPlaybackEnforced: true },
+    }] });
+    const formal: SubmissionRecord = { ...submission('submission_dubbing', 'assignment_dubbing', mediaTask.id, 'student_a'),
+      answers: [{ itemId: 'item_dubbing', value: { kind: 'dubbing', mediaSessionId: 'private_session',
+        finalWorkId: 'work_correct', recording: { durationMs: 1500 } } }] };
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [mediaTask],
+      assignments: [assignment('assignment_dubbing', mediaTask.id, 'student_a', 'class_a', 'awaiting_review', formal.id)],
+      submissions: [formal] });
+    const service = new ReviewQueryService({ repository, clock, requestIds });
+    const baseWork = { id: 'work_correct', organizationId: 'org_demo', studentId: 'student_a',
+      assignmentId: 'assignment_dubbing', round: 1, taskId: mediaTask.id, itemId: 'item_dubbing',
+      mediaId: 'media_dubbing', mediaVersion: 3, status: 'submitted' as const,
+      fileId: 'cloud://private/final.m4a', contentSha256: 'c'.repeat(64), mediaDeletedAt: null,
+      recording: { mediaId: 'recording_correct', durationMs: 1500, sizeBytes: 4000, serverReadable: true } };
+    const signed: string[] = [];
+    const access = { temporaryUrl: async (fileId: string) => {
+      signed.push(fileId); return 'https://example.invalid/short';
+    }, findTaskDubbingWork: async () => baseWork,
+    appendAudit: async () => true };
+    const result = await service.getTaskMediaReviewEvidence(teacher, formal.id, 'item_dubbing', access);
+    expect(result).toMatchObject({ ok: true, data: { finalWork: { available: true,
+      durationMs: 1500, temporaryUrl: 'https://example.invalid/short' },
+      subtitleCues: [{ text: 'Hello' }] } });
+    expect(signed).toEqual(['cloud://private/source.mp4', 'cloud://private/final.m4a']);
+    const mismatched = await service.getTaskMediaReviewEvidence(teacher, formal.id, 'item_dubbing', {
+      ...access, findTaskDubbingWork: async () => ({ ...baseWork, round: 2 }),
+    });
+    expect(mismatched).toMatchObject({ ok: true, data: { finalWork: { available: false } } });
+    expect(signed).toHaveLength(3);
+    const expiredService = new ReviewQueryService({ repository,
+      clock: { nowIso: () => '2027-04-01T00:00:00.000Z' }, requestIds });
+    const expired = await expiredService.getTaskMediaReviewEvidence(teacher, formal.id, 'item_dubbing', access);
+    expect(expired).toMatchObject({ ok: true, data: { finalWork: { available: false } } });
+    expect(signed).toHaveLength(4);
+  });
+  it('学生媒体任务只见冻结原题与片段，不见答案键或私有云路径', async () => {
+    const mediaTask = task('task_media', 'class_a', { items: [{
+      id: 'item_media', resourceId: 'media_demo', resourceVersion: 2, snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '虚构听力', type: 'listening', payload: { hidden: 'cloud://private/source' } },
+      completionRule: { kind: 'listening', questionIds: ['question_1'], segmentIds: ['segment_1'] },
+      scoringRule: { kind: 'automatic', maxScore: 100 }, order: 1,
+      mediaSnapshot: { mediaId: 'media_demo', kind: 'listening', mediaVersion: 2, reviewVersion: 2,
+        mediaAssetKey: 'cloud://private/audio.mp3', mediaSha256: 'a'.repeat(64), durationMs: 2000,
+        questionIds: ['question_1'], questions: [{ questionId: 'question_1', questionType: 'single_choice',
+          stem: 'Which animal?', options: ['cat', 'dog'] }],
+        answerKeys: [{ questionId: 'question_1', correctAnswer: 'cat', explanation: 'Private answer.' }],
+        clips: [{ questionId: 'question_1', segmentId: 'segment_1', startMs: 0, endMs: 2000 }],
+        continuousPlaybackEnforced: true },
+    }] });
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [mediaTask],
+      assignments: [assignment('assignment_media', mediaTask.id, 'student_a', 'class_a', 'not_started', null)] });
+    const result = await new StudentTaskQueryService({ repository, clock, requestIds })
+      .getMyTask(studentA, mediaTask.id);
+    expect(result).toMatchObject({ ok: true, data: { items: [{ mediaSnapshot: {
+      questions: [{ stem: 'Which animal?' }], clips: [{ segmentId: 'segment_1' }] } }] } });
+    const json = JSON.stringify(result);
+    expect(json).not.toContain('cloud://');
+    expect(json).not.toContain('correctAnswer');
+    expect(json).not.toContain('Private answer');
+  });
+  it('重新登录时向本人恢复云端听力答案草稿但仍隐藏答案键', async () => {
+    const mediaTask = task('task_media_draft', 'class_a', { items: [{
+      id: 'item_media_draft', resourceId: 'media_demo', resourceVersion: 2, snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '虚构听力', type: 'listening', payload: {} },
+      completionRule: { kind: 'listening', questionIds: ['question_1'] },
+      scoringRule: {}, order: 1,
+      mediaSnapshot: { mediaId: 'media_demo', kind: 'listening', mediaVersion: 2, reviewVersion: 2,
+        mediaAssetKey: 'cloud://private/audio.mp3', mediaSha256: 'd'.repeat(64), durationMs: 2000,
+        questionIds: ['question_1'], questions: [{ questionId: 'question_1', questionType: 'single_choice',
+          stem: 'Which animal?', options: ['cat', 'dog'] }],
+        answerKeys: [{ questionId: 'question_1', correctAnswer: 'cat', explanation: 'Private answer.' }],
+        clips: [], continuousPlaybackEnforced: true },
+    }] });
+    const draft: SubmissionRecord = { ...submission('submission_media_draft', 'assignment_media_draft',
+      mediaTask.id, 'student_a'), submissionVersion: 1, recordVersion: 2, status: 'draft',
+    answers: [{ itemId: 'item_media_draft', value: { kind: 'listening',
+      mediaSessionId: 'media_session_demo', questionResponses: [
+        { questionId: 'question_1', response: 'dog', correctAnswer: 'cat' },
+        { questionId: 'question_private', response: 'secret response' },
+      ], answerKeys: [{ questionId: 'question_1', correctAnswer: 'cat' }],
+      mediaAssetKey: 'cloud://private/audio.mp3' } }], submittedAt: null };
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [mediaTask],
+      assignments: [assignment('assignment_media_draft', mediaTask.id, 'student_a', 'class_a', 'in_progress', null)],
+      submissions: [draft] });
+    const result = await new StudentTaskQueryService({ repository, clock, requestIds })
+      .getMyTask(studentA, mediaTask.id);
+    expect(result).toMatchObject({ ok: true, data: { submission: { status: 'draft', answers: [{
+      itemId: 'item_media_draft', value: { kind: 'listening',
+        mediaSessionId: 'media_session_demo', questionResponses: [
+          { questionId: 'question_1', response: 'dog' },
+        ] },
+    }] } } });
+    const json = JSON.stringify(result);
+    expect(json).not.toContain('correctAnswer');
+    expect(json).not.toContain('Private answer');
+    expect(json).not.toContain('secret response');
+    expect(json).not.toContain('cloud://private');
+  });
   it('教师只凭检查权限读取提交快照的任务项和指定页图，不返回其他页', async () => {
     const reviewer = { ...teacher, permissions: ['submission.review'] };
     const reviewTask = task('task_review_pages', 'class_a', { items: [{
@@ -99,6 +287,68 @@ describe('M1 本地只读任务查询', () => {
         imageAssetKey: 'cloud://demo/page-2' }] } });
     expect(JSON.stringify(result)).not.toContain('cloud://demo/page-1');
   });
+  it('教师检查整本阅读任务时从冻结快照还原全部页图，缩略图缺失时回退到原图', async () => {
+    const fullBookTask = task('task_full_book_review', 'class_a', { items: [{
+      id: 'item_full_book', resourceId: 'book_full_demo', resourceVersion: 3, snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '整本虚构绘本', type: 'reading', payload: { chapters: [
+        { title: '第一章', pages: [
+          { id: 'page_1', pageNumber: 1, imageAssetKey: 'cloud://demo/full-page-1' },
+          { id: 'page_2', pageNumber: 2, imageAssetKey: 'cloud://demo/full-page-2',
+            thumbnailAssetKey: 'cloud://demo/full-thumb-2' },
+        ] },
+        { title: '第二章', pages: [
+          { id: 'page_3', pageNumber: 3, imageAssetKey: 'cloud://demo/full-page-3' },
+        ] },
+      ] } }, completionRule: { kind: 'reading_pages', requiredPageCount: 3 },
+      scoringRule: {}, order: 1,
+    }] });
+    const fullBookSubmission = { ...submission('submission_full_book_review', 'assignment_full_book_review',
+      fullBookTask.id, 'student_a'), answers: [{ itemId: 'item_full_book', value: {
+        kind: 'reading', completedPageCount: 3,
+      } }] };
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [fullBookTask],
+      assignments: [assignment('assignment_full_book_review', fullBookTask.id, 'student_a', 'class_a',
+        'awaiting_review', fullBookSubmission.id)], submissions: [fullBookSubmission] });
+    const result = await new ReviewQueryService({ repository, clock, requestIds })
+      .getSubmissionForReview(teacher, fullBookSubmission.id);
+    expect(result).toMatchObject({ ok: true, data: { readingPages: [
+      { pageId: 'page_1', pageNumber: 1, imageAssetKey: 'cloud://demo/full-page-1',
+        thumbnailAssetKey: 'cloud://demo/full-page-1' },
+      { pageId: 'page_2', pageNumber: 2, imageAssetKey: 'cloud://demo/full-page-2',
+        thumbnailAssetKey: 'cloud://demo/full-thumb-2' },
+      { pageId: 'page_3', pageNumber: 3, imageAssetKey: 'cloud://demo/full-page-3',
+        thumbnailAssetKey: 'cloud://demo/full-page-3' },
+    ] } });
+  });
+  it('教师读取的跟读句段来自任务冻结快照且绑定当前阅读项', async () => {
+    const pronunciationTask = task('task_pronunciation_review', 'class_a', { items: [{
+      id: 'item_pronunciation', resourceId: 'book_pronunciation', resourceVersion: 3,
+      snapshotSchemaVersion: 2,
+      resourceSnapshot: { title: '跟读虚构绘本', type: 'reading', payload: {
+        copyrightStatus: 'verified', chapters: [],
+        pronunciation: { sourceVersion: '3', reviewStatus: 'approved',
+          approvedBy: 'reviewer_demo', approvedAt: '2026-09-15T00:00:00.000Z',
+          segments: [{ id: 'segment_1', text: 'People at the market are buying fruit.',
+            pageNumber: 2, demonstrationAudioAssetKey: 'cloud://demo/reference.mp3' }] },
+      } }, completionRule: { kind: 'reading_pages', requiredPageCount: 1, pageIds: ['page_2'] },
+      scoringRule: {}, order: 1,
+    }] });
+    const prior = { ...submission('submission_pronunciation_review', 'assignment_pronunciation_review',
+      pronunciationTask.id, 'student_a'), answers: [{ itemId: 'item_pronunciation', value: {
+        kind: 'reading', completedPageCount: 1,
+      } }] };
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants, tasks: [pronunciationTask],
+      assignments: [assignment('assignment_pronunciation_review', pronunciationTask.id, 'student_a',
+        'class_a', 'awaiting_review', prior.id)], submissions: [prior] });
+    const result = await new ReviewQueryService({ repository, clock, requestIds })
+      .getSubmissionForReview(teacher, prior.id);
+    expect(result).toMatchObject({ ok: true, data: { readingPronunciationSegments: [{
+      itemId: 'item_pronunciation', segmentId: 'segment_1',
+      text: 'People at the market are buying fruit.', pageNumber: 2,
+    }] } });
+    expect(JSON.stringify(result)).not.toContain('demonstrationAudioAssetKey');
+    expect(JSON.stringify(result)).not.toContain('cloud://demo/reference.mp3');
+  });
   it('教师工作台、任务列表和完成情况只聚合当前授权班级且统计一致', async () => {
     const service = new TeacherTaskQueryService({ repository: fixture(), clock, requestIds });
     const workbench = await service.getTeacherWorkbench(teacher, '2026-09-16');
@@ -116,6 +366,17 @@ describe('M1 本地只读任务查询', () => {
         assignments: { total: 2 },
       },
     });
+  });
+
+  it('T-07 状态筛选使用当前时间推导，而不是旧的持久化 scheduled 值', async () => {
+    const repository = new InMemoryTaskQueryRepository({ teacherGrants: grants,
+      tasks: [task('task_dynamic', 'class_a', { status: 'scheduled' })],
+      assignments: [assignment('assign_dynamic', 'task_dynamic', 'student_a', 'class_a', 'not_started', null)] });
+    const service = new TeacherTaskQueryService({ repository, clock, requestIds });
+    expect(await service.listTeacherTasks(teacher, { status: 'active' }, { limit: 10 }))
+      .toMatchObject({ ok: true, data: { total: 1, items: [{ taskId: 'task_dynamic', status: 'active' }] } });
+    expect(await service.listTeacherTasks(teacher, { status: 'scheduled' }, { limit: 10 }))
+      .toMatchObject({ ok: true, data: { total: 0 } });
   });
 
   it('草稿选项为授权资源提供可直接发布的三类完成阈值与评分规则', async () => {
@@ -649,8 +910,21 @@ describe('M1 只读查询函数边界', () => {
     const studentMain = createStudentTaskQueryFunction({ ...boundary('student-task-query', studentA), handler: studentHandler });
     expect(await studentMain({ apiVersion: 'm1.v1', action: 'getMyTask', payload: { taskId: 'task_a' } })).toMatchObject({ ok: true, data: { action: 'detail' } });
 
-    const reviewHandler = { listReviewTasks: vi.fn(async () => ok({ action: 'list' })), getSubmissionForReview: vi.fn(async () => ok({ action: 'submission' })), previewBatchComment: vi.fn(async () => ok({ action: 'batch' })) };
-    const reviewMain = createReviewQueryFunction({ ...boundary('review-query', teacher), handler: reviewHandler });
+    const reviewHandler = { listReviewTasks: vi.fn(async () => ok({ action: 'list' })), getSubmissionForReview: vi.fn(async () => ok({ action: 'submission' })),
+      getTaskMediaReviewEvidence: vi.fn(async () => ok({ action: 'media' })),
+      previewBatchComment: vi.fn(async () => ok({ action: 'batch' })) };
+    const taskMediaReviewAccess = { temporaryUrl: async () => 'https://example.invalid/media',
+      findTaskDubbingWork: async () => null, appendAudit: async () => true };
+    const reviewMain = createReviewQueryFunction({ ...boundary('review-query', teacher), handler: reviewHandler,
+      taskMediaReviewAccess });
+    expect(await reviewMain({ apiVersion: 'm1.v1', action: 'getTaskMediaReviewEvidence',
+      payload: { submissionId: 'submission_a1', itemId: 'item_a1' } }))
+      .toMatchObject({ ok: true, data: { action: 'media' } });
+    expect(reviewHandler.getTaskMediaReviewEvidence).toHaveBeenCalledWith(teacher,
+      'submission_a1', 'item_a1', taskMediaReviewAccess);
+    expect(await reviewMain({ apiVersion: 'm1.v1', action: 'getTaskMediaReviewEvidence',
+      payload: { submissionId: 'submission_a1', itemId: 'item_a1', studentId: 'student_b' } }))
+      .toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
     expect(await reviewMain({ apiVersion: 'm1.v1', action: 'previewBatchComment', payload: { taskId: 'task_a', filter: {}, selection: { mode: 'ids', submissionIds: ['submission_a1'], studentId: 'student_b' }, comment: '虚构点评' } })).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR', fieldErrors: { 'selection.studentId': expect.any(String) } } });
     expect(reviewHandler.previewBatchComment).not.toHaveBeenCalled();
   });

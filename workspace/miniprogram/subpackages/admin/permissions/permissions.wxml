@@ -1,0 +1,48 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"></state-panel>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有授权管理权限。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"></state-panel>
+    <block wx:else>
+      <view class="native-admin__hero"><text class="native-admin__hero-title">逐账号管理授权</text><text class="native-admin__hero-note">只能调整其他教师的授权；保存后按新权限生效。</text><text class="native-admin__scope">管理范围　{{scopeLabel}}</text></view>
+      <view class="native-admin__search native-admin__grant-search"><input value="{{keyword}}" placeholder="搜索教师账号" confirm-type="search" bindinput="onKeyword" bindconfirm="applyFilters"/><button bindtap="applyFilters">搜索</button></view>
+      <view class="native-admin__card">
+        <text class="native-admin__card-title">教师名单</text>
+        <text class="native-admin__module-note">未授权、已授权和已撤销的教师都在这里；点一位教师查看或调整。</text>
+        <text wx:if="{{grantCandidateLoading}}" class="native-admin__module-note">正在查找教师…</text>
+        <text wx:if="{{grantCandidateError}}" class="native-admin__notice">{{grantCandidateError}}</text>
+        <button wx:if="{{grantCandidateError}}" class="native-admin__secondary" bindtap="applyFilters">重试</button>
+        <view wx:for="{{grantCandidateRows}}" wx:key="teacherId" class="native-admin__module native-admin__grant-row" data-id="{{item.teacherId}}" bindtap="openGrantCandidate" aria-role="button" aria-label="选择 {{item.displayName}} 授权">
+          <view class="native-admin__icon">师</view><view class="native-admin__module-copy"><text class="native-admin__module-title">{{item.displayName}}</text><text class="native-admin__grant-id">{{item.teacherId}}</text><text class="native-admin__module-note">{{item.grantStatus === 'none' ? '尚未授权' : item.grantStatus === 'active' ? '已授权' : '已撤销'}}</text></view><text class="native-admin__chevron">选择 ›</text>
+        </view>
+        <text wx:if="{{!grantCandidateLoading && !grantCandidateError && !grantCandidateRows.length}}" class="native-admin__module-note">当前范围没有其他可管理的教师</text>
+        <button wx:if="{{grantCandidateNextOffset !== null}}" loading="{{grantCandidateLoading}}" bindtap="loadMoreGrantCandidates">加载更多教师</button>
+      </view>
+      <view wx:if="{{grantDraft}}" id="admin-grant-form" class="native-admin__card">
+        <view class="native-admin__form-heading native-admin__grant-heading"><view class="native-admin__grant-heading-copy"><text class="native-admin__card-title">{{grantExpectedVersion === 0 ? '首次授权' : '修改授权'}}</text><text class="native-admin__grant-id">{{grantDraft.teacherId}}</text></view><button bindtap="closeGrant">关闭</button></view>
+        <text class="native-admin__module-note">只能授予本人已有的权限和管理范围；不能修改自己的授权。</text>
+        <text class="native-admin__section-label">功能权限</text>
+        <view class="native-admin__class-chips"><button wx:for="{{grantPermissionOptions}}" wx:key="value" data-permission="{{item.value}}" bindtap="toggleGrantPermission" disabled="{{!item.enabled}}" class="{{item.selected ? 'active' : ''}}" aria-label="{{item.selected ? '取消' : '选择'}}{{item.label}}权限">{{item.selected ? '✓ ' : ''}}{{item.label}}</button></view>
+        <text class="native-admin__section-label">管理范围</text>
+        <button class="native-admin__secondary" bindtap="toggleGrantWide" disabled="{{!access.scope.organizationWide}}">{{grantDraft.scope.organizationWide ? '学校全部班级' : '指定班级'}}</button>
+        <view wx:if="{{!grantDraft.scope.organizationWide}}"><button class="native-admin__choice-trigger" data-kind="class_for_grant" data-target="grantClass" bindtap="openAdminOptionPicker">选择授权班级（已选 {{grantDraft.scope.classIds.length}} 个）</button><text wx:if="{{grantDraft.scope.classIds.length}}" class="native-admin__module-note">已选班级编号：{{grantScopeText}}</text><input wx:if="{{selectionOptionsUnavailable}}" class="native-admin__field" value="{{grantScopeText}}" bindinput="onGrantScope" placeholder="候选名单不可用时输入班级编号，用顿号分隔"/></view>
+        <text class="native-admin__module-note">已修改 {{grantChangeCount}} 项；保存前请核对教师与范围。</text>
+        <textarea class="native-admin__field" maxlength="200" value="{{grantDraft.reason}}" bindinput="onGrantReason" placeholder="填写授权变更或撤销原因"/>
+        <text wx:if="{{grantError}}" class="native-admin__notice">{{grantError}}；输入已保留，可重试。</text>
+        <view class="native-admin__grant-actions"><button class="native-admin__grant-save" loading="{{grantBusy}}" disabled="{{grantBusy}}" data-status="active" bindtap="requestGrantUpdate">保存授权</button><view class="native-admin__grant-secondary-actions"><button loading="{{grantBusy}}" disabled="{{grantBusy}}" bindtap="resetGrantDraft">重置修改</button><button wx:if="{{grantExpectedVersion > 0}}" loading="{{grantBusy}}" disabled="{{grantBusy}}" data-status="revoked" bindtap="requestGrantUpdate">撤销授权</button></view></view>
+      </view>
+      <view class="native-admin__card"><text class="native-admin__card-title">授权变更记录</text><text wx:if="{{auditLoading}}" class="native-admin__module-note">正在读取记录…</text><text wx:if="{{auditError}}" class="native-admin__notice">{{auditError}}</text><button wx:if="{{auditError}}" class="native-admin__secondary" bindtap="loadAudit">重试</button><view wx:for="{{auditRows}}" wx:key="id" class="native-admin__evidence-row native-admin__grant-audit-row"><view class="native-admin__grant-audit-copy"><text class="native-admin__grant-audit-action">{{item.actionLabel}}</text><text class="native-admin__grant-id">相关编号：{{item.targetId}}</text><text class="native-admin__module-note">{{item.occurredAt}}</text></view><text class="native-admin__grant-audit-result">{{item.result === 'succeeded' ? '成功' : item.result === 'denied' ? '拒绝' : '失败'}}</text></view><text wx:if="{{!auditLoading && !auditError && !auditRows.length}}" class="native-admin__module-note">暂无授权变更记录</text><button wx:if="{{auditNextOffset !== null}}" loading="{{auditLoading}}" bindtap="loadMoreAudit">加载更多记录</button></view>
+      <view wx:if="{{optionPickerKind && optionPickerTarget === 'grantClass'}}" id="admin-option-picker" class="native-admin__card native-admin__option-picker">
+        <view class="native-admin__form-heading"><text class="native-admin__card-title">选择授权班级</text><button bindtap="closeAdminOptionPicker">完成</button></view>
+        <view class="native-admin__search native-admin__option-search"><input value="{{optionPickerQuery}}" bindinput="onAdminOptionQuery" placeholder="搜索班级名称或编号" confirm-type="search" bindconfirm="applyAdminOptionSearch"/><button bindtap="applyAdminOptionSearch">搜索</button></view>
+        <text wx:if="{{optionPickerLoading}}" class="native-admin__module-note">正在查找班级…</text>
+        <text wx:if="{{optionPickerError}}" class="native-admin__notice">{{optionPickerError}}</text>
+        <view aria-role="button" wx:for="{{optionPickerRows}}" wx:key="id" class="native-admin__option-row {{item.selected ? 'active' : ''}}" data-id="{{item.id}}" bindtap="chooseAdminOption"><text>{{item.selected ? '✓ ' : ''}}{{item.label}}</text><text>{{item.detail}}</text></view>
+        <text wx:if="{{!optionPickerLoading && !optionPickerError && !optionPickerRows.length}}" class="native-admin__module-note">没有符合条件的班级</text>
+        <button wx:if="{{optionPickerNextOffset !== null}}" class="native-admin__secondary" loading="{{optionPickerLoading}}" bindtap="loadMoreAdminOptions">加载更多</button>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"></g0-tab-bar>
+</g0-page-shell>

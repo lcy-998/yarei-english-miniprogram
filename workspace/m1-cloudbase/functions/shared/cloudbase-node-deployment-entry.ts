@@ -1,6 +1,7 @@
 import { createNodeCryptoCapabilities, type NodeCryptoSecrets } from '../../src/runtime/node-crypto-capabilities';
 import { bootstrapCloudBaseNodeDeployment } from './cloudbase-node-deployment-bootstrap';
-import { installCloudBaseRuntimeProvider } from './default-cloudbase-function';
+import { installCloudBaseRuntimeProvider,
+  type NativeAccountProviderFactory } from './default-cloudbase-function';
 
 interface DeploymentProcessPort {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -23,23 +24,47 @@ const SECRET_ENVIRONMENT_KEYS = Object.freeze({
  * No environment identifier or cloud credential is read here. Missing SDK or
  * secret capabilities leave the default function entry safely unconfigured.
  */
-export function installCloudBaseNodeDeploymentFromEnvironment(): void {
+export function installCloudBaseNodeDeploymentFromEnvironment(
+  nativeAccountProviderFactory?: NativeAccountProviderFactory): void {
   try {
     const clock = { nowIso: () => new Date().toISOString() };
     const cryptography = createNodeCryptoCapabilities({
       clock,
       secrets: readSecrets(),
     });
+    const pronunciationRuntime = readPronunciationRuntime();
+    const teacherSuggestionRuntime = readTeacherSuggestionRuntime();
     bootstrapCloudBaseNodeDeployment({
       loadSdk: () => require('@cloudbase/node-sdk'),
       environmentId: readCurrentEnvironmentFromProcess(),
       clock,
       requestIds: cryptography.requestIds,
       cryptography,
+      ...(nativeAccountProviderFactory ? { nativeAccountProviderFactory } : {}),
+      ...(pronunciationRuntime ? { pronunciationRuntime } : {}),
+      ...(teacherSuggestionRuntime ? { teacherSuggestionRuntime } : {}),
     });
   } catch {
     installCloudBaseRuntimeProvider(null);
   }
+}
+
+function readTeacherSuggestionRuntime() {
+  const internalSecret = process.env.QWEN_TRIAL_INTERNAL_SECRET;
+  const modelVersion = process.env.QWEN_TRIAL_MODEL_VERSION;
+  const promptVersion = process.env.QWEN_TRIAL_PROMPT_VERSION;
+  if (![internalSecret, modelVersion, promptVersion]
+    .every(value => typeof value === 'string' && value.trim().length > 0)) return undefined;
+  return { internalSecret: internalSecret!, modelVersion: modelVersion!, promptVersion: promptVersion! };
+}
+
+function readPronunciationRuntime() {
+  const internalSecret = process.env.VOICE_INTERNAL_SECRET;
+  const allowedMediaHost = process.env.VOICE_ALLOWED_MEDIA_HOST;
+  if (![internalSecret, allowedMediaHost]
+    .every(value => typeof value === 'string' && value.trim().length > 0)) return undefined;
+  const configuredLeaseMs = Number(process.env.VOICE_WORKER_LEASE_MS ?? 330000);
+  return { internalSecret: internalSecret!, allowedMediaHost: allowedMediaHost!, leaseMs: configuredLeaseMs };
 }
 
 function readSecrets(): NodeCryptoSecrets {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { copyTaskItems } from '../../miniprogram/pages/teacher/publish-task/copy-task-items'
-import type { TeacherTaskCopy } from '../../miniprogram/session/session'
+import { copyTaskItems } from '../../miniprogram/subpackages/teacher/publish-task/copy-task-items'
+import type { TeacherTaskCopy } from '../../miniprogram/subpackages/teacher/session/session'
 
 const source: TeacherTaskCopy = {
   title: '指定阅读与拼写', description: '按要求完成',

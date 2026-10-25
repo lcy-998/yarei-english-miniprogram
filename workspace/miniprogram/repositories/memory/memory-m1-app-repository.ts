@@ -1,5 +1,6 @@
 import { ServiceResult } from '../../domain/types'
 import { ChildView, M1AppRepository, ProfileView, ReadingBookView, ReadingCategory, ReadingProgressView, StudentDetailView, StudentListView, WordPracticeView } from '../m1-app-repository'
+import { getState as getAppState, mutateState as mutateAppState } from './mock-state'
 
 interface M1MemoryState {
   profiles: ProfileView[]
@@ -74,7 +75,7 @@ export async function resetPassword(mobile: string, code: string, password: stri
 
 export async function getWordPractice(userId: string): Promise<ServiceResult<WordPracticeView>> {
   if (userId !== 'usr_student_xiaoyu') return fail('FORBIDDEN', '无权查看该词包')
-  return ok({ packId: 'pack_grade3_unit3', packLabel: '三年级 Unit 3', todayCompleted: 8, todayTotal: 10, masteredPercent: 80, wordId: 'word_sunshine', word: 'sun-shine', syllables: 'sun-shine', meaning: '阳光', example: 'The sunshine is warm.', options: ['阳光', '雨天', '森林'], correctOption: '阳光', wrongCount: 2 })
+  return ok({ packId: 'pack_grade3_unit3', packLabel: '三年级 Unit 3', todayCompleted: 8, todayTotal: 10, masteredPercent: 80, wordId: 'word_sunshine', word: 'sun-shine', syllables: 'sun-shine', syllableParts: ['sun', 'shine'], meaning: '阳光', example: 'The sunshine is warm.', options: ['阳光', '雨天', '森林'], correctOption: '阳光', wrongCount: 2 })
 }
 
 export async function listReadingBooks(userId: string, category?: ReadingCategory, onlyFavorites = false): Promise<ServiceResult<ReadingBookView[]>> {
@@ -98,8 +99,8 @@ export async function getReadingProgress(userId: string, bookId: string): Promis
   const pageNumber = state.readingPages[`${userId}:${bookId}`] ?? 1
   const pages = Array.from({ length: book.pageCount }, (_, index) => ({
     pageNumber: index + 1, chapterNumber: 1,
-    imageUrl: index === 0 ? '/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/assets/content/demo-zoo-page-02-v1.jpg',
-    thumbnailUrl: index === 0 ? '/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/assets/content/demo-zoo-page-02-v1.jpg',
+    imageUrl: index === 0 ? '/subpackages/student/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg',
+    thumbnailUrl: index === 0 ? '/subpackages/student/assets/content/demo-zoo-picture-book-cover-v1.jpg' : '/subpackages/student/assets/content/demo-zoo-page-02-v1.jpg',
   }))
   const page = pages[pageNumber - 1] ?? pages[0]!
   return ok({ book, hasSavedProgress: Object.prototype.hasOwnProperty.call(state.readingPages, `${userId}:${bookId}`), chapterNumber: page.chapterNumber, chapterCount: 1, pageNumber, pageCount: book.pageCount, progressPercent: Math.round(pageNumber * 100 / book.pageCount), pageImageUrl: page.imageUrl, thumbnailImageUrl: page.thumbnailUrl, pages })
@@ -116,7 +117,24 @@ export async function setReadingPage(userId: string, bookId: string, pageNumber:
 }
 
 export async function listChildren(parentId: string): Promise<ServiceResult<ChildView[]>> {
-  return parentId === 'usr_parent_xiaoyu' ? ok(state.children) : fail('FORBIDDEN', '无权查看孩子信息')
+  // Keep the established in-memory demo fixture (including locally bound demo
+  // children); other parent accounts must be resolved from their real links.
+  if (parentId === 'usr_parent_xiaoyu') return ok(state.children)
+  const appState = getAppState()
+  if (!appState.users.some(user => user.id === parentId && user.role === 'parent')) {
+    return fail('FORBIDDEN', '无权查看孩子信息')
+  }
+  const children = appState.parentStudentLinks
+    .filter(link => link.parentId === parentId && link.status === 'active')
+    .flatMap(link => {
+      const child = appState.users.find(user => user.id === link.studentId && user.role === 'student')
+      return child ? [{ id: child.id, displayName: child.displayName,
+        className: child.className ?? '未分班', studentNumber: child.id === 'usr_student_xiaoyu'
+          ? '0321' : child.id.replace(/\D/g, '').padStart(4, '0'),
+        current: state.children.some(item => item.id === child.id && item.current),
+        linkVersion: link.version ?? 1 }] : []
+    })
+  return ok(children)
 }
 
 export async function bindChild(parentId: string, operationId: string, studentNumber: string, bindingCode: string): Promise<ServiceResult<ChildView>> {
@@ -136,19 +154,26 @@ export async function bindChild(parentId: string, operationId: string, studentNu
 }
 
 export async function chooseChild(parentId: string, childId: string): Promise<ServiceResult<ChildView>> {
-  if (parentId !== 'usr_parent_xiaoyu') return fail('FORBIDDEN', '无权切换孩子')
-  const child = state.children.find(item => item.id === childId)
+  const children = await listChildren(parentId)
+  if (!children.ok) return children
+  const child = children.data.find(item => item.id === childId)
   if (!child) return fail('NOT_FOUND', '孩子绑定关系不存在')
   state.children.forEach(item => { item.current = item.id === childId })
-  return ok(child)
+  return ok({ ...child, current: true })
 }
 
 export async function unbindChild(parentId: string, childId: string): Promise<ServiceResult<true>> {
-  if (parentId !== 'usr_parent_xiaoyu') return fail('FORBIDDEN', '无权解除绑定')
+  const children = await listChildren(parentId)
+  if (!children.ok) return children
+  if (!children.data.some(item => item.id === childId)) return fail('NOT_FOUND', '孩子绑定关系不存在')
+  mutateAppState(draft => {
+    const link = draft.parentStudentLinks.find(item => item.parentId === parentId
+      && item.studentId === childId && item.status === 'active')
+    if (link) { link.status = 'revoked'; link.version = (link.version ?? 1) + 1 }
+  })
   const index = state.children.findIndex(item => item.id === childId)
-  if (index < 0) return fail('NOT_FOUND', '孩子绑定关系不存在')
-  state.children.splice(index, 1)
-  if (state.children.length && !state.children.some(item => item.current)) state.children[0].current = true
+  if (index >= 0) state.children.splice(index, 1)
+  if (state.children.length && !state.children.some(item => item.current)) state.children[0]!.current = true
   return ok(true)
 }
 

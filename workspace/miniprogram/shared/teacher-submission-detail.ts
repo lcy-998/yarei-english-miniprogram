@@ -1,7 +1,9 @@
+import type { TaskItem } from '../domain/types'
+
 export interface TeacherTaskItemSummary {
   id: string
   title: string
-  type: 'reading' | 'vocabulary' | 'exercise' | 'recording'
+  type: TaskItem['type']
   completionRule: Record<string, unknown>
 }
 
@@ -123,6 +125,20 @@ export function teacherSubmissionDetails(
         detail: recordingId ? `录音时长：${durationMs === null ? '未记录' : `${Math.round(durationMs / 1000)} 秒`}；请试听后评分。`
           : '本次提交没有可核验的录音引用。', tone: recordingId ? 'success' : 'neutral',
         ...(recordingId ? { recordingId } : {}) }
+    }
+    if (item.type === 'listening' || item.type === 'video' || item.type === 'dubbing') {
+      const typeLabel = item.type === 'listening' ? '听力' : item.type === 'video' ? '看视频' : '视频配音'
+      const recorded = structured?.kind === item.type
+        && typeof structured.mediaSessionId === 'string' && structured.mediaSessionId.length > 0
+        && (item.type !== 'dubbing' || typeof structured.finalWorkId === 'string'
+          && structured.finalWorkId.length > 0)
+      return { id: item.id, title: item.title, typeLabel,
+        requirement: '按发布快照完成媒体与作答要求',
+        result: recorded ? item.type === 'dubbing' ? '已提交配音作品' : '已提交媒体作答'
+          : '本次提交未记录媒体证据',
+        detail: recorded ? '点开原学生作业页核对播放、作答及授权试听证据。'
+          : '当前提交缺少可核对的媒体引用；点开查看具体缺失原因。',
+        tone: 'neutral' }
     }
     const answered = structured?.kind === 'exercise' ? count(structured.answeredQuestionCount) : null
     const required = requiredCount(item.completionRule, 'requiredQuestionCount')

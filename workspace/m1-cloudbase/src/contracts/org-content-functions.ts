@@ -12,6 +12,7 @@ import {
 } from '../org-content/types';
 import { SCHOOL_QUESTION_TYPES, type SchoolQuestionFilters, type StudentCatalogFilters, type TaskCatalogFilters } from '../org-content/types';
 import type { QuestionAdminFilters, QuestionBatchItem, QuestionVisibility } from '../question-admin/types';
+import type { TeacherAssetFilters } from '../teacher-media/asset-catalog-service';
 
 export type ContractValidation<T> =
   | { readonly ok: true; readonly value: T }
@@ -39,12 +40,18 @@ export const CONTENT_QUERY_ACTIONS = [
   'listTaskCatalogResources',
   'listTaskCatalogFacets',
   'getTaskCatalogResource',
+  'listTeacherAssets',
+  'listTeacherAssetFacets',
+  'previewTeacherAsset',
   'listStudentCatalog',
   'listStudentCatalogFacets',
   'listReadingResources',
   'getReadingResource',
+  'getReadingPronunciationSegments',
+  'getReadingAudioMap',
   'listVocabularyPacks',
   'getVocabularyPack',
+  'getHistoricalTaskLearning',
 ] as const;
 export type ContentQueryAction = (typeof CONTENT_QUERY_ACTIONS)[number];
 
@@ -54,11 +61,19 @@ export type ContentQueryInput =
   | Readonly<{ action: 'listSchoolQuestionFacets'; targetClassIds?: readonly string[] }>
   | Readonly<{ action: 'getSchoolQuestion'; resourceId: string; targetClassIds?: readonly string[] }>
   | Readonly<{ action: 'listTaskCatalogResources'; filters: TaskCatalogFilters; page: Readonly<{ limit: number; offset: number }> }>
-  | Readonly<{ action: 'listTaskCatalogFacets'; type: TaskCatalogFilters['type']; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'listTaskCatalogFacets'; type: TaskCatalogFilters['type']; targetClassIds?: readonly string[];
+      category?: TaskCatalogFilters['category'] }>
   | Readonly<{ action: 'getTaskCatalogResource'; resourceId: string; targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'listTeacherAssets'; filters: TeacherAssetFilters;
+      page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'listTeacherAssetFacets'; kind: TeacherAssetFilters['kind'];
+      targetClassIds?: readonly string[] }>
+  | Readonly<{ action: 'previewTeacherAsset'; resourceId: string; targetClassIds?: readonly string[] }>
   | Readonly<{ action: 'listStudentCatalog'; filters: StudentCatalogFilters; page: Readonly<{ limit: number; offset: number }> }>
   | Readonly<{ action: 'listStudentCatalogFacets'; type: StudentCatalogFilters['type']; category?: StudentCatalogFilters['category'] }>
-  | Readonly<{ action: 'getReadingResource' | 'getVocabularyPack'; resourceId: string }>;
+  | Readonly<{ action: 'getReadingResource' | 'getReadingPronunciationSegments' | 'getVocabularyPack'; resourceId: string }>
+  | Readonly<{ action: 'getReadingAudioMap'; resourceId: string; chapterId: string }>
+  | Readonly<{ action: 'getHistoricalTaskLearning'; taskId: string; itemId: string }>;
 
 export const ORGANIZATION_ADMIN_ACTIONS = [
   'listClasses',
@@ -327,17 +342,79 @@ export function validateContentQueryRequest(
       page: page.value } };
   }
   if (request.action === 'listTaskCatalogFacets') {
-    const exact = parseExactObject(request.payload, ['type'], ['targetClassIds']);
+    const exact = parseExactObject(request.payload, ['type'], ['targetClassIds', 'category']);
     if (!exact.ok) return exact;
     if (exact.value.type !== 'reading' && exact.value.type !== 'vocabulary') return invalid('type', '目录类型无效。');
     const targetClassIds = exact.value.targetClassIds === undefined
       ? { ok: true as const, value: undefined }
       : parseIds(exact.value.targetClassIds, 'targetClassIds');
     if (!targetClassIds.ok) return targetClassIds;
+    const category = optionalEnum(exact.value.category, 'category',
+      ['original', 'synchronized', 'picture_book', 'current_events', 'chapter_book'] as const);
+    if (!category.ok || (exact.value.type === 'vocabulary' && category.value !== undefined)) {
+      return invalid('category', '阅读分类无效。');
+    }
     return { ok: true, value: { action: request.action, type: exact.value.type,
-      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }),
+      ...(category.value === undefined ? {} : { category: category.value }) } };
   }
   if (request.action === 'getTaskCatalogResource') {
+    const exact = parseExactObject(request.payload, ['resourceId'], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    const resourceId = requiredId(exact.value.resourceId, 'resourceId');
+    if (!resourceId.ok) return resourceId;
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action, resourceId: resourceId.value,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'listTeacherAssetFacets') {
+    const exact = parseExactObject(request.payload, ['kind'], ['targetClassIds']);
+    if (!exact.ok) return exact;
+    if (exact.value.kind !== 'listening' && exact.value.kind !== 'video'
+      && exact.value.kind !== 'dubbing') return invalid('kind', '媒体类型无效。');
+    const targetClassIds = exact.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(exact.value.targetClassIds, 'targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    return { ok: true, value: { action: request.action, kind: exact.value.kind,
+      ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'listTeacherAssets') {
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filters = parseExactObjectValue(exact.value.filters, ['kind'],
+      ['keyword', 'grade', 'textbook', 'unit', 'targetClassIds', 'scope'], 'filters');
+    if (!filters.ok) return filters;
+    if (filters.value.kind !== 'listening' && filters.value.kind !== 'video'
+      && filters.value.kind !== 'dubbing') return invalid('filters.kind', '媒体类型无效。');
+    if (filters.value.scope !== undefined && filters.value.scope !== 'mine') {
+      return invalid('filters.scope', '素材范围无效。');
+    }
+    const keyword = optionalBoundedString(filters.value.keyword, 'filters.keyword', 100);
+    const grade = optionalBoundedString(filters.value.grade, 'filters.grade', 100);
+    const textbook = optionalBoundedString(filters.value.textbook, 'filters.textbook', 100);
+    const unit = optionalBoundedString(filters.value.unit, 'filters.unit', 100);
+    if (!keyword.ok) return keyword;
+    if (!grade.ok) return grade;
+    if (!textbook.ok) return textbook;
+    if (!unit.ok) return unit;
+    const targetClassIds = filters.value.targetClassIds === undefined
+      ? { ok: true as const, value: undefined }
+      : parseIds(filters.value.targetClassIds, 'filters.targetClassIds');
+    if (!targetClassIds.ok) return targetClassIds;
+    const page = parseQuestionPage(exact.value.page);
+    if (!page.ok) return page;
+    return { ok: true, value: { action: request.action, filters: {
+      kind: filters.value.kind,
+      ...(filters.value.scope === 'mine' ? { scope: 'mine' as const } : {}),
+      ...compactOptional({ keyword: keyword.value, grade: grade.value,
+        textbook: textbook.value, unit: unit.value, targetClassIds: targetClassIds.value }),
+    }, page: page.value } };
+  }
+  if (request.action === 'previewTeacherAsset') {
     const exact = parseExactObject(request.payload, ['resourceId'], ['targetClassIds']);
     if (!exact.ok) return exact;
     const resourceId = requiredId(exact.value.resourceId, 'resourceId');
@@ -370,6 +447,26 @@ export function validateContentQueryRequest(
     if (!targetClassIds.ok) return targetClassIds;
     return { ok: true, value: { action: request.action, resourceId: resourceId.value,
       ...(targetClassIds.value === undefined ? {} : { targetClassIds: targetClassIds.value }) } };
+  }
+  if (request.action === 'getReadingAudioMap') {
+    const exact = parseExactObject(request.payload, ['resourceId', 'chapterId']);
+    if (!exact.ok) return exact;
+    const resourceId = requiredId(exact.value.resourceId, 'resourceId');
+    const chapterId = requiredId(exact.value.chapterId, 'chapterId');
+    if (!resourceId.ok) return resourceId;
+    if (!chapterId.ok) return chapterId;
+    return { ok: true, value: { action: request.action,
+      resourceId: resourceId.value, chapterId: chapterId.value } };
+  }
+  if (request.action === 'getHistoricalTaskLearning') {
+    const exact = parseExactObject(request.payload, ['taskId', 'itemId']);
+    if (!exact.ok) return exact;
+    const taskId = requiredId(exact.value.taskId, 'taskId');
+    const itemId = requiredId(exact.value.itemId, 'itemId');
+    if (!taskId.ok) return taskId;
+    if (!itemId.ok) return itemId;
+    return { ok: true, value: { action: request.action,
+      taskId: taskId.value, itemId: itemId.value } };
   }
   const exact = parseExactObject(request.payload, ['resourceId']);
   if (!exact.ok) return exact;

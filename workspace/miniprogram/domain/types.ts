@@ -35,6 +35,16 @@ export interface StudentClassView {
 
 export type SchoolQuestionType = 'single_choice' | 'multiple_choice' | 'fill' | 'subjective'
 
+export interface ExerciseSection {
+  id: string
+  title: string
+  instruction: string
+  studentMaterial: string
+  order: number
+  questionOrder: number
+  points: number
+}
+
 export interface SchoolQuestionFilters {
   grade?: string
   textbook?: string
@@ -48,6 +58,7 @@ export interface SchoolQuestionFilters {
 
 export interface SchoolQuestionSummary {
   id: string
+  exercisePackId?: string
   title: string
   grade: string
   textbook?: string
@@ -64,6 +75,9 @@ export interface SchoolQuestionDetail extends SchoolQuestionSummary {
   options: string[]
   correctAnswer: unknown
   explanation: string
+  exerciseSection?: ExerciseSection
+  acceptedAnswers?: string[]
+  rubric?: Array<{ criterion: string; points: number }>
 }
 
 export interface SchoolQuestionPage {
@@ -139,6 +153,9 @@ export interface StudentCatalogItem {
   theme?: string
   contentVersion: string
   itemCount: number
+  audioPointreadReady?: boolean
+  audioPointreadPending?: boolean
+  pronunciationReady?: boolean
 }
 export interface StudentCatalogPage { items: StudentCatalogItem[]; total: number; nextOffset: number | null }
 export interface StudentCatalogFacet {
@@ -152,7 +169,7 @@ export interface StudentCatalogFacet {
 
 export interface TextbookChapter { id: string; title: string; lessons: Array<{ id: string; title: string }> }
 export interface TextbookSummary { id: string; title: string; grade: string; term: string; edition: string;
-  contentVersion: string; chapters: TextbookChapter[] }
+  contentVersion: string; audioMode?: 'page_only'; audioAvailabilityNote?: string; chapters: TextbookChapter[] }
 export interface ClassTextbookItem { textbookId: string; chapterIds: string[]; lessonIds: string[]; contentVersion: string }
 export interface ClassTextbookConfig { id: string; organizationId: string; classId: string; status: 'draft' | 'published';
   textbooks: ClassTextbookItem[]; note: string; publishedTextbooks: ClassTextbookItem[]; publishedNote: string;
@@ -160,6 +177,7 @@ export interface ClassTextbookConfig { id: string; organizationId: string; class
 export interface TeacherTextbookClass { id: string; name: string; grade: string; term: string; studentCount: number;
   config: ClassTextbookConfig | null }
 export interface TextbookFilters { grade?: string; term?: string; edition?: string; unit?: string; lesson?: string; keyword?: string }
+export interface TextbookFacetValues { grade: string[]; term: string[]; edition: string[]; unit: string[]; lesson: string[] }
 export interface TextbookPage { items: TextbookSummary[]; nextOffset: number | null }
 export interface TextbookCenterLayout { classTextbooksEnabled: boolean; synchronizedTextbooksEnabled: boolean;
   visibleClassIds: string[]; dashboardFields: Array<'grade' | 'studentCount' | 'configuredBookCount' | 'progress' | 'updatedAt'> }
@@ -200,6 +218,26 @@ export interface ActivityView {
   updatedAt: string
   publishedAt: string | null
   closedAt: string | null
+  visibility?: 'visible' | 'recycled'
+  recycledAt?: string | null
+  recycledBy?: string | null
+  recycleReason?: string | null
+  recoverableUntil?: string | null
+}
+
+export interface TeacherActivityProgressView {
+  activityId: string
+  date: string
+  schoolToday: string
+  restDay: boolean
+  evidenceStatus: 'available' | 'not_available'
+  completedCount: number | null
+  participantCount: number
+  updatedAt: string
+  rows: Array<{ studentId: string; displayNameMasked: string; complete: boolean | null;
+    supplemented: boolean; completedDays: number; consecutiveDays: number;
+    missingConditions: Array<ActivityDailyCondition['kind']>; evidenceDetailAvailable: boolean }>
+  nextOffset: number | null
 }
 
 export interface ActivityDayView {
@@ -271,7 +309,7 @@ export interface ParentStudentLink {
 export interface TaskItem {
   id: string
   resourceId?: string
-  type: 'reading' | 'vocabulary' | 'exercise' | 'recording'
+  type: 'reading' | 'vocabulary' | 'exercise' | 'recording' | 'listening' | 'video' | 'dubbing'
   title: string
   completionRule: string
   completionRuleData?: TaskCompletionRule
@@ -280,7 +318,9 @@ export interface TaskItem {
   snapshotSchemaVersion?: 1 | 2
   vocabularyWordIds?: string[]
   vocabularyPack?: VocabularyPack
-  exerciseQuestion?: { questionId: string; questionType: SchoolQuestionType; stem: string; options: string[] }
+  exerciseQuestion?: { questionId: string; exercisePackId?: string; questionType: SchoolQuestionType; stem: string;
+    options: string[]; exerciseSection?: ExerciseSection }
+  mediaSnapshot?: M3TaskMediaSnapshotView
 }
 
 export type TaskCompletionRule =
@@ -288,6 +328,9 @@ export type TaskCompletionRule =
   | { kind: 'vocabulary_words'; requiredWordCount: number }
   | { kind: 'exercise_questions'; requiredQuestionCount: number }
   | { kind: 'recording_upload' }
+  | { kind: 'listening'; questionIds: string[]; segmentIds: string[] }
+  | { kind: 'video'; durationMs: number; questionIds: string[] }
+  | { kind: 'dubbing' }
 
 export type TaskCompletionValue =
   | { kind: 'reading'; completedPageCount: number }
@@ -296,6 +339,11 @@ export type TaskCompletionValue =
       questionId: string; response: string | string[]; isCorrect?: boolean
     }> }
   | { kind: 'recording'; recordingId: string; durationMs?: number; sizeBytes?: number }
+  | { kind: 'listening'; mediaSessionId: string; questionResponses: Array<{
+      questionId: string; response: string | string[] }> }
+  | { kind: 'video'; mediaSessionId: string; questionResponses?: Array<{
+      questionId: string; response: string | string[] }> }
+  | { kind: 'dubbing'; mediaSessionId: string; finalWorkId: string }
 
 export interface Task {
   id: string
@@ -352,6 +400,8 @@ export interface ReviewFeedback {
   assignmentId: string
   submissionId: string
   teacherId: string
+  teacherName?: string
+  voiceComment?: { available: boolean; durationMs: number | null }
   decision: ReviewDecision
   score?: number
   itemScores?: Array<{ itemId: string; score: number }>
@@ -368,7 +418,7 @@ export interface MemoryExerciseSnapshot {
   question: SchoolQuestionDetail
 }
 
-export type WriteOperationKind = 'publish_task' | 'save_teacher_draft' | 'save_submission_draft' | 'submit_task' | 'publish_review'
+export type WriteOperationKind = 'publish_task' | 'save_teacher_draft' | 'delete_teacher_draft' | 'save_submission_draft' | 'submit_task' | 'publish_review'
 
 export interface WriteOperationReceipt {
   operationId: string
@@ -395,7 +445,7 @@ export interface AppState {
 }
 
 export interface ServiceError {
-  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'MEDIA_INVALID' | 'TASK_NOT_SUBMITTABLE' | 'REDO_LIMIT_REACHED' | 'DUPLICATE_OPERATION' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'
+  code: 'VALIDATION_ERROR' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RESOURCE_OFFLINE' | 'ACTIVITY_PENDING_REVIEW' | 'MEDIA_INVALID' | 'TASK_NOT_SUBMITTABLE' | 'REDO_LIMIT_REACHED' | 'DUPLICATE_OPERATION' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'
   message: string
   retryable: boolean
   fieldErrors?: Record<string, string>
@@ -451,13 +501,133 @@ export interface ReadingResource extends ReadingListItem {
   chapters: ReadingChapter[]
 }
 
+export interface ReadingPronunciationSegmentsView {
+  resourceId: string
+  sourceVersion: string
+  segments: Array<{ id: string; text: string; pageNumber?: number;
+    translationText?: string;
+    demonstrationAudio: { temporaryUrl: string; expiresAt: string } }>
+}
+
+export interface ReadingAudioMapView {
+  resourceId: string
+  sourceVersion: string
+  chapterId: string
+  durationMs: number | null
+  playback: { temporaryUrl: string; expiresAt: string } | null
+  segments: Array<{ id: string; pageId: string; pageNumber: number; text: string;
+    rect: { x: number; y: number; width: number; height: number };
+    startMs: number; endMs: number;
+    clipDurationMs?: number;
+    clipPlayback?: { temporaryUrl: string; expiresAt: string } }>
+}
+
+export interface HistoricalTaskLearningView {
+  taskId: string
+  itemId: string
+  resourceId: string
+  contentVersion: string
+  reading?: ReadingResource
+  vocabulary?: VocabularyPack
+  audioMaps?: ReadingAudioMapView[]
+  pronunciation?: ReadingPronunciationSegmentsView
+}
+
+/** M3 media task contract. Current task publication stays closed until server gates pass. */
+export interface M3TaskMediaSnapshotView {
+  kind: 'listening' | 'video' | 'dubbing'
+  mediaId: string
+  mediaVersion: number
+  reviewVersion: number
+  durationMs: number
+  questionIds: string[]
+  questions: Array<{ questionId: string; questionType: SchoolQuestionType; stem: string; options: string[] }>
+  clips: Array<{ questionId: string; segmentId: string; startMs: number; endMs: number }>
+  subtitleAvailable: boolean
+  subtitleCues?: Array<{ startMs: number; endMs: number; text: string; translationText?: string }>
+  continuousPlaybackEnforced: true
+}
+
+export interface M3TaskMediaPlaybackView {
+  status: 'ready' | 'processing' | 'unavailable' | 'expired'
+  mediaId: string
+  mediaVersion: number
+  sessionId: string | null
+  temporaryUrl: string | null
+  expiresAt: string | null
+  confirmedThroughMs: number
+  seekForwardAllowed: false
+  reason?: string
+}
+
+export interface SubmittedTaskMediaPlaybackView {
+  taskId: string
+  itemId: string
+  submissionVersion: number
+  kind: 'listening' | 'video' | 'dubbing'
+  mediaVersion: number
+  durationMs: number
+  temporaryUrl: string
+  expiresAt: string
+  clips: Array<{ questionId: string; startMs: number; endMs: number }>
+  subtitles: Array<{ startMs: number; endMs: number; text: string; translationText?: string }>
+}
+
+export interface M3TaskMediaHeartbeatView {
+  sessionId: string
+  confirmedThroughMs: number
+  completed: boolean
+}
+
+export interface ReviewVoiceDraftView {
+  recordingId: string
+  submissionId: string
+  submissionVersion: number
+  stagingPath: string
+  status: 'draft' | 'sealed'
+  durationMs: number | null
+  version: number
+  expiresAt: string
+}
+
+export interface TaskDubbingWorkView {
+  workId: string
+  taskId: string
+  itemId: string
+  round: number
+  stagingPath: string
+  status: 'draft' | 'submitted'
+  durationMs: number | null
+  submittedAt: string | null
+  version: number
+}
+
+export interface MyTaskDubbingWorkPage {
+  items: Array<{ workId: string; taskId: string; taskTitle: string; itemId: string;
+    round: number; status: 'formal' | 'task_pending'; durationMs: number;
+    submittedAt: string; playbackAvailable: boolean }>
+  nextOffset: number | null
+}
+
+export interface MyTaskDubbingPlaybackView {
+  workId: string
+  status: 'formal' | 'task_pending'
+  durationMs: number
+  temporaryUrl: string
+  expiresAt: string
+}
+
 export interface VocabularyWord {
   id: string
   word: string
   syllables: string[]
   syllableDisplay?: string
+  ipa?: string
+  ipaDisplay?: string
   meaning: string
   example?: string
+  pronunciationUrl?: string
+  pronunciationExpiresAt?: string
 }
 
 export interface VocabularyPack {
@@ -549,6 +719,7 @@ export interface WorkMaterial {
   title: string
   contentVersion: string
   subtitle: string
+  subtitleCues?: Array<{ startMs: number; endMs: number; text: string; translationText?: string }>
   grade?: string
   textbook?: string
   unit?: string
@@ -642,10 +813,10 @@ export interface TaskTemplateView {
   scope: 'system' | 'personal'
   title: string
   description: string
-  itemRefs: Array<{ id: string; resourceId: string; completionRule: Record<string, unknown>;
+  itemRefs: Array<{ id: string; resourceId: string; completionRule?: Record<string, unknown>;
     scoringRule: Record<string, unknown>; order: number }>
   items: Array<{ id: string; resourceId: string; resourceVersion: number;
-    resourceSnapshot: { title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording'; payload: Record<string, unknown> };
+    resourceSnapshot: { title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording' | 'listening' | 'video' | 'dubbing'; payload: Record<string, unknown> };
     completionRule: Record<string, unknown>; scoringRule: Record<string, unknown>; order: number }>
   status: 'active' | 'deleted'
   useCount: number
@@ -706,10 +877,34 @@ export interface HomeTaskSummary {
 export interface TaskDetailView {
   task: Task
   assignment: TaskAssignment
+  parentItemSummaries?: Array<{ itemId: string; title: string; type: string; order: number;
+    pronunciationAvailable?: boolean }>
+  parentAssignmentId?: string
   readingPageProgress?: Array<{ itemId: string; completedPageCount: number }>
   automaticScore?: number | null
   submission?: Submission
   submissionHistory?: Array<{ version: number; status: SubmissionStatus; submittedAt: string;
     answers?: SubmissionAnswer[]; feedback?: ReviewFeedback }>
   feedback?: ReviewFeedback
+}
+
+export interface ParentRecordingPlaybackView {
+  status: 'ready' | 'expired' | 'unavailable'
+  durationMs: number | null
+  playback: { temporaryUrl: string; expiresAt: string } | null
+}
+
+export interface ParentFeedbackVoicePlaybackView {
+  feedbackId: string
+  temporaryUrl: string
+  expiresAt: string
+  durationMs: number
+}
+
+export interface ParentTaskMediaPlaybackView {
+  kind: 'listening' | 'video' | 'dubbing'
+  status: 'ready' | 'expired' | 'unavailable'
+  durationMs: number | null
+  playback: { temporaryUrl: string; expiresAt: string } | null
+  clips?: Array<{ questionId: string; startMs: number; endMs: number }>
 }

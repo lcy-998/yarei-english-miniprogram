@@ -6,14 +6,19 @@ import { failure, success, type RequestIdGenerator, type ResultClock } from '../
 import type { ServiceResult } from '../shared/protocol';
 import { automaticTaskScore } from '../task-core/task-score';
 import type { TaskQueryRepository } from '../task-query/repository';
+import { hasOnlyOfficialAutomaticItems } from '../task-query/official-score';
 import type { StudentWorkUnitOfWork } from '../student-work/repository';
-import type { StatsExport, StatsFilters, StatsSummary, StatsTaskDetail, StatsView } from './types';
+import type { ActivityService } from '../activity/activity-service';
+import type { PhonicsUnitOfWork } from '../phonics/repository';
+import type { StatsExport, StatsFilters, StatsLearningEvent, StatsSummary, StatsTaskDetail, StatsView } from './types';
 
 export interface LearningStatsDependencies {
   readonly organization: OrgContentRepository;
   readonly tasks: TaskQueryRepository;
   readonly identities: IdentityRepository;
   readonly works?: StudentWorkUnitOfWork;
+  readonly phonics?: PhonicsUnitOfWork;
+  readonly activities?: Pick<ActivityService, 'listVerifiedDaysForStatistics'>;
   readonly clock: ResultClock;
   readonly requestIds: RequestIdGenerator;
 }
@@ -52,8 +57,11 @@ export class LearningStatsService {
     const details = await this.details(actor.organizationId, filters, selected.map((item) => ({ id: item.id, name: item.name })), scoped);
     const dubbingCount = await this.dubbingCount(actor.organizationId, filters,
       scoped.map((item) => item.id), selected.map((item) => item.id));
-    return success({ filters, periodBasis: 'taskDueDate', classes: classes.map((item) => ({ id: item.id, name: item.name })),
-      students, summary: { ...summarize(details), dubbingCount }, details, canExport: true }, this.meta());
+    const learning = await this.learningEvents(actor.organizationId, filters, selected.map(item => ({ id: item.id, name: item.name })), scoped);
+    return success({ filters, periodBasis: 'taskDueDate', learningPeriodBasis: 'eventSchoolDate',
+      classes: classes.map((item) => ({ id: item.id, name: item.name })),
+      students, summary: { ...summarize(details), dubbingCount, ...learning.summary },
+      details, learningEvents: learning.events, canExport: true }, this.meta());
   }
 
   public async parent(actor: TrustedActorContext, childId: string, filters: StatsFilters): Promise<ServiceResult<StatsView>> {
@@ -77,8 +85,10 @@ export class LearningStatsService {
     const details = await this.details(actor.organizationId, filters, selected, students);
     const dubbingCount = await this.dubbingCount(actor.organizationId, filters, [childId],
       filters.classId ? selected.map((item) => item.id) : null);
-    return success({ filters, periodBasis: 'taskDueDate', classes, students,
-      summary: { ...summarize(details), dubbingCount }, details, canExport: false }, this.meta());
+    const learning = await this.learningEvents(actor.organizationId, filters, selected, students);
+    return success({ filters, periodBasis: 'taskDueDate', learningPeriodBasis: 'eventSchoolDate', classes, students,
+      summary: { ...summarize(details), dubbingCount, ...learning.summary },
+      details, learningEvents: learning.events, canExport: false }, this.meta());
   }
 
   public async exportTeacherCsv(actor: TrustedActorContext, filters: StatsFilters): Promise<ServiceResult<StatsExport>> {
@@ -94,8 +104,16 @@ export class LearningStatsService {
       ['已完成任务', String(summary.completedCount)], ['应完成任务', String(summary.assignedCount)],
       ['逾期任务', String(summary.overdueCount)], ['任务提交次数', String(summary.taskSubmissionCount)],
       ['已记录平均成绩', summary.averageScore === null ? '' : String(summary.averageScore)],
+      ['拼读首次作答', summary.phonicsPracticeCount === null ? '' : String(summary.phonicsPracticeCount)],
+      ['拼读首次正确率', summary.practiceAccuracy === null ? '' : `${summary.practiceAccuracy}%`],
+      ['有效打卡天数', summary.checkinCompletedDays === null ? '' : String(summary.checkinCompletedDays)],
       ...(summary.dubbingCount === null ? [] : [['自主配音提交', String(summary.dubbingCount)]]), []];
-    const csv = '\uFEFF' + [...summaryRows, header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
+    const learningRows = result.data.learningEvents.map(item => [item.occurredOn, item.className,
+      item.studentName, item.kind === 'phonics' ? '自然拼读' : '打卡', item.sourceTitle,
+      item.kind === 'phonics' ? item.firstCorrect ? '首次正确' : '首次错误' : item.supplemented ? '教师补记' : '证据完成']);
+    const csv = '\uFEFF' + [...summaryRows, header, ...rows, [],
+      ['事件日期', '班级', '学员', '来源', '内容', '结果'], ...learningRows]
+      .map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
     return success({ fileName: `雅睿英语-学员统计-${filters.startsOn}-${filters.endsOn}.csv`, csv }, this.meta());
   }
 
@@ -122,7 +140,8 @@ export class LearningStatsService {
       if (task.visibility === 'recycled' && history.length === 0) continue;
       const latest = history.sort((left, right) => right.submissionVersion - left.submissionVersion)[0];
       const feedback = latest ? await this.dependencies.tasks.findFeedback(organizationId, latest.id) : null;
-      const score = feedback?.score ?? (latest ? automaticTaskScore(task, latest) : null);
+      const score = feedback?.score ?? (latest && hasOnlyOfficialAutomaticItems(task)
+        ? automaticTaskScore(task, latest) : null);
       detailRows.push({ taskId: task.id, taskTitle: task.title, studentId: assignment.studentId,
         studentName, classId: assignment.classId, className, dueOn, status: assignment.status,
         submittedAt: latest?.submittedAt ?? null, isLate: assignment.isLate,
@@ -151,6 +170,69 @@ export class LearningStatsService {
     return count;
   }
 
+  private async learningEvents(organizationId: string, filters: StatsFilters,
+    classes: readonly { id: string; name: string }[], students: readonly { id: string; name: string; classId: string }[]): Promise<Readonly<{
+      events: readonly StatsLearningEvent[];
+      summary: Pick<StatsSummary, 'phonicsPracticeCount' | 'practiceAccuracy' | 'checkinCompletedDays' | 'checkinEvidenceStatus'>;
+    }>> {
+    const events: StatsLearningEvent[] = [];
+    const organization = await this.dependencies.organization.findOrganization(organizationId);
+    const timeZone = organization?.timeZone ?? 'Asia/Shanghai';
+    const classNames = new Map(classes.map(item => [item.id, item.name]));
+    let phonicsPracticeCount: number | null = null;
+    let practiceAccuracy: number | null = null;
+    if (this.dependencies.phonics) {
+      let correct = 0;
+      let count = 0;
+      const seenAnswerIds = new Set<string>();
+      await this.dependencies.phonics.transaction(async transaction => {
+        const courses = (await transaction.listCourses(organizationId)).filter(course => course.status !== 'draft');
+        for (const student of students) {
+          for (const course of courses) {
+            if (course.visibility.type === 'classes' && !course.visibility.classIds.includes(student.classId)) continue;
+            const answers = await transaction.listAnswers(organizationId, student.id, course.id, course.contentVersion);
+            for (const answer of answers) {
+              const occurredOn = localDate(answer.attemptedAt, timeZone);
+              if (!answer.firstAttempt || seenAnswerIds.has(answer.id)
+                || occurredOn < filters.startsOn || occurredOn > filters.endsOn) continue;
+              seenAnswerIds.add(answer.id);
+              count += 1;
+              if (answer.isCorrect) correct += 1;
+              events.push({ kind: 'phonics', sourceId: course.id, sourceTitle: course.title,
+                studentId: student.id, studentName: student.name, classId: student.classId,
+                className: classNames.get(student.classId) ?? '', occurredOn,
+                occurredAt: answer.attemptedAt, firstCorrect: answer.isCorrect });
+            }
+          }
+        }
+      });
+      phonicsPracticeCount = count;
+      practiceAccuracy = count > 0 ? Math.round(correct * 100 / count) : null;
+    }
+    let checkinCompletedDays: number | null = null;
+    let checkinEvidenceStatus: StatsSummary['checkinEvidenceStatus'] = 'unavailable';
+    if (this.dependencies.activities) {
+      const verified = await this.dependencies.activities.listVerifiedDaysForStatistics(organizationId,
+        classes.map(item => item.id), students.map(item => item.id), filters.startsOn, filters.endsOn);
+      checkinEvidenceStatus = verified.evidenceStatus;
+      const studentNames = new Map(students.map(item => [`${item.classId}|${item.id}`, item.name]));
+      let acceptedDays = 0;
+      for (const item of verified.events) {
+        const studentName = studentNames.get(`${item.classId}|${item.studentId}`);
+        const className = classNames.get(item.classId);
+        if (studentName === undefined || className === undefined) continue;
+        acceptedDays++;
+        events.push({ kind: 'checkin', sourceId: item.activityId, sourceTitle: item.activityTitle,
+          studentId: item.studentId, studentName, classId: item.classId, className,
+          occurredOn: item.date, occurredAt: null, supplemented: item.supplemented });
+      }
+      if (verified.evidenceStatus === 'available') checkinCompletedDays = acceptedDays;
+    }
+    events.sort((left, right) => right.occurredOn.localeCompare(left.occurredOn)
+      || left.kind.localeCompare(right.kind) || left.studentId.localeCompare(right.studentId));
+    return { events, summary: { phonicsPracticeCount, practiceAccuracy, checkinCompletedDays, checkinEvidenceStatus } };
+  }
+
   private meta() {
     return { requestId: this.dependencies.requestIds.next(), serverTime: this.dependencies.clock.nowIso(), apiVersion: 'm1.v1' as const };
   }
@@ -164,7 +246,8 @@ function summarize(details: readonly StatsTaskDetail[]): StatsSummary {
     overdueCount: details.filter((item) => item.isLate || item.status === 'overdue').length,
     taskSubmissionCount: details.reduce((total, item) => total + item.submissionCount, 0),
     averageScore: scored.length ? Math.round(scored.reduce((total, score) => total + score, 0) / scored.length) : null,
-    learningMinutes: null, practiceAccuracy: null, dubbingCount: null, shadowingCount: null };
+    learningMinutes: null, phonicsPracticeCount: null, practiceAccuracy: null,
+    checkinCompletedDays: null, checkinEvidenceStatus: 'unavailable', dubbingCount: null, shadowingCount: null };
 }
 
 function validDates(filters: StatsFilters): boolean {

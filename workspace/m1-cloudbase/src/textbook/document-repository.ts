@@ -70,7 +70,13 @@ function projectBook(document: VersionedDocument, organizationId: string): Textb
   if (visibility === null || (visibility === 'classes' && (!Array.isArray(rawClassIds)
     || !rawClassIds.every(id => typeof id === 'string')))) return null;
   return { id: document._id, title: document.title, grade, term, edition,
-    contentVersion: String(document.contentVersion), chapters, visibility,
+    contentVersion: String(document.contentVersion),
+    ...((payload.audioMode === 'page_only' || payload.audioMode === 'chapter_audio'
+      || payload.audioMode === 'partial_pointread') ? {
+      audioMode: payload.audioMode as 'page_only' | 'chapter_audio' | 'partial_pointread',
+      audioAvailabilityNote: typeof payload.audioAvailabilityNote === 'string'
+        ? payload.audioAvailabilityNote : '点读、跟读与示范音频暂未开放' } : {}),
+    chapters, visibility,
     allowedClassIds: visibility === 'classes' ? [...rawClassIds as string[]] : [] };
 }
 

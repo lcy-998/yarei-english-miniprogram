@@ -1,7 +1,7 @@
 import type { FunctionRequest, JsonObject } from '../shared/protocol';
 import { parseExactObject } from '../shared/strict-object';
 
-export const TASK_RECORDING_QUERY_ACTIONS = ['listRound', 'getPlayback', 'getMediaState', 'listPrompts', 'getPrompt'] as const;
+export const TASK_RECORDING_QUERY_ACTIONS = ['listRound', 'getPlayback', 'getMediaState', 'listPrompts', 'listPromptFacets', 'getPrompt'] as const;
 export const TASK_RECORDING_COMMAND_ACTIONS = ['begin', 'submit'] as const;
 export type TaskRecordingQueryAction = (typeof TASK_RECORDING_QUERY_ACTIONS)[number];
 export type TaskRecordingCommandAction = (typeof TASK_RECORDING_COMMAND_ACTIONS)[number];
@@ -9,7 +9,9 @@ export type TaskRecordingQueryInput = Readonly<{ action: 'listRound'; taskId: st
   | Readonly<{ action: 'getPlayback'; recordingId: string }>
   | Readonly<{ action: 'getMediaState'; recordingId: string }>
   | Readonly<{ action: 'listPrompts'; targetClassIds?: readonly string[]; keyword?: string;
+    grade?: string; unit?: string;
     page: Readonly<{ limit: number; offset: number }> }>
+  | Readonly<{ action: 'listPromptFacets'; targetClassIds?: readonly string[] }>
   | Readonly<{ action: 'getPrompt'; promptId: string; targetClassIds?: readonly string[] }>;
 export type TaskRecordingCommandInput = Readonly<{ action: 'begin'; taskId: string; itemId: string; operationId: string }>
   | Readonly<{ action: 'submit'; recordingId: string; stagingFileId: string;
@@ -27,17 +29,31 @@ export function validateTaskRecordingQueryRequest(request: FunctionRequest<TaskR
       ? { ok: true, value: { action: 'listRound', taskId: parsed.value.taskId, itemId: parsed.value.itemId } }
       : bad('taskId');
   }
+  if (request.action === 'listPromptFacets') {
+    const parsed = parseExactObject(request.payload, [], ['targetClassIds']);
+    return parsed.ok && (parsed.value.targetClassIds === undefined
+      || (Array.isArray(parsed.value.targetClassIds) && parsed.value.targetClassIds.every(id)))
+      ? { ok: true, value: { action: 'listPromptFacets',
+        ...(parsed.value.targetClassIds === undefined ? {} : { targetClassIds: parsed.value.targetClassIds as string[] }) } }
+      : bad('targetClassIds');
+  }
   if (request.action === 'listPrompts') {
-    const parsed = parseExactObject(request.payload, ['page'], ['targetClassIds', 'keyword']);
+    const parsed = parseExactObject(request.payload, ['page'], ['targetClassIds', 'keyword', 'grade', 'unit']);
     if (!parsed.ok || (parsed.value.targetClassIds !== undefined
       && (!Array.isArray(parsed.value.targetClassIds) || !parsed.value.targetClassIds.every(id)))
       || (parsed.value.keyword !== undefined
-        && (typeof parsed.value.keyword !== 'string' || parsed.value.keyword.length > 100))) return bad('targetClassIds');
+        && (typeof parsed.value.keyword !== 'string' || parsed.value.keyword.length > 100))
+      || (parsed.value.grade !== undefined
+        && (typeof parsed.value.grade !== 'string' || parsed.value.grade.length > 100))
+      || (parsed.value.unit !== undefined
+        && (typeof parsed.value.unit !== 'string' || parsed.value.unit.length > 100))) return bad('targetClassIds');
     const page = parseExactObject(parsed.value.page, ['limit', 'offset']);
     if (!page.ok || !Number.isSafeInteger(page.value.limit) || !Number.isSafeInteger(page.value.offset)) return bad('page');
     return { ok: true, value: { action: 'listPrompts',
       ...(parsed.value.targetClassIds === undefined ? {} : { targetClassIds: parsed.value.targetClassIds as string[] }),
       ...(typeof parsed.value.keyword === 'string' ? { keyword: parsed.value.keyword } : {}),
+      ...(typeof parsed.value.grade === 'string' ? { grade: parsed.value.grade } : {}),
+      ...(typeof parsed.value.unit === 'string' ? { unit: parsed.value.unit } : {}),
       page: { limit: Number(page.value.limit), offset: Number(page.value.offset) } } };
   }
   if (request.action === 'getPrompt') {

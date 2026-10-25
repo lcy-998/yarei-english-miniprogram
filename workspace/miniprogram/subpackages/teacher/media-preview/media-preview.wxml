@@ -1,0 +1,21 @@
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="media-preview-page">
+  <app-header title="内容预览" back="{{true}}"></app-header>
+  <view class="media-preview-content">
+    <state-panel wx:if="{{loading}}" state="loading" message="正在加载素材"></state-panel>
+    <state-panel wx:elif="{{error && !asset}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:elif="{{asset}}">
+      <view class="preview-card"><text class="preview-title">{{asset.title}}</text><text class="preview-meta">{{asset.grade}}{{asset.textbook ? ' · ' + asset.textbook : ''}}{{asset.unit ? ' · ' + asset.unit : ''}} · 版本 {{asset.contentVersion}}{{asset.acceptanceStatus ? ' · 待用户验收' : ''}}</text><text class="preview-meta">{{asset.kind === 'listening' ? '听力' : asset.kind === 'video' ? '看视频' : '视频配音'}} · {{durationLabel}} · {{asset.questionCount ? asset.questionCount + ' 题' : '无配套题'}}</text><text class="preview-meta">来源：后台统一资产库 · 适用 {{asset.allowedClassIds.length}} 个授权班级</text></view>
+      <view class="preview-card">
+        <video wx:if="{{asset.kind !== 'listening'}}" id="teacher-preview-video" src="{{asset.playback.temporaryUrl}}" controls="{{true}}" class="preview-video" binderror="onMediaError"></video>
+        <button wx:else class="preview-play" bindtap="toggleAudio">{{playing ? '暂停整段试听' : '播放整段音频'}}</button>
+        <text wx:if="{{error}}" class="preview-error">{{error}}</text>
+        <button wx:if="{{error}}" bindtap="load">刷新试听地址</button>
+      </view>
+      <view wx:if="{{asset.subtitles.length}}" class="preview-card"><text class="preview-heading">字幕</text><text wx:for="{{asset.subtitles}}" wx:key="startMs" class="preview-line">{{item.text}}</text></view>
+      <view wx:if="{{questions.length}}" class="preview-card"><text class="preview-heading">配套题目</text>
+        <view wx:for="{{questions}}" wx:key="questionId" class="preview-question"><text>{{index + 1}}. {{item.stem}}</text><text wx:for="{{item.options}}" wx:for-item="option" wx:key="*this" class="preview-option">{{option}}</text><button wx:if="{{asset.kind === 'listening' && item.hasClip}}" data-question-id="{{item.questionId}}" bindtap="playClip">试听本题片段 {{item.clipLabel}}</button><text wx:elif="{{asset.kind === 'listening'}}" class="preview-error">本题片段未提供</text></view>
+      </view>
+      <text class="preview-note">教师只能预览与引用；素材、字幕和题目由资产库统一处理。</text>
+    </view>
+  </view>
+</view></g0-page-shell>

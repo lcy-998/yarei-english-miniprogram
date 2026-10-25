@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ActivityService } from '../../src/activity/activity-service';
-import type { ActivityEntity } from '../../src/activity/types';
+import { ActivityError, type ActivityEntity } from '../../src/activity/types';
 import { NotificationMaintenance } from '../../src/notification/maintenance';
 import { FakeDocumentDatabase } from '../../src/repositories/fake-document-database';
 import type { VersionedDocument } from '../../src/repositories/document-database-port';
@@ -78,6 +78,19 @@ describe('M2 trusted timer maintenance', () => {
       .toMatchObject({ ok: true, data: { scannedOrganizations: 0 } });
   });
 
+  it('routes the hourly media trigger only to bounded retention', async () => {
+    const notifications = vi.fn(async () => { throw new Error('Notifications must not run'); });
+    const retention = vi.fn(async () => ({ scanned: 25, planned: 1, completed: 1, failed: 0 }));
+    const event = { Type: 'Timer', TriggerName: 'yarei_media_retention_hourly', Time: now };
+    const run = createMaintenanceTimerFunction({ trustedTriggerSource: () => 'timer',
+      maintenance: { run: notifications }, retention: { run: retention },
+      clock: { nowIso: () => now }, requestIds: { next: () => 'request_media_demo' } });
+    expect(await run(event)).toMatchObject({ ok: true,
+      data: { mediaRetention: { scanned: 25, completed: 1 } } });
+    expect(retention).toHaveBeenCalledTimes(1);
+    expect(notifications).not.toHaveBeenCalled();
+  });
+
   it('writes due and 20:00 incomplete reminders once with actual late trigger time', async () => {
     const { database, maintenance } = fixture();
     const first = await maintenance.run();
@@ -121,15 +134,26 @@ describe('M2 trusted timer maintenance', () => {
     expect(activity.finalizeActivity).toHaveBeenCalledWith(org, activityId);
   });
 
-  it('records missed leaderboard finalization without recalculating the current evidence', async () => {
+  it('retries finalization after the initial midnight window', async () => {
     const late = '2026-09-27T16:06:00.000Z'; // Next local day, 00:06
     const { database, maintenance, activity } = fixture(late, 1, '2026-09-27');
-    expect(await maintenance.run()).toMatchObject({ pendingRecoveryActivities: 1, finalizedActivities: 0 });
-    expect(database.snapshot().checkin_finalization_recovery).toMatchObject([
-      { activityId, status: 'pending', reason: 'window_missed' },
-    ]);
-    expect(activity.finalizeActivity).not.toHaveBeenCalled();
+    expect(await maintenance.run()).toMatchObject({ pendingRecoveryActivities: 0, finalizedActivities: 1 });
+    expect(activity.finalizeActivity).toHaveBeenCalledWith(org, activityId);
     expect(database.snapshot().checkin_final_boards ?? []).toHaveLength(0);
+  });
+
+  it('keeps an ended activity pending while a submitted exercise awaits grading', async () => {
+    const late = '2026-09-27T16:06:00.000Z';
+    const { database, maintenance, activity } = fixture(late, 1, '2026-09-27');
+    vi.mocked(activity.finalizeActivity).mockRejectedValueOnce(new ActivityError('ACTIVITY_PENDING_REVIEW'));
+    expect(await maintenance.run()).toMatchObject({ finalizedActivities: 0, pendingRecoveryActivities: 1 });
+    expect(database.snapshot().checkin_finalization_recovery).toMatchObject([
+      { activityId, status: 'pending', reason: 'pending_review' },
+    ]);
+    expect(await maintenance.run()).toMatchObject({ finalizedActivities: 1 });
+    expect(database.snapshot().checkin_finalization_recovery).toMatchObject([
+      { activityId, status: 'resolved' },
+    ]);
   });
 
   it('does not finalize or open a recovery for a closed draft that was never published', async () => {

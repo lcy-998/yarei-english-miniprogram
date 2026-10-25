@@ -5,12 +5,16 @@ import { addOperationReceipt, findOperation } from '../repositories/memory/write
 import { ActivityDayView, ActivityDraftInput, ActivityLeaderboardView, ActivityOverrideState, ActivityOverrideView, ActivityView, AppState, HomeView, MaterialPlayback, ParentChildLinkView, PhonicsAnswerView, PhonicsAudioView, PhonicsCourseListItem, PhonicsCourseState, PhonicsCourseView, ReadingListItem, ReadingProgress, ReadingResource, ReviewFeedback, Role, SchoolQuestionDetail, SchoolQuestionFacet, SchoolQuestionFilters, SchoolQuestionPage, SchoolQuestionSummary, ServiceError, ServiceResult, Session, StudentCatalogFacet, StudentCatalogFilters, StudentCatalogItem, StudentCatalogPage, StudentClassView, StudentWork, Submission, SubmissionAnswer, Task, TaskCatalogFacet, TaskCatalogFilters, TaskCatalogListItem, TaskCatalogPage, TaskCompletionValue, TaskDetailView, TaskItem, TaskTemplateInput, TaskTemplateView, TeacherStudentDetail, TeacherStudentPage, TeacherStudentStatusFilter, TeacherTextbookClass, TextbookSummary, TextbookFilters, TextbookPage, TextbookCenterLayout, ClassTextbookConfig, ClassTextbookItem, UserAccount, VocabularyAnswerInput, VocabularyAnswerScope, VocabularyAttemptState, VocabularyAttemptView, VocabularyPack, VocabularyPackAttemptSummary, VocabularyPackScope, VocabularyProgress, WorkMaterial, WorkPlayback } from '../domain/types'
 import { getCloudAppService } from '../repositories/repository-factory'
 import type { InboxNotice, InboxPage, NotificationFilter } from '../domain/types'
+import type { HistoricalTaskLearningView } from '../domain/types'
+import { parentSafeMemoryAnswer } from './parent-safe-answer'
 import { getReadingProgress as getM1ReadingProgress, listReadingBooks as listM1ReadingBooks } from './m1-app-service'
-import type { BatchCommentPreview, BatchCommentReceipt, TeacherReviewSubmissionView, TeacherStudentMutationView, TeacherStudentStatusCommand, TeacherStudentTransferCommand, TeacherStudentUpdateCommand, TeacherTaskEditView, TeacherTaskPreviewView, TeacherWorkbenchView } from './cloudbase-app-service'
+import type { BatchCommentPreview, BatchCommentReceipt, TeacherReviewSubmissionView, TeacherSuggestionView, TeacherSuggestionStatusView, TeacherStudentMutationView, TeacherStudentStatusCommand, TeacherStudentTransferCommand, TeacherStudentUpdateCommand, TeacherTaskEditView, TeacherTaskPreviewView, TeacherWorkbenchView } from './cloudbase-app-service'
+import type { ParentHomeView, ParentTaskListFilters, ParentTaskListPage, ParentTaskListView } from './parent-task-types'
 import { Clock, systemClock } from './clock'
 
 const id = (prefix: string): string => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
 let demoStudentPassword = '123456'
+let memoryPasswordResetVerifiedMobile: string | null = null
 
 function ok<T>(data: T): ServiceResult<T> { return { ok: true, data } }
 function fail<T>(code: ServiceError['code'], message: string, retryable = false): ServiceResult<T> { return { ok: false, error: { code, message, retryable } } }
@@ -33,7 +37,9 @@ function memoryDraftTaskItem(item: StructuredTaskDraft['items'][number]): TaskIt
       : item.type === 'vocabulary' ? { kind: 'vocabulary_words', requiredWordCount: item.requiredCount }
         : { kind: 'exercise_questions', requiredQuestionCount: item.requiredCount },
     ...(question ? { exerciseQuestion: { questionId: question.id, questionType: question.questionType,
-      stem: question.stem, options: [...question.options] } } : {}),
+      ...(question.exercisePackId === undefined ? {} : { exercisePackId: question.exercisePackId }),
+      stem: question.stem, options: [...question.options],
+      ...(question.exerciseSection === undefined ? {} : { exerciseSection: { ...question.exerciseSection } }) } } : {}),
   }
 }
 
@@ -64,7 +70,7 @@ export interface PublishClassroomTaskCommand {
 }
 
 export interface StructuredTaskDraft {
-  items: Array<{ id: string; resourceId: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording'; requiredCount: number; maxScore: number; weightPercent?: number; scoringKind?: 'manual' | 'automatic'; pageIds?: string[] }>
+  items: Array<{ id: string; resourceId: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording' | 'listening' | 'video' | 'dubbing'; requiredCount: number; maxScore: number; weightPercent?: number; scoringKind?: 'manual' | 'automatic' | 'completion_only'; pageIds?: string[] }>
   target: { type: 'classes'; classIds: string[] } | { type: 'students'; studentIds: string[] }
   startsAt: string
   dueAt: string
@@ -75,7 +81,7 @@ export interface StructuredTaskDraft {
 export interface TaskDraftOptionsView {
   selectedClassName: string
   availableClasses?: Array<{ id: string; name: string }>
-  resources: Array<{ id: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording'; requiredCount: number; allowedClassIds?: string[] }>
+  resources: Array<{ id: string; title: string; type: 'reading' | 'vocabulary' | 'exercise' | 'recording' | 'listening' | 'video' | 'dubbing'; requiredCount: number; scoringKind?: 'manual' | 'automatic' | 'completion_only'; allowedClassIds?: string[] }>
   structuredDraft: StructuredTaskDraft
 }
 
@@ -115,6 +121,8 @@ export interface PublishReviewCommand {
   score?: number
   itemScores?: Array<{ itemId: string; score: number }>
   comment: string
+  aiSuggestionId?: string
+  voiceRecordingId?: string
   overrideReason?: string
 }
 
@@ -151,8 +159,11 @@ function parentVisibleTaskDetail(detail: TaskDetailView): TaskDetailView {
     return feedback
   }
   const submissionHistory = detail.submissionHistory?.map(entry => ({ ...entry,
+    ...(entry.answers ? { answers: entry.answers.map(answer => parentSafeMemoryAnswer(answer, detail.task.items)) } : {}),
     ...(entry.feedback ? { feedback: publicFeedback(entry.feedback) } : {}) }))
   const visible = { ...detail, submissionHistory,
+    ...(detail.submission ? { submission: { ...detail.submission,
+      answers: detail.submission.answers.map(answer => parentSafeMemoryAnswer(answer, detail.task.items)) } } : {}),
     ...(detail.feedback ? { feedback: publicFeedback(detail.feedback) } : {}) }
   return detail.submission?.status === 'draft'
     ? { ...visible, submission: undefined, automaticScore: null } : visible
@@ -235,14 +246,26 @@ export async function requestPasswordResetCode(mobile: string): Promise<ServiceR
   const cloud = getCloudAppService()
   if (cloud) return cloud.requestPasswordResetCode(mobile)
   if (!/^1\d{10}$/.test(mobile)) return fail('VALIDATION_ERROR', '请输入正确的手机号')
+  memoryPasswordResetVerifiedMobile = null
   return ok({ expiresInMinutes: 10 })
 }
 
-export async function resetPassword(mobile: string, code: string, newPassword: string): Promise<ServiceResult<null>> {
+export async function verifyPasswordResetCode(mobile: string, code: string): Promise<ServiceResult<{ expiresInSeconds: number }>> {
   const cloud = getCloudAppService()
-  if (cloud) return cloud.resetPassword(mobile, code, newPassword)
-  if (!/^1\d{10}$/.test(mobile) || !/^\d{6}$/.test(code) || newPassword.length < 6 || newPassword.length > 32) return fail('VALIDATION_ERROR', '手机号、验证码或新密码格式不正确')
-  if (mobile === '13800000001' && code === '246810') demoStudentPassword = newPassword
+  if (cloud) return cloud.verifyPasswordResetCode(mobile, code)
+  if (!/^1\d{10}$/.test(mobile) || !/^\d{6}$/.test(code)) return fail('VALIDATION_ERROR', '手机号或验证码格式不正确')
+  if (code !== '246810') return fail('VALIDATION_ERROR', '验证码无效或已过期')
+  memoryPasswordResetVerifiedMobile = mobile
+  return ok({ expiresInSeconds: 600 })
+}
+
+export async function resetPassword(mobile: string, newPassword: string): Promise<ServiceResult<null>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.resetPassword(mobile, newPassword)
+  if (!/^1\d{10}$/.test(mobile) || newPassword.length < 6 || newPassword.length > 32) return fail('VALIDATION_ERROR', '手机号或新密码格式不正确')
+  if (memoryPasswordResetVerifiedMobile !== mobile) return fail('VALIDATION_ERROR', '验证码无效或已过期')
+  if (mobile === '13800000001') demoStudentPassword = newPassword
+  memoryPasswordResetVerifiedMobile = null
   return ok(null)
 }
 
@@ -526,6 +549,35 @@ export async function recycleTeacherTask(userId: string, taskId: string, version
   return fail('SERVICE_UNAVAILABLE', '内存演示模式暂不支持回收任务')
 }
 
+export async function deleteTeacherDraftTask(userId: string, taskId: string, version: number,
+  reason: string, operationId: string): Promise<ServiceResult<{ taskId: string; deleted: true }>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.deleteTeacherDraftTask(userId, taskId, version, reason, operationId)
+  const state = getState()
+  const teacher = state.users.find(item => item.id === userId && item.role === 'teacher')
+  if (!teacher) return fail('FORBIDDEN', '仅授权教师可删除草稿')
+  if (!taskId.trim() || !reason.trim() || reason.length > 200 || !Number.isSafeInteger(version)
+    || version < 1 || !operationId.trim()) return fail('VALIDATION_ERROR', '草稿删除参数无效')
+  const fingerprint = JSON.stringify({ taskId, version, reason: reason.trim() })
+  const prior = findOperation<Task>(state, 'delete_teacher_draft', userId, operationId, fingerprint)
+  if (prior.status === 'conflict') return fail('CONFLICT', '操作标识已被其他请求使用')
+  if (prior.status === 'replay' && prior.result?.id === taskId) return ok({ taskId, deleted: true })
+  const task = state.tasks.find(item => item.id === taskId)
+  if (!task || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权删除该草稿')
+  if (task.version !== version || task.status !== 'draft'
+    || state.assignments.some(item => item.taskId === taskId)
+    || state.submissions.some(item => state.assignments.some(assignment =>
+      assignment.id === item.assignmentId && assignment.taskId === taskId))) {
+    return fail('CONFLICT', '草稿已变化或存在学员记录')
+  }
+  mutateState(draft => {
+    draft.tasks = draft.tasks.filter(item => item.id !== taskId)
+    addOperationReceipt(draft, { kind: 'delete_teacher_draft', actorUserId: userId,
+      operationId, fingerprint, result: task })
+  })
+  return ok({ taskId, deleted: true })
+}
+
 export interface ReviewAssignmentView {
   studentName: string
   classId?: string
@@ -565,7 +617,7 @@ export async function getReviewSubmission(userId: string, submissionId: string):
   const assignment = submission ? state.assignments.find(item => item.id === submission.assignmentId) : undefined
   const task = assignment ? state.tasks.find(item => item.id === assignment.taskId) : undefined
   const teacher = state.users.find(item => item.id === userId)
-  if (!submission || !task || !teacher || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权查看该提交')
+  if (!submission || !assignment || !task || !teacher || !canTeacherManageTask(teacher, task)) return fail('FORBIDDEN', '无权查看该提交')
   if (submission.status === 'draft' || !submission.submittedAt) return fail('NOT_FOUND', '提交尚未完成')
   const feedback = state.feedback.find(item => item.submissionId === submissionId)
   const exerciseEvidence = (state.exerciseSnapshots ?? []).filter(snapshot => snapshot.taskId === task.id).map(snapshot => {
@@ -576,14 +628,36 @@ export async function getReviewSubmission(userId: string, submissionId: string):
       correctAnswer: snapshot.question.correctAnswer, explanation: snapshot.question.explanation,
       isCorrect: response?.isCorrect ?? null, recorded: response !== undefined }
   })
-  return ok({ taskTitle: task.title, submittedAt: submission.submittedAt ?? '', submissionVersion: submission.version,
+  return ok({ taskId: task.id, assignmentId: assignment.id, taskTitle: task.title,
+    submittedAt: submission.submittedAt ?? '', submissionVersion: submission.version,
     taskItems: task.items.map((item, order) => ({ id: item.id, title: item.title, type: item.type,
       completionRule: item.completionRuleData ?? {}, order })), readingPages: [],
+    readingPronunciationSegments: [],
     answers: submission.answers.map(item => ({ itemId: item.taskItemId, value: item.structuredValue ?? item.value })),
     automaticScore: submission.automaticScore ?? null, exerciseEvidence,
     feedback: feedback ? { id: feedback.id, decision: feedback.decision, score: feedback.score ?? null, textComment: feedback.textComment ?? null, returnReason: feedback.returnReason ?? null, publishedAt: feedback.publishedAt,
       originalAutomaticScore: feedback.originalAutomaticScore, overrideReason: feedback.overrideReason } : null,
   })
+}
+
+export async function generateTeacherSuggestion(userId: string, submissionId: string, operationId: string): Promise<ServiceResult<TeacherSuggestionView>> {
+  const cloud = getCloudAppService()
+  if (!cloud) return fail('SERVICE_UNAVAILABLE', 'AI 点评仅在已配置的非生产云端可用')
+  return cloud.generateTeacherSuggestion(userId, submissionId, operationId)
+}
+
+export async function getTeacherSuggestion(userId: string, submissionId: string,
+  generationOperationId: string): Promise<ServiceResult<TeacherSuggestionStatusView>> {
+  const cloud = getCloudAppService()
+  if (!cloud) return fail('SERVICE_UNAVAILABLE', 'AI 点评仅在已配置的非生产云端可用')
+  return cloud.getTeacherSuggestion(userId, submissionId, generationOperationId)
+}
+
+export async function getAutomaticTeacherSuggestion(userId: string,
+  submissionId: string): Promise<ServiceResult<TeacherSuggestionStatusView>> {
+  const cloud = getCloudAppService()
+  if (!cloud) return fail('SERVICE_UNAVAILABLE', 'AI 点评仅在已配置的非生产云端可用')
+  return cloud.getAutomaticTeacherSuggestion(userId, submissionId)
 }
 
 export async function previewBatchComment(userId: string, taskId: string, submissionIds: readonly string[],
@@ -641,6 +715,10 @@ export async function publishClassroomTask(userId: string, titleOrCommand: strin
       || new Set(structuredDraft.items.map(item => item.resourceId)).size !== structuredDraft.items.length) {
       return fail('VALIDATION_ERROR', '任务内容不能重复')
     }
+    const exerciseItems = structuredDraft.items.filter(item => item.type === 'exercise')
+    if (exerciseItems.length > 0 && exerciseItems.length < 5) {
+      return fail('VALIDATION_ERROR', '习题类型每个任务至少需要 5 道不同的题目。')
+    }
     for (const item of structuredDraft.items) {
       const validReading = item.type === 'reading' && item.resourceId === 'book_zoo'
         && Number.isInteger(item.requiredCount) && item.requiredCount >= 1 && item.requiredCount <= 12
@@ -671,7 +749,6 @@ export async function publishClassroomTask(userId: string, titleOrCommand: strin
       items: structuredDraft ? structuredDraft.items.map(memoryDraftTaskItem) : [
         { id: id('tki_reading'), resourceId: 'book_zoo', type: 'reading', title: '阅读练习', completionRule: '完成指定阅读内容' },
         { id: id('tki_vocabulary'), type: 'vocabulary', title: '单词练习', completionRule: '完成指定词量' },
-        { id: id('tki_exercise'), type: 'exercise', title: '习题练习', completionRule: '完成全部题目' },
       ],
       version: (existingDraft?.version ?? 0) + 1,
     }
@@ -748,6 +825,7 @@ export async function reviewSubmission(
     if (!command) return fail('VALIDATION_ERROR', '云端点评需要完整操作参数')
     return cloud.reviewSubmission(userId, command)
   }
+  if (command?.voiceRecordingId) return fail('SERVICE_UNAVAILABLE', '语音点评需要可信云端封存后才能发布')
   const taskId = command?.taskId ?? taskIdOrCommand as string
   const decision = command?.decision ?? decisionOrClock as 'approved' | 'returned'
   const score = command ? (command.score === undefined ? undefined : Math.max(0, Math.min(100, command.score))) : Math.max(0, Math.min(100, legacyScore))
@@ -807,7 +885,27 @@ export async function reviewSubmission(
   return ok(next.feedback.find(item => item.id === feedbackId)!)
 }
 
-export async function getParentHome(userId: string): Promise<ServiceResult<{ user: UserAccount; child: UserAccount; tasks: TaskDetailView[] }>> {
+function parentTaskDetails(state: AppState, childId: string): TaskDetailView[] {
+  return state.assignments
+    .filter(item => item.studentId === childId)
+    .map(assignment => buildTaskDetail(state, assignment))
+    .filter((item): item is TaskDetailView => item !== null
+      && item.task.status !== 'draft' && item.task.status !== 'withdrawn')
+    .sort((left, right) => right.task.dueAt.localeCompare(left.task.dueAt)
+      || left.task.id.localeCompare(right.task.id))
+    .map(parentVisibleTaskDetail)
+}
+
+function parentWeekDates(today: string): Readonly<{ startsOn: string; endsOn: string }> {
+  const current = new Date(`${today}T00:00:00.000Z`)
+  const mondayOffset = (current.getUTCDay() + 6) % 7
+  current.setUTCDate(current.getUTCDate() - mondayOffset)
+  const startsOn = current.toISOString().slice(0, 10)
+  current.setUTCDate(current.getUTCDate() + 6)
+  return { startsOn, endsOn: current.toISOString().slice(0, 10) }
+}
+
+export async function getParentHome(userId: string): Promise<ServiceResult<ParentHomeView>> {
   const cloud = getCloudAppService()
   if (cloud) return cloud.getParentHome(userId)
   const state = getState()
@@ -815,11 +913,68 @@ export async function getParentHome(userId: string): Promise<ServiceResult<{ use
   const activeLink = state.parentStudentLinks.find(item => item.parentId === userId && item.status === 'active')
   const child = activeLink ? state.users.find(item => item.id === activeLink.studentId && item.role === 'student') : undefined
   if (!parent || parent.role !== 'parent' || !child) return fail('FORBIDDEN', '无权查看孩子数据')
-  const tasks = state.assignments
-    .filter(item => item.studentId === child.id)
-    .map(assignment => buildTaskDetail(state, assignment))
-    .filter((item): item is TaskDetailView => item !== null)
-  return ok({ user: parent, child, tasks: tasks.map(parentVisibleTaskDetail) })
+  const tasks = parentTaskDetails(state, child.id)
+  const week = parentWeekDates(localTaskDate(new Date().toISOString()))
+  const weekly = tasks.filter(item => {
+    const dueOn = localTaskDate(item.task.dueAt)
+    return dueOn >= week.startsOn && dueOn <= week.endsOn
+  })
+  const recentFeedback = tasks.filter(item => item.feedback)
+    .map(item => ({ feedbackId: item.feedback!.id, taskId: item.task.id,
+      taskTitle: item.task.title, teacherName: item.feedback!.teacherName ?? null,
+      textComment: item.feedback!.textComment ?? null, publishedAt: item.feedback!.publishedAt }))
+    .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt))
+    .slice(0, 3)
+  return ok({ user: parent, child, tasks: tasks.slice(0, 5),
+    pendingTaskCount: tasks.filter(item => item.assignment.status !== 'awaiting_review'
+      && item.assignment.status !== 'completed').length,
+    weeklyAssignedCount: weekly.length,
+    weeklyCompletedCount: weekly.filter(item => item.assignment.status === 'awaiting_review'
+      || item.assignment.status === 'completed').length,
+    overdueTaskCount: tasks.filter(item => item.assignment.status !== 'awaiting_review'
+      && item.assignment.status !== 'completed'
+      && item.assignment.status !== 'redo_required'
+      && item.task.dueAt < new Date().toISOString()).length,
+    recentFeedback })
+}
+
+export async function listParentTasks(userId: string, filters: ParentTaskListFilters,
+  page: Readonly<{ limit: number; cursor?: string }>): Promise<ServiceResult<ParentTaskListPage>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.listParentTasks(userId, filters, page)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(filters.startsOn)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(filters.endsOn)
+    || filters.endsOn < filters.startsOn || !Number.isSafeInteger(page.limit)
+    || page.limit < 1 || page.limit > 50
+    || (page.cursor !== undefined && !/^\d{1,6}$/.test(page.cursor))) {
+    return fail('VALIDATION_ERROR', '任务筛选条件无效')
+  }
+  const state = getState()
+  const parent = state.users.find(item => item.id === userId)
+  const activeLink = state.parentStudentLinks.find(item => item.parentId === userId && item.status === 'active')
+  const child = activeLink ? state.users.find(item => item.id === activeLink.studentId && item.role === 'student') : undefined
+  if (!parent || parent.role !== 'parent' || !child) return fail('FORBIDDEN', '无权查看孩子数据')
+  const filtered = parentTaskDetails(state, child.id).filter(item => {
+    const dueOn = localTaskDate(item.task.dueAt)
+    if (dueOn < filters.startsOn || dueOn > filters.endsOn) return false
+    if (filters.statusGroup === 'awaiting_review') return item.assignment.status === 'awaiting_review'
+    if (filters.statusGroup === 'completed') return item.assignment.status === 'completed'
+    return filters.statusGroup !== 'active' || ['not_started', 'in_progress', 'overdue', 'redo_required']
+      .includes(item.assignment.status)
+  })
+  const offset = page.cursor === undefined ? 0 : Number(page.cursor)
+  const items: ParentTaskListView[] = filtered.slice(offset, offset + page.limit).map(item => ({
+    taskId: item.task.id, title: item.task.title,
+    contentTypes: [...new Set(item.task.items.map(content => content.type))],
+    status: item.assignment.status,
+    startsAt: item.task.startsAt, dueAt: item.task.dueAt,
+    submittedAt: item.assignment.submittedAt ?? null,
+    isLate: Boolean(item.assignment.submittedAt && Date.parse(item.assignment.submittedAt) > Date.parse(item.task.dueAt)),
+    feedbackId: item.feedback?.id ?? null,
+    score: item.feedback?.score ?? item.automaticScore ?? null,
+  }))
+  const next = offset + items.length
+  return ok({ items, total: filtered.length, nextCursor: next < filtered.length ? String(next) : null })
 }
 
 export async function getParentTask(userId: string, taskId: string): Promise<ServiceResult<TaskDetailView>> {
@@ -851,12 +1006,16 @@ export async function getDraftOptions(userId: string, clock: Clock = systemClock
   const resources: TaskDraftOptionsView['resources'] = [
     { id: 'book_zoo', title: 'A Day at the Zoo', type: 'reading', requiredCount: 4, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
     { id: DEMO_VOCABULARY.id, title: DEMO_VOCABULARY.title, type: 'vocabulary', requiredCount: 2, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
-    { id: DEMO_SCHOOL_QUESTIONS[0].id, title: DEMO_SCHOOL_QUESTIONS[0].title, type: 'exercise', requiredCount: 1, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] },
+    ...DEMO_SCHOOL_QUESTIONS.map(question => ({ id: question.id, title: question.title,
+      type: 'exercise' as const, requiredCount: 1, allowedClassIds: [teacher.classId ?? 'cls_grade3_2'] })),
   ]
+  let exerciseOrder = 0
   return ok({
     selectedClassName: '三年级 2 班', availableClasses: [{ id: teacher.classId ?? 'cls_grade3_2', name: '三年级 2 班' }], resources,
     structuredDraft: {
-      items: resources.map(item => ({ id: `item_${item.type}`, resourceId: item.id, type: item.type, requiredCount: item.requiredCount, maxScore: 100 })),
+      items: resources.map(item => ({ id: item.type === 'exercise'
+        ? `item_exercise_${++exerciseOrder}` : `item_${item.type}`,
+      resourceId: item.id, type: item.type, requiredCount: item.requiredCount, maxScore: 100 })),
       target: { type: 'classes', classIds: [teacher.classId ?? 'cls_grade3_2'] },
       startsAt: startsAt.toISOString(), dueAt: dueAt.toISOString(), latePolicy: { allowLate: true, lateDays: 7 },
     },
@@ -1072,16 +1231,32 @@ export async function getMyClass(userId: string): Promise<ServiceResult<StudentC
   })
 }
 
+const DEMO_GARDEN_PASSAGE = 'Mia’s class has a small garden. On Monday, they plant four bean seeds in four cups. Cup A gets water and sunlight. Cup B gets water but stays in a dark cupboard. Cup C gets sunlight but no water. After seven days, only Cup A has a small green shoot. On Friday, the children make a chart and take turns watering the garden.'
 const DEMO_SCHOOL_QUESTIONS: SchoolQuestionDetail[] = [{
-  id: 'res_exercise_bird_demo', title: '动物主题选择题', grade: '三年级', textbook: '演示同步教材', unit: 'Unit 3',
-  knowledgePoint: '动物', questionType: 'single_choice', difficulty: '中等', stemSummary: 'Which animal can fly?',
-  contentVersion: 'demo-v1', stem: 'Which animal can fly?', options: ['A. bird', 'B. lion', 'C. elephant'],
-  correctAnswer: 'A. bird', explanation: 'Birds can fly.',
+  id: 'res_exercise_garden_q1', exercisePackId: 'exercise_pack_demo_garden', title: 'Class Garden Week｜Reading 1', grade: '三年级', textbook: 'Codex Original', unit: 'Garden Week',
+  knowledgePoint: '阅读细节', questionType: 'single_choice', difficulty: '基础', stemSummary: 'How many cups did the class use?',
+  contentVersion: 'codex-original-v1', stem: `${DEMO_GARDEN_PASSAGE}\n\nHow many cups did the class use? / 全班用了几个杯子？`, options: ['Four', 'Three', 'Seven'],
+  correctAnswer: 'Four', explanation: 'The passage says the class planted the seeds in four cups.',
 }, {
-  id: 'res_exercise_lion_demo', title: '动物主题填空题', grade: '三年级', textbook: '演示同步教材', unit: 'Unit 3',
-  knowledgePoint: '动物', questionType: 'fill', difficulty: '基础', stemSummary: 'The lion is _____.',
-  contentVersion: 'demo-v1', stem: 'The lion is _____.', options: [], correctAnswer: 'strong',
-  explanation: 'The lion is strong.',
+  id: 'res_exercise_garden_q2', exercisePackId: 'exercise_pack_demo_garden', title: 'Class Garden Week｜Reading 2', grade: '三年级', textbook: 'Codex Original', unit: 'Garden Week',
+  knowledgePoint: '阅读细节', questionType: 'single_choice', difficulty: '基础', stemSummary: 'Where did Cup B stay?',
+  contentVersion: 'codex-original-v1', stem: `${DEMO_GARDEN_PASSAGE}\n\nWhere did Cup B stay? / B 杯放在哪里？`, options: ['In a dark cupboard', 'In the garden', 'By the window'],
+  correctAnswer: 'In a dark cupboard', explanation: 'Cup B stayed in a dark cupboard.',
+}, {
+  id: 'res_exercise_garden_q3', exercisePackId: 'exercise_pack_demo_garden', title: 'Class Garden Week｜Reading 3', grade: '三年级', textbook: 'Codex Original', unit: 'Garden Week',
+  knowledgePoint: '阅读细节', questionType: 'single_choice', difficulty: '基础', stemSummary: 'Which cup grew a shoot?',
+  contentVersion: 'codex-original-v1', stem: `${DEMO_GARDEN_PASSAGE}\n\nWhich cup grew a shoot? / 哪个杯子长出了嫩芽？`, options: ['Cup A', 'Cup B', 'Cup C'],
+  correctAnswer: 'Cup A', explanation: 'Only Cup A grew a small green shoot.',
+}, {
+  id: 'res_exercise_garden_q4', exercisePackId: 'exercise_pack_demo_garden', title: 'Class Garden Week｜Reading 4', grade: '三年级', textbook: 'Codex Original', unit: 'Garden Week',
+  knowledgePoint: '词汇提取', questionType: 'fill', difficulty: '基础', stemSummary: 'What kind of seeds did the class plant?',
+  contentVersion: 'codex-original-v1', stem: `${DEMO_GARDEN_PASSAGE}\n\nThe children planted ____ seeds. / 孩子们种了 ____ 种子。`, options: [],
+  correctAnswer: 'bean', explanation: 'The passage says they planted bean seeds.',
+}, {
+  id: 'res_exercise_garden_q5', exercisePackId: 'exercise_pack_demo_garden', title: 'Class Garden Week｜Reading 5', grade: '三年级', textbook: 'Codex Original', unit: 'Garden Week',
+  knowledgePoint: '阅读理解', questionType: 'multiple_choice', difficulty: '中等', stemSummary: 'What did the children do on Friday?',
+  contentVersion: 'codex-original-v1', stem: `${DEMO_GARDEN_PASSAGE}\n\nChoose TWO things the children did on Friday. / 选出孩子们星期五做的两件事。`, options: ['Made a chart', 'Took turns watering the garden', 'Planted four new trees', 'Put Cup A in a cupboard'],
+  correctAnswer: ['Made a chart', 'Took turns watering the garden'], explanation: 'The last sentence says they made a chart and took turns watering the garden.',
 }]
 
 function memoryQuestionAccess(userId: string, filters?: SchoolQuestionFilters): ServiceResult<true> {
@@ -1140,6 +1315,14 @@ export async function listSynchronizedTextbooks(userId: string, filters: Textboo
   return ok({ items: [], nextOffset: null })
 }
 
+export async function listSynchronizedTextbookFacets(userId: string, filters: TextbookFilters,
+  targetClassId?: string): Promise<ServiceResult<import('../domain/types').TextbookFacetValues>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.listSynchronizedTextbookFacets(userId, filters, targetClassId)
+  const access = targetClassId ? await getTeacherTextbookClass(userId, targetClassId) : await listTeacherTextbookClasses(userId)
+  return access.ok ? ok({ grade: [], term: [], edition: [], unit: [], lesson: [] }) : access
+}
+
 export async function getSynchronizedTextbook(userId: string, textbookId: string,
   targetClassId?: string): Promise<ServiceResult<TextbookSummary>> {
   const cloud = getCloudAppService(); if (cloud) return cloud.getSynchronizedTextbook(userId, textbookId, targetClassId)
@@ -1173,12 +1356,13 @@ export async function listTaskCatalogResources(userId: string, filters: TaskCata
   return ok({ items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : null })
 }
 
-export async function listTaskCatalogFacets(userId: string, type: TaskCatalogFilters['type'], targetClassIds?: string[]): Promise<ServiceResult<TaskCatalogFacet[]>> {
-  const cloud = getCloudAppService(); if (cloud) return cloud.listTaskCatalogFacets(userId, type, targetClassIds)
+export async function listTaskCatalogFacets(userId: string, type: TaskCatalogFilters['type'], targetClassIds?: string[],
+  category?: TaskCatalogFilters['category']): Promise<ServiceResult<TaskCatalogFacet[]>> {
+  const cloud = getCloudAppService(); if (cloud) return cloud.listTaskCatalogFacets(userId, type, targetClassIds, category)
   const access = memoryQuestionAccess(userId, { ...(targetClassIds === undefined ? {} : { targetClassIds }) })
   if (!access.ok) return access
   if (type !== 'reading' && type !== 'vocabulary') return fail('VALIDATION_ERROR', '目录类型无效')
-  return ok(memoryTaskCatalog().filter(item => item.type === type).map(item => ({
+  return ok(memoryTaskCatalog().filter(item => item.type === type && (!category || item.category === category)).map(item => ({
     source: item.source, grade: item.grade,
     ...(item.term === undefined ? {} : { term: item.term }),
     textbook: item.textbook ?? '__unlabeled_textbook__',
@@ -1209,6 +1393,27 @@ export async function publishActivity(userId: string, activityId: string, expect
     : fail('SERVICE_UNAVAILABLE', '打卡活动服务尚未接入当前演示模式')
 }
 
+export async function closeActivity(userId: string, activityId: string, expectedVersion: number,
+  reason: string, operationId: string): Promise<ServiceResult<ActivityView>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.closeActivity(userId, activityId, expectedVersion, reason, operationId)
+    : fail('SERVICE_UNAVAILABLE', '打卡活动关闭服务尚未接入当前演示模式')
+}
+
+export async function deleteActivityDraft(userId: string, activityId: string, expectedVersion: number,
+  reason: string, operationId: string): Promise<ServiceResult<ActivityView>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.deleteActivityDraft(userId, activityId, expectedVersion, reason, operationId)
+    : fail('SERVICE_UNAVAILABLE', '打卡活动草稿删除尚未接入当前演示模式')
+}
+
+export async function recycleActivity(userId: string, activityId: string, expectedVersion: number,
+  reason: string, operationId: string): Promise<ServiceResult<ActivityView>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.recycleActivity(userId, activityId, expectedVersion, reason, operationId)
+    : fail('SERVICE_UNAVAILABLE', '打卡活动回收尚未接入当前演示模式')
+}
+
 export async function addActivityFutureRestDay(userId: string, activityId: string, date: string, reason: string,
   expectedVersion: number, operationId: string): Promise<ServiceResult<ActivityView>> {
   const cloud = getCloudAppService()
@@ -1220,6 +1425,14 @@ export async function listTeacherActivities(userId: string): Promise<ServiceResu
   const cloud = getCloudAppService()
   return cloud ? cloud.listTeacherActivities(userId)
     : fail('SERVICE_UNAVAILABLE', '打卡活动服务尚未接入当前演示模式')
+}
+
+export async function getTeacherActivityProgress(userId: string, activityId: string, date: string,
+  limit = 20, offset = 0, keyword = '', completion: 'all' | 'complete' | 'incomplete' = 'all'):
+  Promise<ServiceResult<import('../domain/types').TeacherActivityProgressView>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.getTeacherActivityProgress(userId, activityId, date, limit, offset, keyword, completion)
+    : fail('SERVICE_UNAVAILABLE', '打卡活动逐人记录尚未接入当前演示模式')
 }
 
 export async function listStudentActivities(userId: string): Promise<ServiceResult<ActivityView[]>> {
@@ -1302,8 +1515,29 @@ export async function getReadingResource(userId: string, resourceId: string): Pr
     { id: 'page_zoo_2', pageNumber: 2, order: 2, thumbnailAssetKey: 'demo-zoo-page-02', imageAssetKey: 'demo-zoo-page-02', width: 750, height: 1000, assetVersion: 'demo-v1' },
   ] }] })
 }
+export async function getReadingPronunciationSegments(userId: string, resourceId: string): Promise<ServiceResult<import('../domain/types').ReadingPronunciationSegmentsView>> {
+  const cloud = getCloudAppService(); if (cloud) return cloud.getReadingPronunciationSegments(userId, resourceId)
+  const resource = await getReadingResource(userId, resourceId)
+  return resource.ok ? ok({ resourceId, sourceVersion: resource.data.contentVersion, segments: [] }) : resource
+}
+export async function getReadingAudioMap(userId: string, resourceId: string,
+  chapterId: string): Promise<ServiceResult<import('../domain/types').ReadingAudioMapView>> {
+  const cloud = getCloudAppService()
+  if (cloud) return cloud.getReadingAudioMap(userId, resourceId, chapterId)
+  const resource = await getReadingResource(userId, resourceId)
+  if (!resource.ok) return resource
+  if (!resource.data.chapters.some(chapter => chapter.id === chapterId)) return fail('NOT_FOUND', '阅读章节不存在')
+  return ok({ resourceId, sourceVersion: resource.data.contentVersion,
+    chapterId, durationMs: null, playback: null, segments: [] })
+}
 export async function listVocabularyPacks(userId: string): Promise<ServiceResult<VocabularyPack[]>> { const cloud = getCloudAppService(); return cloud ? cloud.listVocabularyPacks(userId) : ok([DEMO_VOCABULARY]) }
 export async function getVocabularyPack(userId: string, resourceId: string): Promise<ServiceResult<VocabularyPack>> { const cloud = getCloudAppService(); return cloud ? cloud.getVocabularyPack(userId, resourceId) : resourceId === DEMO_VOCABULARY.id ? ok(DEMO_VOCABULARY) : fail('NOT_FOUND', '词包不存在') }
+export async function getHistoricalTaskLearning(userId: string, taskId: string,
+  itemId: string): Promise<ServiceResult<HistoricalTaskLearningView>> {
+  const cloud = getCloudAppService()
+  return cloud ? cloud.getHistoricalTaskLearning(userId, taskId, itemId)
+    : fail('SERVICE_UNAVAILABLE', '历史任务素材尚未接入当前演示模式')
+}
 export async function getReadingProgress(userId: string, resourceId: string): Promise<ServiceResult<ReadingProgress | null>> { const cloud = getCloudAppService(); return cloud ? cloud.getReadingProgress(userId, resourceId) : ok(getState().readingProgress.find(item => item.id === `reading_${userId}_${resourceId}`) ?? null) }
 export async function saveReadingProgress(userId: string, command: SaveReadingProgressCommand): Promise<ServiceResult<ReadingProgress>> {
   const cloud = getCloudAppService(); if (cloud) return cloud.saveReadingProgress(userId, command)

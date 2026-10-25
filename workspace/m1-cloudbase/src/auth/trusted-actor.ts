@@ -21,6 +21,12 @@ export interface PlatformIdentity {
   readonly isAuthenticated: boolean;
 }
 
+/** Canonical subject for a CloudBase Auth username/phone UID in server functions. */
+export function cloudbaseUsernameSubject(platformUid: string): string {
+  if (platformUid.trim().length === 0 || platformUid.length > 512) throw new Error('PLATFORM_SUBJECT_INVALID');
+  return `cloudbase:username:${platformUid}`;
+}
+
 export interface TrustedActorResolver {
   resolve(identity: PlatformIdentity, functionName: FunctionName, sessionId: string | null): Promise<TrustedActorContext | null>;
 }

@@ -1,5 +1,6 @@
 import type { FunctionRequest, JsonObject, JsonValue } from '../shared/protocol';
 import { parseExactObject } from '../shared/strict-object';
+import type { TeacherCheckFilters } from '../teacher-check/types';
 import type {
   CompletionFilters,
   DraftPreviewInput,
@@ -9,11 +10,11 @@ import type {
   TeacherTaskFilters,
 } from '../task-query/types';
 
-export const TASK_QUERY_ACTIONS = ['getTeacherWorkbench', 'listTeacherTasks', 'getDraftOptions', 'previewTask', 'getTaskForEdit', 'getCompletion'] as const;
+export const TASK_QUERY_ACTIONS = ['getTeacherWorkbench', 'listTeacherTasks', 'listTeacherCheckItems', 'getDraftOptions', 'previewTask', 'getTaskForEdit', 'getCompletion'] as const;
 export type TaskQueryAction = (typeof TASK_QUERY_ACTIONS)[number];
-export const STUDENT_TASK_QUERY_ACTIONS = ['getHome', 'listMyTasks', 'getMyTask'] as const;
+export const STUDENT_TASK_QUERY_ACTIONS = ['getHome', 'listMyTasks', 'getMyTask', 'getTaskMediaPlayback', 'getSubmittedTaskMediaPlayback'] as const;
 export type StudentTaskQueryAction = (typeof STUDENT_TASK_QUERY_ACTIONS)[number];
-export const REVIEW_QUERY_ACTIONS = ['listReviewTasks', 'getSubmissionForReview', 'previewBatchComment'] as const;
+export const REVIEW_QUERY_ACTIONS = ['listReviewTasks', 'getSubmissionForReview', 'getTaskMediaReviewEvidence', 'previewBatchComment'] as const;
 export type ReviewQueryAction = (typeof REVIEW_QUERY_ACTIONS)[number];
 
 type Valid<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly fieldErrors: Readonly<Record<string, string>> };
@@ -21,6 +22,8 @@ type Valid<T> = { readonly ok: true; readonly value: T } | { readonly ok: false;
 export type TaskQueryInput =
   | Readonly<{ action: 'getTeacherWorkbench'; date: string; classId?: string }>
   | Readonly<{ action: 'listTeacherTasks'; filters: TeacherTaskFilters; page: PageRequest }>
+  | Readonly<{ action: 'listTeacherCheckItems'; filters: TeacherCheckFilters;
+      page: Readonly<{ limit: number; offset: number }> }>
   | Readonly<{ action: 'getDraftOptions'; catalogMode?: 'selector' }>
   | Readonly<{ action: 'previewTask'; preview: Readonly<{ taskId: string; expectedVersion: number }> | Readonly<{ draft: DraftPreviewInput }> }>
   | Readonly<{ action: 'getTaskForEdit'; taskId: string }>
@@ -29,11 +32,14 @@ export type TaskQueryInput =
 export type StudentTaskQueryInput =
   | Readonly<{ action: 'getHome'; localDate: string }>
   | Readonly<{ action: 'listMyTasks'; filters: StudentTaskFilters; page: PageRequest }>
-  | Readonly<{ action: 'getMyTask'; taskId: string }>;
+  | Readonly<{ action: 'getMyTask'; taskId: string }>
+  | Readonly<{ action: 'getTaskMediaPlayback'; taskId: string; itemId: string }>
+  | Readonly<{ action: 'getSubmittedTaskMediaPlayback'; taskId: string; itemId: string; submissionVersion: number }>;
 
 export type ReviewQueryInput =
   | Readonly<{ action: 'listReviewTasks'; filters: ReviewTaskFilters; page: PageRequest }>
   | Readonly<{ action: 'getSubmissionForReview'; submissionId: string }>
+  | Readonly<{ action: 'getTaskMediaReviewEvidence'; submissionId: string; itemId: string }>
   | Readonly<{
       action: 'previewBatchComment';
       taskId: string;
@@ -62,6 +68,44 @@ export function validateTaskQueryRequest(request: FunctionRequest<TaskQueryActio
     const page = pageRequest(exact.value.page);
     if (!page.ok) return page;
     return { ok: true, value: { action: request.action, filters: filters.value, page: page.value } };
+  }
+  if (request.action === 'listTeacherCheckItems') {
+    const exact = parseExactObject(request.payload, ['filters', 'page']);
+    if (!exact.ok) return exact;
+    const filters = parseExactObject(exact.value.filters, [],
+      ['type', 'classId', 'status', 'startsOn', 'endsOn', 'keyword']);
+    const page = parseExactObject(exact.value.page, ['limit', 'offset']);
+    if (!filters.ok || !page.ok) return invalid('filters', '筛选或分页字段无效。');
+    const type = filters.value.type;
+    if (type !== undefined && type !== 'classroom' && type !== 'checkin') return invalid('filters.type', '任务类型无效。');
+    const classId = optionalId(filters.value.classId, 'filters.classId');
+    const status = teacherFilters({ status: filters.value.status });
+    const startsOn = filters.value.startsOn === undefined ? { ok: true as const, value: undefined }
+      : localDate(filters.value.startsOn, 'filters.startsOn');
+    const endsOn = filters.value.endsOn === undefined ? { ok: true as const, value: undefined }
+      : localDate(filters.value.endsOn, 'filters.endsOn');
+    const keyword = optionalBoundedString(filters.value.keyword, 'filters.keyword', 50);
+    if (!classId.ok) return classId;
+    if (!status.ok) return status;
+    if (!startsOn.ok) return startsOn;
+    if (!endsOn.ok) return endsOn;
+    if (!keyword.ok) return keyword;
+    if (startsOn.value !== undefined && endsOn.value !== undefined && startsOn.value > endsOn.value) {
+      return invalid('filters.endsOn', '结束日期须晚于开始日期。');
+    }
+    if (!Number.isSafeInteger(page.value.limit) || Number(page.value.limit) < 1
+      || Number(page.value.limit) > 50 || !Number.isSafeInteger(page.value.offset)
+      || Number(page.value.offset) < 0 || Number(page.value.offset) > 10000) {
+      return invalid('page', '分页参数无效。');
+    }
+    return { ok: true, value: { action: 'listTeacherCheckItems',
+      filters: { ...(type === undefined ? {} : { type }),
+        ...(classId.value === undefined ? {} : { classId: classId.value }),
+        ...(status.value.status === undefined ? {} : { status: status.value.status }),
+        ...(startsOn.value === undefined ? {} : { startsOn: startsOn.value }),
+        ...(endsOn.value === undefined ? {} : { endsOn: endsOn.value }),
+        ...(keyword.value === undefined ? {} : { keyword: keyword.value }) },
+      page: { limit: Number(page.value.limit), offset: Number(page.value.offset) } } };
   }
   if (request.action === 'getDraftOptions') {
     const exact = parseExactObject(request.payload, [], ['catalogMode']);
@@ -117,6 +161,24 @@ export function validateStudentTaskQueryRequest(request: FunctionRequest<Student
     const taskId = requiredId(exact.value.taskId, 'taskId');
     return taskId.ok ? { ok: true, value: { action: request.action, taskId: taskId.value } } : taskId;
   }
+  if (request.action === 'getTaskMediaPlayback' || request.action === 'getSubmittedTaskMediaPlayback') {
+    const exact = parseExactObject(request.payload,
+      request.action === 'getSubmittedTaskMediaPlayback'
+        ? ['taskId', 'itemId', 'submissionVersion'] : ['taskId', 'itemId']);
+    if (!exact.ok) return exact;
+    const taskId = requiredId(exact.value.taskId, 'taskId');
+    const itemId = requiredId(exact.value.itemId, 'itemId');
+    if (!taskId.ok) return taskId;
+    if (!itemId.ok) return itemId;
+    if (request.action === 'getSubmittedTaskMediaPlayback') {
+      return Number.isSafeInteger(exact.value.submissionVersion)
+        && Number(exact.value.submissionVersion) >= 1
+        ? { ok: true, value: { action: request.action, taskId: taskId.value,
+          itemId: itemId.value, submissionVersion: Number(exact.value.submissionVersion) } }
+        : invalid('submissionVersion', '提交版本无效。');
+    }
+    return { ok: true, value: { action: request.action, taskId: taskId.value, itemId: itemId.value } };
+  }
   const exact = parseExactObject(request.payload, ['filters', 'page']);
   if (!exact.ok) return exact;
   const filters = studentFilters(exact.value.filters);
@@ -134,6 +196,16 @@ export function validateReviewQueryRequest(request: FunctionRequest<ReviewQueryA
     if (!exact.ok) return exact;
     const submissionId = requiredId(exact.value.submissionId, 'submissionId');
     return submissionId.ok ? { ok: true, value: { action: request.action, submissionId: submissionId.value } } : submissionId;
+  }
+  if (request.action === 'getTaskMediaReviewEvidence') {
+    const exact = parseExactObject(request.payload, ['submissionId', 'itemId']);
+    if (!exact.ok) return exact;
+    const submissionId = requiredId(exact.value.submissionId, 'submissionId');
+    const itemId = requiredId(exact.value.itemId, 'itemId');
+    if (!submissionId.ok) return submissionId;
+    if (!itemId.ok) return itemId;
+    return { ok: true, value: { action: request.action, submissionId: submissionId.value,
+      itemId: itemId.value } };
   }
   if (request.action === 'listReviewTasks') {
     const exact = parseExactObject(request.payload, ['filters', 'page']);

@@ -1,12 +1,42 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../miniprogram/services/app-service', () => ({
+vi.mock('../../miniprogram/subpackages/student-media/services/app-service', () => ({
   beginWorkDraft: vi.fn(), getMaterialPlayback: vi.fn(), getWorkMaterial: vi.fn(), listMyWorks: vi.fn(),
   listWorkMaterials: vi.fn(), listWorkMaterialFacets: vi.fn(), searchWorkMaterials: vi.fn(), submitWork: vi.fn(),
 }))
 
 describe('S-07 recording duration', () => {
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.resetModules() })
+
+  it('recovers from denied microphone permission through settings without losing the selected material', async () => {
+    vi.useFakeTimers()
+    let definition: { data: Record<string, unknown>; methods: Record<string,
+      (this: unknown, ...args: unknown[]) => unknown> } | null = null
+    vi.stubGlobal('Component', (value: typeof definition) => { definition = value })
+    const start = vi.fn(), authorize = vi.fn().mockRejectedValueOnce(new Error('denied'))
+      .mockResolvedValueOnce(undefined)
+    vi.stubGlobal('wx', {
+      getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), start, stop: vi.fn() }),
+      authorize,
+      openSetting: ({ success }: { success: (value: { authSetting: Record<string, boolean> }) => void }) =>
+        success({ authSetting: { 'scope.record': true } }),
+    })
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
+    if (!definition) throw new Error('Dubbing page was not registered')
+    const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
+      selectedMaterial: { id: 'material_demo' } },
+    setData(change: Record<string, unknown>) { Object.assign(this.data, change) } }
+    Object.assign(context, definition.methods)
+    await context.startRecording()
+    expect(context.data.permissionDenied).toBe(true)
+    expect(start).not.toHaveBeenCalled()
+    context.openMicrophoneSettings()
+    await context.startRecording()
+    expect(context.data.permissionDenied).toBe(false)
+    expect(context.data.selectedMaterialId).toBe('material_demo')
+    expect(start).toHaveBeenCalledOnce()
+    context.stopRecording()
+  })
 
   it('advances during recording and keeps the recorder duration after stopping', async () => {
     vi.useFakeTimers()
@@ -19,7 +49,7 @@ describe('S-07 recording duration', () => {
       getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), start: vi.fn(), stop }),
       authorize: vi.fn().mockResolvedValue(undefined),
     })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const methods = definition.methods
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
@@ -39,6 +69,29 @@ describe('S-07 recording duration', () => {
     expect(context.data).toMatchObject({ recordingState: 'local', durationMs: 2300, durationLabel: '00:02' })
   })
 
+  it('continues ticking while the native recording state update is pending', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-16T10:00:00+08:00'))
+    let definition: { data: Record<string, unknown>; methods: Record<string,
+      (this: unknown, ...args: unknown[]) => unknown> } | null = null
+    vi.stubGlobal('Component', (value: typeof definition) => { definition = value })
+    vi.stubGlobal('wx', { getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(),
+      start: vi.fn(), stop: vi.fn() }), authorize: vi.fn().mockResolvedValue(undefined) })
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
+    if (!definition) throw new Error('Dubbing page was not registered')
+    const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
+      selectedMaterial: { id: 'material_demo' } },
+      setData(change: Record<string, unknown>) {
+        const { recordingState, ...rest } = change
+        Object.assign(this.data, rest)
+        if (recordingState !== 'recording') this.data.recordingState = recordingState
+      } }
+    Object.assign(context, definition.methods)
+    await context.startRecording()
+    vi.advanceTimersByTime(2200)
+    expect(context.data.durationLabel).toBe('00:02')
+  })
+
   it('marks an overlong take as unavailable for submission beside the recording timer', async () => {
     let definition: { data: Record<string, unknown>; methods: Record<string,
       (this: unknown, ...args: unknown[]) => unknown> } | null = null
@@ -46,7 +99,7 @@ describe('S-07 recording duration', () => {
     vi.stubGlobal('wx', {
       getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), start: vi.fn(), stop: vi.fn() }),
     })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data, recordingState: 'recording' },
       setData(change: Record<string, unknown>) { Object.assign(this.data, change) },
@@ -66,12 +119,12 @@ describe('S-07 recording duration', () => {
       getStorageSync: () => ({ sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } }),
       cloud: { uploadFile: vi.fn().mockResolvedValue({ fileID: 'cloud://demo/staging.mp3' }) },
     })
-    const services = await import('../../miniprogram/services/app-service')
+    const services = await import('../../miniprogram/subpackages/student-media/services/app-service')
     vi.mocked(services.submitWork).mockResolvedValue({ ok: false, error: {
       code: 'MEDIA_INVALID', message: '录音文件无效或超出时长、大小限制', retryable: false,
     } })
     vi.mocked(services.listMyWorks).mockResolvedValue({ ok: true, data: [] })
-    await import('../../miniprogram/pages/student/dubbing/dubbing')
+    await import('../../miniprogram/subpackages/student-media/dubbing/dubbing')
     if (!definition) throw new Error('Dubbing page was not registered')
     const context = { data: { ...definition.data, selectedMaterialId: 'material_demo',
       selectedMaterial: { id: 'material_demo', contentVersion: 'v1' },

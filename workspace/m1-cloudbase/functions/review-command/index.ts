@@ -13,5 +13,8 @@ const unavailable = createUnconfiguredFunction('review-command', REVIEW_COMMAND_
 export const main = createDefaultCloudBaseTaskCoreFunction(
   'review-command',
   unavailable,
-  (_capabilities, infrastructure) => createReviewCommandFunction(infrastructure),
+  (_capabilities, infrastructure) => createReviewCommandFunction({
+    ...infrastructure,
+    ...(infrastructure.reviewVoice === undefined ? {} : { reviewVoice: infrastructure.reviewVoice }),
+  }),
 );

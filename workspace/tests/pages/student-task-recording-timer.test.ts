@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../miniprogram/repositories/repository-factory', () => ({ getRepositoryMode: () => 'cloudbase' }))
-vi.mock('../../miniprogram/services/task-recording-service', () => ({
+vi.mock('../../miniprogram/subpackages/student/services/task-recording-service', () => ({
   beginTaskRecording: vi.fn(), getTaskRecordingMediaState: vi.fn(), getTaskRecordingPlayback: vi.fn(),
   listTaskRecordings: vi.fn(), submitTaskRecording: vi.fn(),
 }))
@@ -20,7 +20,7 @@ describe('S-09 task recording indicator', () => {
       getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), start: vi.fn(), stop }),
       authorize: vi.fn().mockResolvedValue(undefined),
     })
-    await import('../../miniprogram/pages/student/task-detail/task-detail')
+    await import('../../miniprogram/subpackages/student/task-detail/task-detail')
     if (!definition) throw new Error('Task detail page was not registered')
     const methods = definition.methods
     const context = { data: { ...definition.data, editable: true, completionInputs: [{
@@ -45,7 +45,7 @@ describe('S-09 task recording indicator', () => {
       (this: unknown, ...args: unknown[]) => unknown> } | null = null
     vi.stubGlobal('Component', (value: typeof definition) => { definition = value })
     vi.stubGlobal('wx', { getRecorderManager: () => ({ onStop: vi.fn(), onError: vi.fn(), start: vi.fn(), stop: vi.fn() }) })
-    await import('../../miniprogram/pages/student/task-detail/task-detail')
+    await import('../../miniprogram/subpackages/student/task-detail/task-detail')
     if (!definition) throw new Error('Task detail page was not registered')
     const context = { data: { ...definition.data, activeRecordingItemId: 'item_recording', completionInputs: [{
       itemId: 'item_recording', type: 'recording', recordingState: 'recording', recordingElapsedLabel: '00:02',
@@ -67,11 +67,11 @@ describe('S-09 task recording indicator', () => {
       getStorageSync: () => ({ sessionId: 'session_demo', user: { id: 'student_demo', role: 'student' } }),
       cloud: { uploadFile },
     })
-    const service = await import('../../miniprogram/services/task-recording-service')
+    const service = await import('../../miniprogram/subpackages/student/services/task-recording-service')
     vi.mocked(service.submitTaskRecording).mockResolvedValue({ ok: false, error: {
       code: 'MEDIA_INVALID', message: '录音文件无效或超出时长、大小限制', retryable: false,
     } })
-    await import('../../miniprogram/pages/student/task-detail/task-detail')
+    await import('../../miniprogram/subpackages/student/task-detail/task-detail')
     if (!definition) throw new Error('Task detail page was not registered')
     const methods = definition.methods
     const item = { itemId: 'item_recording', type: 'recording', recordingState: 'local',

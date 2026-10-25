@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { previewWeightedReviewScore, reviewEvidenceReady, reviewScoreForConfirmation } from '../../miniprogram/pages/teacher/review-task/review-task-state'
-import { requiresIndividualReview } from '../../miniprogram/pages/teacher/completion/completion-state'
+import { previewWeightedReviewScore, reviewEvidenceReady, reviewScoreForConfirmation } from '../../miniprogram/shared/review-task-state'
+import { requiresIndividualReview } from '../../miniprogram/subpackages/teacher/completion/completion-state'
 
 describe('teacher review scoring and publish guards', () => {
   const weighted = [

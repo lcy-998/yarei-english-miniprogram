@@ -1,0 +1,14 @@
+@import "../admin-page.less";
+
+// A-01 uses the shared navigation row for both its back arrow and page title.
+.native-admin__header { padding: 0 0 16px; }
+.native-admin__hero, .native-admin__search, .native-admin__card { margin-left: 20px; margin-right: 20px; }
+.native-admin__hero { padding: 16px 20px; }
+.native-admin__hero-note { margin-top: 0; }
+.native-admin__scope { display: block; margin-top: 10px; overflow-wrap: anywhere; }
+.native-admin__search input { min-width: 0; }
+.native-admin__card-title, .native-admin__module-title, .native-admin__module-note { min-width: 0; overflow-wrap: anywhere; }
+@media (orientation: landscape) {
+  .native-admin__header { padding-bottom: 10px; }
+  .native-admin__hero { padding-top: 12px; padding-bottom: 12px; }
+}

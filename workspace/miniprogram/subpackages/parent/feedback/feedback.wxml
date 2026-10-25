@@ -1,0 +1,35 @@
+<view class="page page--secondary">
+  <image class="page-bg" src="/assets/g0/student-public-natural-background-v1.jpg" mode="scaleToFill" aria-hidden="true"></image>
+  <app-header title="反馈详情" back="{{true}}"></app-header>
+  <state-panel wx:if="{{loading}}" state="loading"></state-panel>
+  <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="loadFeedback"></state-panel>
+  <view wx:else class="feedback-content">
+    <view class="card summary-card">
+      <text class="task-title">{{taskTitle}}</text>
+      <text wx:if="{{childDisplayName}}" class="child-meta">{{childDisplayName}} · {{childClassName}}</text>
+      <text class="submission-meta">{{versions.length ? '提交于 ' + selectedSubmittedAtLabel : '尚无正式提交'}}</text>
+      <text class="decision {{feedback && feedback.decision === 'returned' ? 'returned' : ''}}">{{feedback ? feedback.decision === 'returned' ? '退回重做' : '已点评' : '待点评'}}</text>
+    </view>
+    <view wx:if="{{feedback}}" class="card score-card">
+      <text class="score">{{feedback.score === undefined || feedback.score === null ? '未记录' : feedback.score + ' 分'}}</text>
+      <text class="score-label">本次正式点评得分</text>
+    </view>
+    <view wx:if="{{feedback}}" class="card teacher-card">
+      <text class="section-title">教师点评</text>
+      <text class="teacher-name">{{feedback.teacherName || '任课教师'}}</text>
+      <text class="feedback-time">点评于 {{feedbackTime}}</text>
+      <text class="comment">{{feedback.textComment || feedback.returnReason || (feedback.voiceComment && feedback.voiceComment.available ? '老师发布了语音评语' : '老师暂未填写评语')}}</text>
+    </view>
+    <view wx:if="{{feedback && feedback.voiceComment && feedback.voiceComment.available && parentAssignmentId}}" class="card voice-card">
+      <text class="section-title">语音点评</text>
+      <button class="voice-button" bindtap="playVoiceComment" disabled="{{voiceLoading}}">{{voiceLoading ? '正在核对…' : voicePlaying ? '停止试听' : '试听语音评语'}}</button>
+      <text wx:if="{{voiceMessage}}" class="voice-message">{{voiceMessage}}</text>
+    </view>
+    <view wx:if="{{!feedback}}" class="card waiting-card">当前提交版本暂无已发布点评。</view>
+    <view wx:if="{{versions.length}}" class="card versions-card">
+      <text class="section-title">提交版本</text>
+      <view class="version-list"><view wx:for="{{versions}}" wx:key="version" class="version-item {{selectedVersion === index ? 'version-item--selected' : ''}}" data-index="{{index}}" bindtap="selectVersion" aria-role="button">{{item.label}}</view></view>
+    </view>
+    <text class="readonly">家长端仅可查看。录音到期后无法试听，提交与点评记录仍保留。</text>
+  </view>
+</view>

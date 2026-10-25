@@ -18,6 +18,12 @@ export function createActivityCommandFunction(dependencies: ActivityCommandDepen
         ? await dependencies.service.saveDraft(actor, input.draft, input.expectedVersion, input.operationId)
         : input.action === 'publish'
           ? await dependencies.service.publish(actor, input.activityId, input.expectedVersion, input.operationId)
+          : input.action === 'deleteDraft'
+            ? await dependencies.service.deleteDraft(actor, input.activityId, input.expectedVersion, input.reason, input.operationId)
+          : input.action === 'recycle'
+            ? await dependencies.service.recycle(actor, input.activityId, input.expectedVersion, input.reason, input.operationId)
+          : input.action === 'close'
+            ? await dependencies.service.close(actor, input.activityId, input.expectedVersion, input.reason, input.operationId)
           : input.action === 'addFutureRestDay'
             ? await dependencies.service.addFutureRestDay(actor, input.activityId, input.date, input.reason,
               input.expectedVersion, input.operationId)

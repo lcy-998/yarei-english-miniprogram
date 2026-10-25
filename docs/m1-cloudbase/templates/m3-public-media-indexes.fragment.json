@@ -1,0 +1,37 @@
+{
+  "environment": "nonproduction-only",
+  "indexes": [
+    {
+      "collection": "learning_resources",
+      "name": "idx_public_media_source_status",
+      "keys": [
+        ["publicCatalogSource", 1],
+        ["status", 1],
+        ["deletedAt", 1]
+      ],
+      "unique": false
+    },
+    {
+      "collection": "learning_resources",
+      "name": "idx_org_media_type_status",
+      "keys": [
+        ["organizationId", 1],
+        ["type", 1],
+        ["status", 1],
+        ["deletedAt", 1]
+      ],
+      "unique": false
+    },
+    {
+      "collection": "operation_logs",
+      "name": "idx_org_target_history",
+      "keys": [
+        ["organizationId", 1],
+        ["targetType", 1],
+        ["targetId", 1],
+        ["deletedAt", 1]
+      ],
+      "unique": false
+    }
+  ]
+}

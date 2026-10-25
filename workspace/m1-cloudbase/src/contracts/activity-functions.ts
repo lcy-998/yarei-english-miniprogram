@@ -7,14 +7,17 @@ import { parseExactObject } from '../shared/strict-object';
 type Validation<T> = { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly fieldErrors: Readonly<Record<string, string>> };
 
-export const ACTIVITY_COMMAND_ACTIONS = ['saveDraft', 'publish', 'setOverride', 'addFutureRestDay'] as const;
-export const ACTIVITY_QUERY_ACTIONS = ['listForTeacher', 'listForStudent', 'getForStudent', 'getMyDay', 'getOverrideForTeacher', 'getLeaderboard'] as const;
+export const ACTIVITY_COMMAND_ACTIONS = ['saveDraft', 'publish', 'setOverride', 'addFutureRestDay', 'close', 'deleteDraft', 'recycle'] as const;
+export const ACTIVITY_QUERY_ACTIONS = ['listForTeacher', 'listForStudent', 'getForStudent', 'getMyDay', 'getOverrideForTeacher', 'getLeaderboard', 'getTeacherProgress'] as const;
 export type ActivityCommandAction = (typeof ACTIVITY_COMMAND_ACTIONS)[number];
 export type ActivityQueryAction = (typeof ACTIVITY_QUERY_ACTIONS)[number];
 
 export type ActivityCommandInput =
   | Readonly<{ action: 'saveDraft'; draft: ActivityDraftInput; operationId: string; expectedVersion: number }>
   | Readonly<{ action: 'publish'; activityId: string; operationId: string; expectedVersion: number }>
+  | Readonly<{ action: 'close'; activityId: string; reason: string; operationId: string; expectedVersion: number }>
+  | Readonly<{ action: 'deleteDraft'; activityId: string; reason: string; operationId: string; expectedVersion: number }>
+  | Readonly<{ action: 'recycle'; activityId: string; reason: string; operationId: string; expectedVersion: number }>
   | Readonly<{ action: 'addFutureRestDay'; activityId: string; date: string; reason: string;
       operationId: string; expectedVersion: number }>
   | Readonly<{ action: 'setOverride'; activityId: string; studentId: string; date: string;
@@ -25,7 +28,10 @@ export type ActivityQueryInput =
   | Readonly<{ action: 'getForStudent'; activityId: string }>
   | Readonly<{ action: 'getMyDay'; activityId: string; date: string }>
   | Readonly<{ action: 'getOverrideForTeacher'; activityId: string; studentId: string; date: string }>
-  | Readonly<{ action: 'getLeaderboard'; activityId: string }>;
+  | Readonly<{ action: 'getLeaderboard'; activityId: string }>
+  | Readonly<{ action: 'getTeacherProgress'; activityId: string; date: string;
+      page: Readonly<{ limit: number; offset: number }>; keyword: string;
+      completion: 'all' | 'complete' | 'incomplete' }>;
 
 function invalid<T>(field: string, message: string): Validation<T> {
   return { ok: false, fieldErrors: { [field]: message } };
@@ -80,6 +86,16 @@ export function validateActivityCommandRequest(request: FunctionRequest<Activity
     return { ok: true, value: { action: 'publish', activityId: exact.value.activityId,
       operationId: request.operationId, expectedVersion: request.expectedVersion } };
   }
+  if (request.action === 'close' || request.action === 'deleteDraft' || request.action === 'recycle') {
+    const exact = parseExactObject(request.payload, ['activityId', 'reason']);
+    if (!exact.ok) return exact;
+    if (!nonemptyString(exact.value.activityId, 128) || !nonemptyString(exact.value.reason, 200)) {
+      return invalid('close', '活动标识或关闭原因无效。');
+    }
+    return { ok: true, value: { action: request.action, activityId: exact.value.activityId,
+      reason: exact.value.reason, operationId: request.operationId,
+      expectedVersion: request.expectedVersion } };
+  }
   if (request.action === 'addFutureRestDay') {
     const exact = parseExactObject(request.payload, ['activityId', 'date', 'reason']);
     if (!exact.ok) return exact;
@@ -128,6 +144,25 @@ export function validateActivityQueryRequest(request: FunctionRequest<ActivityQu
   if (request.action === 'listForTeacher' || request.action === 'listForStudent') {
     const exact = parseExactObject(request.payload, []);
     return exact.ok ? { ok: true, value: { action: request.action } } : exact;
+  }
+  if (request.action === 'getTeacherProgress') {
+    const exact = parseExactObject(request.payload, ['activityId', 'date', 'page'], ['keyword', 'completion']);
+    if (!exact.ok || !nonemptyString(exact.value.activityId, 128) || !localDate(exact.value.date)) {
+      return invalid('activityId', '活动或日期无效。');
+    }
+    const page = parseExactObject(exact.value.page, ['limit', 'offset']);
+    if (!page.ok || !Number.isSafeInteger(page.value.limit) || Number(page.value.limit) < 1
+      || Number(page.value.limit) > 50 || !Number.isSafeInteger(page.value.offset)
+      || Number(page.value.offset) < 0 || Number(page.value.offset) > 10000
+      || (exact.value.keyword !== undefined && (typeof exact.value.keyword !== 'string' || exact.value.keyword.length > 50))
+      || (exact.value.completion !== undefined && exact.value.completion !== 'all'
+        && exact.value.completion !== 'complete' && exact.value.completion !== 'incomplete')) {
+      return invalid('page', '活动记录筛选或分页无效。');
+    }
+    return { ok: true, value: { action: 'getTeacherProgress', activityId: exact.value.activityId,
+      date: exact.value.date, page: { limit: Number(page.value.limit), offset: Number(page.value.offset) },
+      keyword: (exact.value.keyword as string | undefined) ?? '',
+      completion: (exact.value.completion as 'all' | 'complete' | 'incomplete' | undefined) ?? 'all' } };
   }
   const exact = parseExactObject(request.payload, request.action === 'getMyDay' ? ['activityId', 'date']
     : request.action === 'getOverrideForTeacher' ? ['activityId', 'studentId', 'date'] : ['activityId']);

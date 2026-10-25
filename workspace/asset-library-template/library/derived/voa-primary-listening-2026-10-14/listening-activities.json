@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "attribution": "VOA Learning English, Let's Learn English - Level 1",
+  "items": [
+    {
+      "resourceId": "res_voa_lle1_l4_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 3,
+      "title": "What Is It?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-4/3168920.html",
+      "audio": { "path": "lesson-4-what-is-it.mp3", "sha256": "367BF49CD0BCE99226BCBBCB3CAD7A3F8B9A5D1B9B829DFE8486D71533AD299D", "bytes": 1428935, "durationMs": 89287, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Pete, hi! Hi, we are here!",
+        "Pete: Hi, Anna! Hi, Marsha!",
+        "Pete: How are you two?",
+        "Marsha: I am great!",
+        "Anna: You know, Pete, I am new to D.C. The city is big.",
+        "Pete: Yeah. But you learn a little more every day. How's the new apartment?",
+        "Anna: The new apartment is great! Let's get coffee!",
+        "Marsha: Anna, do you have a pen?",
+        "Anna: Yes. I have a pen in my bag. I have a ...",
+        "Pete: It is not a pen. It is a book. It is a big book.",
+        "Marsha: It is not a pen, Anna ... a toy?",
+        "Pete: And it is a pillow!",
+        "Marsha: Anna, it is a map.",
+        "Pete: Why do you have a map of the world?",
+        "Anna: Pete, Marsha. Now I know I have a pen.",
+        "Pete: And now you have a lamp.",
+        "Anna: I have a pen! Let's get coffee!"
+      ],
+      "questions": [
+        { "id": "l4-q1", "type": "single_choice", "stem": "What does Pete first say Anna has found instead of a pen?", "options": ["A book", "A toy", "A pillow", "A lamp"], "correctAnswer": "A book", "explanation": "Pete first identifies the object as a big book.", "mainSegment": { "startMs": 0, "endMs": 89287, "basis": "Whole conversation: follow the sequence of objects Anna takes from her bag." } },
+        { "id": "l4-q2", "type": "single_choice", "stem": "What does Marsha think one object might be?", "options": ["A toy", "A cup", "A hat", "A key"], "correctAnswer": "A toy", "explanation": "Marsha suggests that one object may be a toy.", "mainSegment": { "startMs": 0, "endMs": 89287, "basis": "Whole conversation: compare Marsha's guess with the other object guesses." } },
+        { "id": "l4-q3", "type": "single_choice", "stem": "What does Pete identify after the toy guess?", "options": ["A pillow", "A phone", "A shoe", "A map"], "correctAnswer": "A pillow", "explanation": "Pete calls the next object a pillow.", "mainSegment": { "startMs": 0, "endMs": 89287, "basis": "Whole conversation: keep the object sequence in order." } },
+        { "id": "l4-q4", "type": "single_choice", "stem": "What is Anna's map of?", "options": ["The world", "Washington", "Her neighborhood", "The United States"], "correctAnswer": "The world", "explanation": "Pete asks why Anna has a map of the world.", "mainSegment": { "startMs": 0, "endMs": 89287, "basis": "Whole conversation: identify the map's stated scope." } },
+        { "id": "l4-q5", "type": "single_choice", "stem": "What do Anna and her friends decide to do?", "options": ["Get coffee", "Go to the gym", "Visit the library", "Go home"], "correctAnswer": "Get coffee", "explanation": "Anna returns to the plan to get coffee at the end.", "mainSegment": { "startMs": 0, "endMs": 89287, "basis": "Whole conversation: identify the plan repeated at the ending." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l5_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 3,
+      "title": "Where Are You?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-5-where-are-you/3168971.html",
+      "audio": { "path": "lesson-5-where-are-you.mp3", "sha256": "E6CA2DE9116750B3DFE7B99A455F21BC6A84FDACC72CC9B8F5F13AAF4260FD94", "bytes": 970963, "durationMs": 60682, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Hello, everyone! Today my friend Marsha is at her friend's house. She says it is beautiful. I want to see this house! Here we are!",
+        "Anna: Marsha, I am in the kitchen! It is a beautiful kitchen!",
+        "Marsha: It is beautiful. We cook in the kitchen.",
+        "Anna: I eat in the kitchen.",
+        "Marsha: We relax in the living room.",
+        "Anna: I relax in the living room. Marsha, let's go upstairs!",
+        "Marsha: Anna? Where are you?",
+        "Anna: Marsha, I am in the bathroom! I wash in the bathroom.",
+        "Marsha: I am in the bedroom. We sleep in the bedroom.",
+        "Anna: I sleep in the bedroom!"
+      ],
+      "questions": [
+        { "id": "l5-q1", "type": "single_choice", "stem": "Where is Anna when she first arrives?", "options": ["In the kitchen", "In the garden", "In the bedroom", "At the bus stop"], "correctAnswer": "In the kitchen", "explanation": "Anna says she is in the kitchen at the start of the visit.", "mainSegment": { "startMs": 0, "endMs": 60682, "basis": "Whole conversation: identify the opening location from the dialogue." } },
+        { "id": "l5-q2", "type": "single_choice", "stem": "What do Marsha and Anna say people do in the kitchen?", "options": ["Cook and eat", "Sleep and read", "Wash and relax", "Play and study"], "correctAnswer": "Cook and eat", "explanation": "Marsha says they cook there; Anna says she eats there.", "mainSegment": { "startMs": 0, "endMs": 60682, "basis": "Whole conversation: compare both speakers' statements about the kitchen." } },
+        { "id": "l5-q3", "type": "single_choice", "stem": "Where do they relax?", "options": ["In the living room", "In the bathroom", "In the kitchen", "In the garage"], "correctAnswer": "In the living room", "explanation": "Marsha names the living room as the place where they relax.", "mainSegment": { "startMs": 0, "endMs": 60682, "basis": "Whole conversation: locate the statement about relaxing." } },
+        { "id": "l5-q4", "type": "single_choice", "stem": "Where does Anna say she washes?", "options": ["In the bathroom", "In the bedroom", "In the living room", "In the kitchen"], "correctAnswer": "In the bathroom", "explanation": "Anna directly connects washing with the bathroom.", "mainSegment": { "startMs": 0, "endMs": 60682, "basis": "Whole conversation: identify Anna's upstairs location and activity." } },
+        { "id": "l5-q5", "type": "single_choice", "stem": "Where do Marsha and Anna say they sleep?", "options": ["In the bedroom", "In the kitchen", "In the living room", "In the bathroom"], "correctAnswer": "In the bedroom", "explanation": "Both speakers connect sleeping with the bedroom.", "mainSegment": { "startMs": 0, "endMs": 60682, "basis": "Whole conversation: identify the final room and its activity." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l6_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 4,
+      "title": "Where Is the Gym?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-6-where-is-the-gym/3225958.html",
+      "audio": { "path": "lesson-6-where-is-the-gym.mp3", "sha256": "9F6C3DE4E4E88AB46A7BFE9FFFF275A60EDFBBE1064C064FF2B3C1236DB7C0F5", "bytes": 1729141, "durationMs": 108069, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Hi there! I'm Anna and I live in Washington, D.C. Every day I learn more about this great city. People in Washington like to work out! Oh, hi, Pete. How's it going?",
+        "Pete: Hi, Anna. It's going great. How's it going with you?",
+        "Anna: Things are awesome! Pete, I want to work out. Where is the gym?",
+        "Pete: The gym is across from the lounge. It's next to the mailroom. Go that way.",
+        "Anna: Thanks, Pete!",
+        "Pete: No, Anna! Not that way! Go that way!",
+        "Anna: Oh, Pete. This is not the gym.",
+        "Pete: That's right, Anna. This is the mailroom.",
+        "Pete: The gym is across from the lounge.",
+        "Pete: The gym is across from the lounge. It is behind the lobby.",
+        "Anna: This is not a gym. This is a parking garage.",
+        "Anna: This is not a gym. This is a rooftop.",
+        "Pete: I want to work out too! Join me!",
+        "Anna: I'm good."
+      ],
+      "questions": [
+        { "id": "l6-q1", "type": "single_choice", "stem": "Why does Anna ask Pete about the gym?", "options": ["She wants to work out", "She wants to mail a letter", "She wants to eat lunch", "She wants to go home"], "correctAnswer": "She wants to work out", "explanation": "Anna says she wants to work out before asking for directions.", "mainSegment": { "startMs": 0, "endMs": 108069, "basis": "Whole conversation: connect Anna's stated goal with her question." } },
+        { "id": "l6-q2", "type": "single_choice", "stem": "What place is next to the gym?", "options": ["The mailroom", "The rooftop", "The garage", "The bedroom"], "correctAnswer": "The mailroom", "explanation": "Pete says the gym is next to the mailroom.", "mainSegment": { "startMs": 0, "endMs": 108069, "basis": "Whole conversation: follow Pete's directions and Anna's first mistaken stop." } },
+        { "id": "l6-q3", "type": "single_choice", "stem": "Which place does Anna visit but discover is not the gym?", "options": ["The parking garage", "The library", "The kitchen", "The classroom"], "correctAnswer": "The parking garage", "explanation": "Anna identifies one mistaken stop as a parking garage.", "mainSegment": { "startMs": 0, "endMs": 108069, "basis": "Whole conversation: identify one of Anna's mistaken destinations." } },
+        { "id": "l6-q4", "type": "single_choice", "stem": "Where is the gym in relation to the lobby?", "options": ["Behind it", "Inside it", "Across the street from it", "Above it"], "correctAnswer": "Behind it", "explanation": "Pete says the gym is behind the lobby.", "mainSegment": { "startMs": 0, "endMs": 108069, "basis": "Whole conversation: compare the repeated directions." } },
+        { "id": "l6-q5", "type": "single_choice", "stem": "What does Pete invite Anna to do at the end?", "options": ["Work out with him", "Go to the mailroom", "Visit the rooftop", "Record a show"], "correctAnswer": "Work out with him", "explanation": "Pete says he wants to work out too and invites Anna to join him.", "mainSegment": { "startMs": 0, "endMs": 108069, "basis": "Whole conversation: understand the final invitation." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l7_listening_formal_v1",
+      "contentVersion": 1,
+      "suggestedGrade": 5,
+      "title": "What Are You Doing?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-7-what-are-you-doing/3240468.html",
+      "audio": { "path": "lesson-7-what-are-you-doing.mp3", "sha256": "37A2C15AF77A09C5F66206C89872B6FF01A3C50E13317F632C5C8BD7E2DE4F41", "bytes": 2398805, "durationMs": 149917, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Caty: Come in. Well, Anna, welcome. I am your boss, Caty Weaver. But, please call me Caty.",
+        "Anna: Thank you, Ms. Weaver.",
+        "Caty: Just Caty.",
+        "Caty: Are you excited?",
+        "Anna: Yes, I am excited!",
+        "Caty: I am busy. Please meet your co-workers. But remember, they are busy working.",
+        "Anna: Hi there! I'm Anna.",
+        "Anne: Hi, Anna. I'm Anne.",
+        "Anna: Nice to meet you. What are you doing?",
+        "Anne: Um, I'm writing.",
+        "Anna: I am sorry!",
+        "Jonathan: And people all around the world are waiting to hear news about the next president.",
+        "Anna: Jonathan, hi! Remember me? I live in your building.",
+        "Anna: What are you doing?",
+        "Jonathan: I am doing my show!",
+        "Anna: Oh, sorry. Are you recording?",
+        "Jonathan: Yes! And now I have to record again!",
+        "Amelia: The word of the day is social. Social is an adjective.",
+        "Anna: Nice to meet you! What are you doing?",
+        "Amelia: I'm reading.",
+        "Anna: Are you reading the news?",
+        "Amelia: No, I'm reading for my show.",
+        "Anna: This day is not going well.",
+        "Caty: Anna! What are you doing?",
+        "Anna: I am bothering people, Ms. Weaver.",
+        "Caty: Let's go to my office and talk."
+      ],
+      "questions": [
+        { "id": "l7-q1", "type": "single_choice", "stem": "What is Anne doing when Anna first meets her?", "options": ["Writing", "Cooking", "Sleeping", "Driving"], "correctAnswer": "Writing", "explanation": "Anne says she is writing.", "mainSegment": { "startMs": 0, "endMs": 149917, "basis": "Whole conversation: distinguish the co-workers' activities." } },
+        { "id": "l7-q2", "type": "single_choice", "stem": "What is Jonathan doing in the studio?", "options": ["Recording his show", "Reading a book", "Making lunch", "Cleaning the room"], "correctAnswer": "Recording his show", "explanation": "Jonathan says he is doing his show and recording again after the interruption.", "mainSegment": { "startMs": 0, "endMs": 149917, "basis": "Whole conversation: use the studio context and Jonathan's response." } },
+        { "id": "l7-q3", "type": "single_choice", "stem": "What is Amelia reading for?", "options": ["Her show", "A school test", "A bus map", "A recipe"], "correctAnswer": "Her show", "explanation": "Amelia explains that she is reading for her show.", "mainSegment": { "startMs": 0, "endMs": 149917, "basis": "Whole conversation: distinguish Amelia's reading from Anna's guess." } },
+        { "id": "l7-q4", "type": "single_choice", "stem": "Where does Caty ask Anna to go so they can talk?", "options": ["Caty's office", "The rooftop", "The mailroom", "The gym"], "correctAnswer": "Caty's office", "explanation": "Caty asks Anna to go to her office.", "mainSegment": { "startMs": 0, "endMs": 149917, "basis": "Whole conversation: follow the final instruction." } },
+        { "id": "l7-q5", "type": "single_choice", "stem": "How does Anna feel the day is going?", "options": ["It is not going well", "It is perfect", "It is very quiet", "It is almost over"], "correctAnswer": "It is not going well", "explanation": "Anna says the day is not going well after interrupting her co-workers.", "mainSegment": { "startMs": 0, "endMs": 149917, "basis": "Whole conversation: infer Anna's view from her comment and events." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l8_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 6,
+      "title": "Are You Busy?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-8-are-you-busy/3253185.html",
+      "audio": { "path": "lesson-8-are-you-busy.mp3", "sha256": "5E063515A76627BD05CA37E426887E0250699E25F41B3606A792A1D87374247F", "bytes": 1897678, "durationMs": 118596, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Hello, everyone. Here I am at my new job! Today I want to apologize to my co-workers.",
+        "Anna: Hi, Anne. Are you busy?",
+        "Anne: Yes. At 10 a.m. I am writing. Every day I do my morning show.",
+        "Anna: Hi, Jonathan. Are you busy?",
+        "Jonathan: When the studio light is on, I am recording my evening show.",
+        "Anna: Sorry about yesterday.",
+        "Jonathan: No worries.",
+        "Anna: May I see the studio?",
+        "Jonathan: Maybe another time. Right now I am busy.",
+        "Anna: Hi, Amelia! Are you busy?",
+        "Amelia: I'm a little busy.",
+        "Anna: I want to say I'm sorry for yesterday.",
+        "Amelia: It's okay. Come by this afternoon.",
+        "Caty: Are you busy?",
+        "Anna: Yes, Ms. Weaver. I am busy.",
+        "Caty: My office. 5:00 p.m.",
+        "Caty: Come in.",
+        "Co-workers: Surprise!",
+        "Anna: A party! Awesome! And I still have my job!"
+      ],
+      "questions": [
+        { "id": "l8-q1", "type": "single_choice", "stem": "What is Anne doing at 10 a.m.?", "options": ["Writing", "Driving", "Cooking", "Reading outside"], "correctAnswer": "Writing", "explanation": "Anne states her activity at 10 a.m.", "mainSegment": { "startMs": 0, "endMs": 118596, "basis": "Whole conversation: connect the time with Anne's activity." } },
+        { "id": "l8-q2", "type": "single_choice", "stem": "What does Jonathan do when the studio light is on?", "options": ["Records his evening show", "Writes the morning show", "Leaves the building", "Meets Amelia"], "correctAnswer": "Records his evening show", "explanation": "Jonathan explains what the studio light means for his work.", "mainSegment": { "startMs": 0, "endMs": 118596, "basis": "Whole conversation: understand Jonathan's work routine." } },
+        { "id": "l8-q3", "type": "single_choice", "stem": "When does Amelia invite Anna to come by?", "options": ["This afternoon", "At 10 a.m.", "At 5 p.m.", "Tomorrow morning"], "correctAnswer": "This afternoon", "explanation": "Amelia tells Anna to come by this afternoon.", "mainSegment": { "startMs": 0, "endMs": 118596, "basis": "Whole conversation: distinguish Amelia's invitation from Caty's appointment." } },
+        { "id": "l8-q4", "type": "single_choice", "stem": "What time does Caty tell Anna to come to her office?", "options": ["5:00 p.m.", "10:00 a.m.", "12:00 noon", "6:00 p.m."], "correctAnswer": "5:00 p.m.", "explanation": "Caty gives Anna the appointment time.", "mainSegment": { "startMs": 0, "endMs": 118596, "basis": "Whole conversation: compare the appointment with other times mentioned." } },
+        { "id": "l8-q5", "type": "single_choice", "stem": "What surprise do Anna's co-workers have for her?", "options": ["A party", "A new studio", "A day off", "A new apartment"], "correctAnswer": "A party", "explanation": "The co-workers surprise Anna with a party, and she learns she still has her job.", "mainSegment": { "startMs": 0, "endMs": 118596, "basis": "Whole conversation: understand the ending and the reason Anna feels relieved." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l9_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 4,
+      "title": "Is It Cold?",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-9-is-it-cold/3261789.html",
+      "audio": { "path": "lesson-9-is-it-cold.mp3", "sha256": "B99AA2E6163A830AB6E6F9377EE6DC5865EDDD86B22FE299A3B560B27751E39A", "bytes": 1950341, "durationMs": 121887, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: In Washington, DC, the weather changes often. One day is cold and windy. But the next day is warm and sunny. So every day I check the forecast.",
+        "Phone: Today it is 18 degrees ... eighteen degrees Celsius.",
+        "Anna: Eighteen degrees! That is cold! Oh, Celsius. That is 65 degrees Fahrenheit. That's warm.",
+        "Phone: Yes, Anna. It is warm.",
+        "Anna: Is it windy today?",
+        "Phone: No, it is not windy today.",
+        "Anna: Is it sunny today?",
+        "Phone: Yes, Anna. It is sunny.",
+        "Anna: Is it snowy today?",
+        "Phone: No, Anna. It is not snowy.",
+        "Anna: Today the weather is warm and sunny -- great for seeing Washington, DC.",
+        "Anna: Phone! It is not warm and sunny! It is cold and windy and snowy!",
+        "Phone: Anna, it is not cold, windy, or snowy. It is warm and sunny ... in Mexico City, Mexico.",
+        "Anna: Washington weather changes often. Remember to check the forecast -- the right forecast."
+      ],
+      "questions": [
+        { "id": "l9-q1", "type": "single_choice", "stem": "What number does the phone give for the temperature?", "options": ["18 degrees", "65 degrees", "80 degrees", "10 degrees"], "correctAnswer": "18 degrees", "explanation": "The phone first reports 18 degrees, then clarifies the Celsius scale.", "mainSegment": { "startMs": 0, "endMs": 121887, "basis": "Whole conversation: hear the number and its unit clarification." } },
+        { "id": "l9-q2", "type": "single_choice", "stem": "What does Anna first think about 18 degrees?", "options": ["It is cold", "It is very hot", "It is snowy", "It is windy"], "correctAnswer": "It is cold", "explanation": "Anna initially reacts to the number before learning it is Celsius.", "mainSegment": { "startMs": 0, "endMs": 121887, "basis": "Whole conversation: follow Anna's reaction before and after the unit is named." } },
+        { "id": "l9-q3", "type": "single_choice", "stem": "What is 18 degrees Celsius in Fahrenheit in this conversation?", "options": ["65 degrees", "18 degrees", "32 degrees", "80 degrees"], "correctAnswer": "65 degrees", "explanation": "Anna converts the temperature to 65 degrees Fahrenheit.", "mainSegment": { "startMs": 0, "endMs": 121887, "basis": "Whole conversation: connect the Celsius and Fahrenheit numbers." } },
+        { "id": "l9-q4", "type": "single_choice", "stem": "Which city's forecast was the phone giving at the end?", "options": ["Mexico City", "Washington, D.C.", "New York", "London"], "correctAnswer": "Mexico City", "explanation": "The phone reveals that the warm, sunny forecast is for Mexico City.", "mainSegment": { "startMs": 0, "endMs": 121887, "basis": "Whole conversation: understand the final correction to the forecast location." } },
+        { "id": "l9-q5", "type": "single_choice", "stem": "What should Anna remember to check?", "options": ["The right city's forecast", "The time of the sunrise", "The bus schedule", "The temperature in her apartment"], "correctAnswer": "The right city's forecast", "explanation": "Anna concludes that she needs the forecast for the correct city.", "mainSegment": { "startMs": 0, "endMs": 121887, "basis": "Whole conversation: identify the lesson Anna states at the ending." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l10_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 4,
+      "title": "Come Over to My Place",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-10/3285228.html",
+      "audio": { "path": "lesson-10-come-over.mp3", "sha256": "0A868F1021608F8E7D72B15F5251FF1D21FD51A5AE1E2E141CC7E062441CD818", "bytes": 1451298, "durationMs": 90697, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Today my friend Ashley is coming over. I am showing her my new apartment.",
+        "Ashley: I'm coming to your apartment. Where is your apartment?",
+        "Anna: My apartment is near the Columbia Heights Metro.",
+        "Anna: Exit the Metro and turn right. Then at the bus station turn left. Then walk straight ahead.",
+        "Ashley: Exit Metro, turn right, turn left, then go straight ahead?",
+        "Anna: Yes. My apartment is near a coffee shop.",
+        "Ashley: Which coffee shop? There are three coffee shops.",
+        "Anna: My apartment is across from a big department store.",
+        "Ashley: A big department store? Ah, I see it!",
+        "Anna: I love having my friends over. Come on!"
+      ],
+      "questions": [
+        { "id": "l10-q1", "type": "single_choice", "stem": "Who is coming to Anna's apartment?", "options": ["Ashley", "Marsha", "Amelia", "Caty"], "correctAnswer": "Ashley", "explanation": "Anna says Ashley is coming over.", "mainSegment": { "startMs": 0, "endMs": 90697, "basis": "Whole conversation: identify the visitor and follow her arrival." } },
+        { "id": "l10-q2", "type": "single_choice", "stem": "What is Anna's apartment near?", "options": ["The Columbia Heights Metro", "A school", "A hospital", "A park"], "correctAnswer": "The Columbia Heights Metro", "explanation": "Anna uses the Metro station as the first location clue.", "mainSegment": { "startMs": 0, "endMs": 90697, "basis": "Whole conversation: identify the starting landmark in Anna's directions." } },
+        { "id": "l10-q3", "type": "single_choice", "stem": "After leaving the Metro, which way should Ashley turn first?", "options": ["Right", "Left", "Back", "Toward the river"], "correctAnswer": "Right", "explanation": "Anna's first direction is to turn right after exiting the Metro.", "mainSegment": { "startMs": 0, "endMs": 90697, "basis": "Whole conversation: follow the direction sequence in order." } },
+        { "id": "l10-q4", "type": "single_choice", "stem": "What landmark is across from Anna's apartment?", "options": ["A big department store", "A bus station", "A library", "A post office"], "correctAnswer": "A big department store", "explanation": "Anna gives the department store as the clearer landmark.", "mainSegment": { "startMs": 0, "endMs": 90697, "basis": "Whole conversation: distinguish the final landmark from the earlier coffee-shop clue." } },
+        { "id": "l10-q5", "type": "single_choice", "stem": "Why does Ashley ask Anna to name a coffee shop?", "options": ["There are three coffee shops", "The Metro is closed", "She cannot find the bus station", "She has no map"], "correctAnswer": "There are three coffee shops", "explanation": "Ashley says there are three coffee shops, so that clue is not specific enough.", "mainSegment": { "startMs": 0, "endMs": 90697, "basis": "Whole conversation: understand why Ashley asks for a more specific landmark." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l11_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 4,
+      "title": "This Is My Neighborhood",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-11-this-is-my-neighborhood/3293986.html",
+      "audio": { "path": "lesson-11-neighborhood.mp3", "sha256": "BC11FA2D7E80EEBCC7428C0B4EEC56EC95B10933213CF89AE439C498001237A1", "bytes": 1768847, "durationMs": 110550, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: Before we get ice cream, I need to return three books to the library. Where is the library?",
+        "Marsha: It is on this street on the corner.",
+        "Anna: These are letters to my family and friends back home ... four letters! Is there a post office near here?",
+        "Marsha: The post office is far from here. But there is a mailbox across from the store.",
+        "Anna: Now I need to buy stamps.",
+        "Marsha: Do you have cash?",
+        "Anna: No. Is there a bank near here?",
+        "Marsha: There is a bank behind you.",
+        "Anna: Now I have cash. I can buy stamps.",
+        "Marsha: That store sells stamps.",
+        "Anna: I have stamps.",
+        "Anna and Marsha: Ice cream!",
+        "Anna: I love my new neighborhood! Everything is near our apartment!"
+      ],
+      "questions": [
+        { "id": "l11-q1", "type": "single_choice", "stem": "What does Anna need to return to the library?", "options": ["Three books", "Four letters", "Some stamps", "A coffee cup"], "correctAnswer": "Three books", "explanation": "Anna says she needs to return three books before getting ice cream.", "mainSegment": { "startMs": 0, "endMs": 110550, "basis": "Whole conversation: follow Anna's errands and identify the first one." } },
+        { "id": "l11-q2", "type": "single_choice", "stem": "What does Anna discover inside the books?", "options": ["Letters", "A map", "Cash", "A photo"], "correctAnswer": "Letters", "explanation": "Anna realizes the books contain letters for her family and friends.", "mainSegment": { "startMs": 0, "endMs": 110550, "basis": "Whole conversation: connect the letters to Anna's next errand." } },
+        { "id": "l11-q3", "type": "single_choice", "stem": "Where is the mailbox?", "options": ["Across from the store", "Behind the library", "Inside the bank", "At the corner"], "correctAnswer": "Across from the store", "explanation": "Marsha gives the mailbox location when the post office is too far away.", "mainSegment": { "startMs": 0, "endMs": 110550, "basis": "Whole conversation: distinguish the mailbox clue from the library and bank locations." } },
+        { "id": "l11-q4", "type": "single_choice", "stem": "Where is the bank in relation to Anna?", "options": ["Behind her", "Across from her", "Next to the library", "Far from the store"], "correctAnswer": "Behind her", "explanation": "Anna says the bank is behind Marsha, who is speaking to her; the location is given as behind you.", "mainSegment": { "startMs": 0, "endMs": 110550, "basis": "Whole conversation: interpret the direction given during the stamp errand." } },
+        { "id": "l11-q5", "type": "single_choice", "stem": "What do Anna and Marsha plan to get after the errands?", "options": ["Ice cream", "Coffee", "Books", "Stamps"], "correctAnswer": "Ice cream", "explanation": "They say 'Ice cream!' after Anna gets the stamps.", "mainSegment": { "startMs": 0, "endMs": 110550, "basis": "Whole conversation: understand the errands' final goal." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l12_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 5,
+      "title": "Meet My Family",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-12-meet-my-family/3301733.html",
+      "audio": { "path": "lesson-12-meet-my-family.mp3", "sha256": "73B07AD20D711D44F610CCC84640BFA3941FAE9B91E5B44F3080DB8226C2E23F", "bytes": 3031539, "durationMs": 189466, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: I'm thinking about my family. I'm feeling homesick. I have some photos.",
+        "Anna: This is my mother and this is my father. They are rodeo clowns. They make jokes at a rodeo. They make people laugh.",
+        "Anna: That is my Aunt Lavender. She is my mom's sister. She loves gardening and makes spoons.",
+        "Anna: This is my Uncle John. He is my father's brother. He's a chicken farmer and makes guitars.",
+        "Anna: They are my cousins. They are my Uncle John's daughter and son. They raise sheep and make sweaters.",
+        "Anna: I do feel better. Thanks for listening. Washington, DC is my new home. But I like remembering my old home, too."
+      ],
+      "questions": [
+        { "id": "l12-q1", "type": "single_choice", "stem": "Why does Anna show Marsha her family photos?", "options": ["She feels homesick", "She wants to sell them", "She is planning a trip", "She needs a new job"], "correctAnswer": "She feels homesick", "explanation": "Anna says she is thinking about her family and feeling homesick.", "mainSegment": { "startMs": 0, "endMs": 189466, "basis": "Whole conversation: connect Anna's feelings to her decision to share photos." } },
+        { "id": "l12-q2", "type": "single_choice", "stem": "What do Anna's parents do?", "options": ["They are rodeo clowns", "They raise sheep", "They make guitars", "They teach music"], "correctAnswer": "They are rodeo clowns", "explanation": "Anna describes both parents as rodeo clowns.", "mainSegment": { "startMs": 0, "endMs": 189466, "basis": "Whole conversation: identify the parents' work." } },
+        { "id": "l12-q3", "type": "single_choice", "stem": "What does Aunt Lavender enjoy?", "options": ["Gardening", "Driving", "Singing", "Painting"], "correctAnswer": "Gardening", "explanation": "Anna says her aunt loves gardening and makes spoons.", "mainSegment": { "startMs": 0, "endMs": 189466, "basis": "Whole conversation: distinguish the aunt's interests from other family members' jobs." } },
+        { "id": "l12-q4", "type": "single_choice", "stem": "Which two things does Uncle John do?", "options": ["Raises chickens and makes guitars", "Raises horses and makes spoons", "Makes sweaters and tells jokes", "Grows vegetables and teaches music"], "correctAnswer": "Raises chickens and makes guitars", "explanation": "Anna describes Uncle John as a chicken farmer who also makes guitars.", "mainSegment": { "startMs": 0, "endMs": 189466, "basis": "Whole conversation: combine both details about Uncle John's work." } },
+        { "id": "l12-q5", "type": "single_choice", "stem": "What do Anna's cousins do?", "options": ["They raise sheep and make sweaters", "They make spoons and guitars", "They perform at a rodeo", "They grow flowers"], "correctAnswer": "They raise sheep and make sweaters", "explanation": "Anna says her cousins raise sheep and make sweaters.", "mainSegment": { "startMs": 0, "endMs": 189466, "basis": "Whole conversation: identify the cousins' shared activities." } }
+      ]
+    },
+    {
+      "resourceId": "res_voa_lle1_l13_listening_formal_v1",
+      "contentVersion": 2,
+      "suggestedGrade": 6,
+      "title": "Happy Birthday, William Shakespeare!",
+      "sourceUrl": "https://learningenglish.voanews.com/a/lets-learn-english-lesson-13-happy-birthday-william-shakespeare/3312239.html",
+      "audio": { "path": "lesson-13-shakespeare-birthday.mp3", "sha256": "365A03458FD798A4FDD02760F76B3AC14C9A5564B58B62F6209A3E42AC2D6D7C", "bytes": 2080258, "durationMs": 130011, "mimeType": "audio/mpeg" },
+      "transcript": [
+        "Anna: I feel bored. When I feel bored I always look for something unusual to do. I hear music. Let's go see!",
+        "Rebecca: It's a big birthday party for the writer William Shakespeare.",
+        "Anna: This is a drum band. I never listen to a drum band. But today I am listening to a drum band because it's Shakespeare's birthday!",
+        "Anna: This is a puppet show. I never watch puppet shows. But today I am watching a puppet show because it's Shakespeare's birthday!",
+        "Anna: Seeing the Queen of England is very unusual! Your majesty!",
+        "Anna: This is sword fighting. I never sword fight. But today I am sword fighting because it's Shakespeare's birthday!",
+        "Anna: Today, I am not bored because it is William Shakespeare's birthday!"
+      ],
+      "questions": [
+        { "id": "l13-q1", "type": "single_choice", "stem": "Whose birthday is the party celebrating?", "options": ["William Shakespeare's", "Anna's", "Rebecca's", "The Queen's"], "correctAnswer": "William Shakespeare's", "explanation": "Rebecca explains that the party is for William Shakespeare.", "mainSegment": { "startMs": 0, "endMs": 130011, "basis": "Whole conversation: identify the event that brings the activities together." } },
+        { "id": "l13-q2", "type": "single_choice", "stem": "What music performance does Anna hear?", "options": ["A drum band", "A piano solo", "A choir", "A guitar lesson"], "correctAnswer": "A drum band", "explanation": "Anna hears and watches a drum band at the celebration.", "mainSegment": { "startMs": 0, "endMs": 130011, "basis": "Whole conversation: identify one event Anna experiences." } },
+        { "id": "l13-q3", "type": "single_choice", "stem": "What kind of show does Anna watch?", "options": ["A puppet show", "A weather show", "A cooking show", "A sports show"], "correctAnswer": "A puppet show", "explanation": "Anna describes watching a puppet show.", "mainSegment": { "startMs": 0, "endMs": 130011, "basis": "Whole conversation: identify the show among the unusual activities." } },
+        { "id": "l13-q4", "type": "single_choice", "stem": "Whom does Anna call very unusual to see in Washington, D.C.?", "options": ["The Queen of England", "The President", "A drum band", "A writer"], "correctAnswer": "The Queen of England", "explanation": "Anna contrasts seeing the Queen with more usual sights in Washington, D.C.", "mainSegment": { "startMs": 0, "endMs": 130011, "basis": "Whole conversation: understand Anna's usual-versus-unusual comparison." } },
+        { "id": "l13-q5", "type": "single_choice", "stem": "Why does Anna say she is no longer bored?", "options": ["She is enjoying unusual birthday activities", "She has finished shopping", "She has gone home", "She has found a new job"], "correctAnswer": "She is enjoying unusual birthday activities", "explanation": "The celebration gives Anna several unusual things to see and do.", "mainSegment": { "startMs": 0, "endMs": 130011, "basis": "Whole conversation: infer the reason from the events and Anna's final statement." } }
+      ]
+    }
+  ]
+}

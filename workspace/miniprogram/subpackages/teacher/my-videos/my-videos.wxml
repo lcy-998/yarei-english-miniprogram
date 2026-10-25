@@ -1,0 +1,16 @@
+<g0-page-shell nature="{{true}}" tone="teacher"><view class="my-videos-page">
+  <app-header title="我的视频" back="{{true}}"></app-header>
+  <view class="my-videos-content">
+    <button class="primary" bindtap="create">录制或上传视频</button>
+    <state-panel wx:if="{{loading}}" state="loading" message="正在读取我的视频"></state-panel>
+    <state-panel wx:elif="{{error}}" state="error" message="{{error}}" bind:retry="load"></state-panel>
+    <view wx:else>
+      <view wx:for="{{items}}" wx:key="id" class="video-row">
+        <text class="video-title">{{item.title}}</text>
+        <text class="video-meta">{{item.status === 'published' ? '可布置' : item.status === 'offline' ? '已下架' : item.status === 'ready' ? '待发布' : item.status === 'processing' ? '处理中' : item.status === 'failed' ? '处理失败' : '草稿'}} · {{item.questionCount}} 题</text>
+        <view class="actions"><button data-id="{{item.id}}" bindtap="edit">查看或编辑</button><button wx:if="{{item.status === 'published'}}" data-id="{{item.id}}" bindtap="assign">布置作业</button><button wx:if="{{item.status === 'published'}}" data-id="{{item.id}}" bindtap="withdraw">下架</button></view>
+      </view>
+      <text wx:if="{{!items.length}}" class="empty">还没有自制视频。</text>
+    </view>
+  </view>
+</view></g0-page-shell>

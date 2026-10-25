@@ -1,0 +1,3 @@
+<view class="task-return-bar">
+  <button bindtap="onPress">{{label}}</button>
+</view>

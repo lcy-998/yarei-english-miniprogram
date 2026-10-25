@@ -124,6 +124,33 @@ describe('CloudBase Node deployment bootstrap', () => {
     expect((await provider('auth-session'))?.sdk.getWXContext()).toEqual({ UID });
   });
 
+  it('injects the native account provider only through the trusted deployment factory', async () => {
+    let factoryCalls = 0;
+    let contextReads = 0;
+    const nativeAccountProvider = {
+      async mobileExists() { return false; },
+      async provision() { return { platformUid: UID, subjectDigest: DIGEST }; },
+      async blockUnlinked() {},
+    };
+    const provider = createCloudBaseNodeDeploymentProvider({
+      ...options({
+        getCloudbaseContext: () => { contextReads += 1; return { TCB_ENV: 'env_current_runtime' }; },
+        init: () => ({ auth: () => ({ getUserInfo: () => ({ uid: UID }) }), database: () => identityDatabase() }),
+      }),
+      nativeAccountProviderFactory: context => {
+        factoryCalls += 1;
+        expect(context.environmentId).toBe('env_current_runtime');
+        return nativeAccountProvider;
+      },
+    });
+
+    const capabilities = await provider('native-admin-management-command');
+
+    expect(capabilities?.nativeAccountProvider).toBe(nativeAccountProvider);
+    expect(factoryCalls).toBe(1);
+    expect(contextReads).toBe(1);
+  });
+
   it('installs a cold-start provider that can bootstrap a persistent auth session', async () => {
     const database = identityDatabase();
     bootstrapCloudBaseNodeDeployment(options({

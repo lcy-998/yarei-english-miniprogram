@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTeacherStudentErrorCsv, createTeacherStudentImportTemplate, decodeUtf8Strict, exportTeacherStudentsCsv, previewTeacherStudentCsv } from '../../miniprogram/shared/teacher-student-csv'
+import { createTeacherStudentErrorCsv, createTeacherStudentImportResultCsv, createTeacherStudentImportTemplate, decodeUtf8Strict, exportTeacherStudentsCsv, previewTeacherStudentCsv, projectTeacherStudentImportErrors } from '../../miniprogram/subpackages/teacher/shared/teacher-student-csv'
 import type { TeacherStudentListItem } from '../../miniprogram/domain/types'
 
 const bytes = (value: string): Uint8Array => Buffer.from(value, 'utf8')
@@ -36,5 +36,23 @@ describe('教师学员 CSV 本地预检', () => {
     expect(csv).not.toContain('mobile')
     expect(createTeacherStudentImportTemplate()).toContain(header)
     expect(createTeacherStudentErrorCsv([{ lineNumber: 2, field: 'mobile', code: 'INVALID_MOBILE', message: '手机号格式无效。' }])).not.toContain('13800000001')
+  })
+
+  it('正式导入结果可导出逐行错误，保留可读原因但不包含账号资料', () => {
+    const errors = projectTeacherStudentImportErrors([
+      { lineNumber: 2, status: 'created', studentId: 'private_student_id', classId: 'class_a' },
+      { lineNumber: 3, status: 'rejected', code: 'DUPLICATE_MOBILE' },
+      { lineNumber: 4, status: 'failed', code: 'BUSINESS_COMMIT_FAILED' },
+    ], [{ lineNumber: 4, field: 'display_name', code: 'REQUIRED_FIELD', message: '该字段为必填项。' }])
+    expect(errors).toEqual([
+      { lineNumber: 3, field: 'row', code: 'DUPLICATE_MOBILE', message: '手机号已绑定其他账号。' },
+      { lineNumber: 4, field: 'display_name', code: 'REQUIRED_FIELD', message: '该字段为必填项。' },
+    ])
+    const csv = createTeacherStudentImportResultCsv([
+      { lineNumber: 2, status: 'created', studentId: 'private_student_id', classId: 'class_a' },
+      { lineNumber: 3, status: 'rejected', code: 'DUPLICATE_MOBILE' },
+    ], [])
+    expect(csv).toContain('"3","row","DUPLICATE_MOBILE","手机号已绑定其他账号。"')
+    expect(csv).not.toContain('private_student_id')
   })
 })

@@ -50,22 +50,92 @@ export const CLOUD_FUNCTIONS = Object.freeze([
   Object.freeze({ name: 'task-recording-command', timeout: 60, memorySize: 512 }),
 ]);
 
+/** All M3 pronunciation functions require explicit opt-in and stay out of M1/M2 bundles. */
+export const PRONUNCIATION_FUNCTIONS = Object.freeze([
+  Object.freeze({ name: 'pronunciation-command', timeout: 60, memorySize: 512 }),
+  Object.freeze({ name: 'pronunciation-query', timeout: 20, memorySize: 256 }),
+  Object.freeze({ name: 'pronunciation-worker', timeout: 300, memorySize: 512 }),
+]);
+
+/** Explicitly opt-in review bundles. These are never added to the standard M1/M2 build. */
+export const NATIVE_ADMIN_FUNCTIONS = Object.freeze([
+  Object.freeze({ name: 'native-admin-query', timeout: 20, memorySize: 256 }),
+  Object.freeze({ name: 'native-admin-command', timeout: 20, memorySize: 256 }),
+  Object.freeze({ name: 'native-admin-management-command', timeout: 20, memorySize: 256 }),
+  Object.freeze({ name: 'native-admin-operations-command', timeout: 20, memorySize: 256 }),
+  Object.freeze({ name: 'native-admin-media-command', timeout: 20, memorySize: 256 }),
+]);
+
+/** Student account provisioning uses the protected Manager Auth runtime and is opt-in. */
+export const TEACHER_STUDENT_IMPORT_FUNCTIONS = Object.freeze([
+  Object.freeze({ name: 'teacher-student-import-command', timeout: 300, memorySize: 512 }),
+]);
+
+/** High-memory teacher video processing is built only after its cost and runtime review. */
+export const TEACHER_PRIVATE_VIDEO_FUNCTIONS = Object.freeze([
+  Object.freeze({ name: 'teacher-private-video-worker', timeout: 900, memorySize: 3072 }),
+]);
+
+/** Qwen-backed teacher suggestions are opt-in and excluded from standard M1/M2 builds. */
+export const TEACHER_AI_FUNCTIONS = Object.freeze([
+  Object.freeze({ name: 'teacher-suggestion-command', timeout: 240, memorySize: 512 }),
+  Object.freeze({ name: 'teacher-suggestion-worker', timeout: 240, memorySize: 512 }),
+]);
+export const TEACHER_AI_CLOSURE_FUNCTIONS = Object.freeze([
+  CLOUD_FUNCTIONS.find(({ name }) => name === 'submission-command'),
+  CLOUD_FUNCTIONS.find(({ name }) => name === 'review-command'),
+  ...TEACHER_AI_FUNCTIONS,
+]);
+
+/** Narrow runtime-only repair package for the trusted CloudBase Auth subject mapping. */
+export const IDENTITY_RUNTIME_FUNCTIONS = Object.freeze([
+  CLOUD_FUNCTIONS.find(({ name }) => name === 'auth-session'),
+  NATIVE_ADMIN_FUNCTIONS.find(({ name }) => name === 'native-admin-management-command'),
+]);
+
 export async function buildCloudFunctions(options = {}) {
   const outputRoot = resolveOutputRoot(options.outDir ?? DEFAULT_OUTPUT_ROOT);
   const esbuild = loadExistingEsbuild();
+  const selectorFlags = [options.identityRuntimeOnly, options.nativeAdminOnly, options.teacherStudentImportOnly, options.pronunciationOnly,
+    options.teacherAiClosureOnly, options.teacherAiOnly, options.teacherPrivateVideoOnly, options.includeNativeAdmin,
+    options.includePronunciation, options.includeTeacherAi];
+  if (options.functionNames !== undefined && selectorFlags.some(Boolean)) {
+    throw new Error('functionNames cannot be combined with bundle selectors.');
+  }
+  const definitions = options.functionNames !== undefined
+    ? (() => {
+      if (!Array.isArray(options.functionNames) || options.functionNames.length === 0
+        || new Set(options.functionNames).size !== options.functionNames.length) {
+        throw new Error('functionNames must contain unique standard function names.');
+      }
+      const selected = options.functionNames.map((name) => CLOUD_FUNCTIONS.find((item) => item.name === name));
+      if (selected.some((item) => item === undefined)) throw new Error('functionNames includes a nonstandard function.');
+      return selected;
+    })()
+    : options.identityRuntimeOnly === true ? IDENTITY_RUNTIME_FUNCTIONS
+    : options.nativeAdminOnly === true ? NATIVE_ADMIN_FUNCTIONS
+      : options.teacherStudentImportOnly === true ? TEACHER_STUDENT_IMPORT_FUNCTIONS
+    : options.teacherPrivateVideoOnly === true ? TEACHER_PRIVATE_VIDEO_FUNCTIONS
+    : options.pronunciationOnly === true ? PRONUNCIATION_FUNCTIONS
+      : options.teacherAiClosureOnly === true ? TEACHER_AI_CLOSURE_FUNCTIONS
+      : options.teacherAiOnly === true ? TEACHER_AI_FUNCTIONS
+      : [...CLOUD_FUNCTIONS,
+        ...(options.includeNativeAdmin === true ? NATIVE_ADMIN_FUNCTIONS : []),
+        ...(options.includePronunciation === true ? PRONUNCIATION_FUNCTIONS : []),
+        ...(options.includeTeacherAi === true ? TEACHER_AI_FUNCTIONS : [])];
   const stagingRoot = `${outputRoot}.staging-${process.pid}-${Date.now()}`;
   assertSafeGeneratedPath(stagingRoot);
   await rm(stagingRoot, { recursive: true, force: true });
   await mkdir(stagingRoot, { recursive: true });
 
   try {
-    await Promise.all(CLOUD_FUNCTIONS.map((definition) => buildFunction(esbuild, definition, stagingRoot)));
-    await verifyGeneratedPackages(stagingRoot);
+    await Promise.all(definitions.map((definition) => buildFunction(esbuild, definition, stagingRoot)));
+    await verifyGeneratedPackages(stagingRoot, definitions);
     assertSafeGeneratedPath(outputRoot);
     await rm(outputRoot, { recursive: true, force: true });
     await mkdir(dirname(outputRoot), { recursive: true });
     await rename(stagingRoot, outputRoot);
-    return { outputRoot, functions: CLOUD_FUNCTIONS.map(({ name }) => name) };
+    return { outputRoot, functions: definitions.map(({ name }) => name) };
   } catch (error) {
     await rm(stagingRoot, { recursive: true, force: true });
     throw error;
@@ -75,12 +145,21 @@ export async function buildCloudFunctions(options = {}) {
 async function buildFunction(esbuild, definition, stagingRoot) {
   const functionRoot = join(stagingRoot, definition.name);
   await mkdir(functionRoot, { recursive: true });
+  const nativeAccountProviderSetup = definition.name === 'native-admin-management-command'
+    || definition.name === 'teacher-student-import-command'
+    ? "import { createTcbNativeAccountProviderFactory } from './functions/native-admin-management-command/tcb-account-provider-factory';"
+    : '';
+  const runtimeInstall = definition.name === 'native-admin-management-command'
+    || definition.name === 'teacher-student-import-command'
+    ? 'installCloudBaseNodeDeploymentFromEnvironment(createTcbNativeAccountProviderFactory);'
+    : 'installCloudBaseNodeDeploymentFromEnvironment();';
   const entrySource = [
     "import { installCloudBaseNodeDeploymentFromEnvironment } from './functions/shared/cloudbase-node-deployment-entry';",
+    nativeAccountProviderSetup,
     `import { main as functionMain } from './functions/${definition.name}/index';`,
-    'installCloudBaseNodeDeploymentFromEnvironment();',
+    runtimeInstall,
     'export const main = functionMain;',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   await esbuild.build({
     stdin: {
@@ -121,8 +200,8 @@ function loadExistingEsbuild() {
   throw new Error('The pinned local esbuild dependency is unavailable; no dependency was downloaded.');
 }
 
-async function verifyGeneratedPackages(stagingRoot) {
-  for (const { name } of CLOUD_FUNCTIONS) {
+async function verifyGeneratedPackages(stagingRoot, definitions) {
+  for (const { name } of definitions) {
     const bundle = await readFile(join(stagingRoot, name, 'index.js'), 'utf8');
     if (!bundle.includes(SDK_PACKAGE)
       || !bundle.includes('bootstrapCloudBaseNodeDeployment')
@@ -156,8 +235,31 @@ function readCliOutputRoot(argv) {
   return value;
 }
 
+function readCliFunctionNames(argv) {
+  const names = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] !== '--function') continue;
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith('--')) throw new Error('--function requires a standard function name.');
+    names.push(value);
+    index += 1;
+  }
+  return names.length === 0 ? undefined : names;
+}
+
 const invokedPath = process.argv[1] === undefined ? null : pathToFileURL(resolve(process.argv[1])).href;
 if (invokedPath === import.meta.url) {
-  const result = await buildCloudFunctions({ outDir: readCliOutputRoot(process.argv.slice(2)) });
+  const argv = process.argv.slice(2);
+  const result = await buildCloudFunctions({ outDir: readCliOutputRoot(argv),
+    functionNames: readCliFunctionNames(argv),
+    identityRuntimeOnly: argv.includes('--identity-runtime-only'),
+    nativeAdminOnly: argv.includes('--native-admin-only'),
+    teacherStudentImportOnly: argv.includes('--teacher-student-import-only'),
+    teacherPrivateVideoOnly: argv.includes('--teacher-private-video-only'),
+    pronunciationOnly: argv.includes('--pronunciation-only'),
+    teacherAiClosureOnly: argv.includes('--teacher-ai-closure-only'),
+    includePronunciation: argv.includes('--include-pronunciation'),
+    teacherAiOnly: argv.includes('--teacher-ai-only'),
+    includeTeacherAi: argv.includes('--include-teacher-ai') });
   process.stdout.write(`Built ${result.functions.length} CloudBase function packages in ${result.outputRoot}\n`);
 }

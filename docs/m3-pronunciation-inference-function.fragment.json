@@ -1,0 +1,24 @@
+{
+  "deployable": false,
+  "reason": "Merge with the reviewed nonproduction cloudbaserc only after Linux performance, quota and M3 authorization gates pass.",
+  "function": {
+    "name": "pronunciation-inference",
+    "type": "Event",
+    "runtime": "Python3.11",
+    "handler": "main.main",
+    "timeout": 210,
+    "memorySize": 1024,
+    "installDependency": false,
+    "envVariables": {
+      "VOICE_INTERNAL_SECRET": "{{env.VOICE_INTERNAL_SECRET}}",
+      "VOICE_ALLOWED_MEDIA_HOST": "{{env.VOICE_ALLOWED_MEDIA_HOST}}",
+      "VOICE_MEDIA_DOWNLOAD_TIMEOUT_SEC": "{{env.VOICE_MEDIA_DOWNLOAD_TIMEOUT_SEC}}",
+      "VOICE_MODEL_PATH": "/var/task/model/vosk-model-small-en-us-0.15"
+    }
+  },
+  "securityRuleFragment": {
+    "pronunciation-inference": {
+      "invoke": false
+    }
+  }
+}

@@ -2,11 +2,12 @@ import type { TrustedActorContext } from '../auth/trusted-actor';
 import { activityDays, isEffectiveActivityDay, localDateAt, rankActivity, validateActivitySchedule,
   type ActivityDailyRecord, type ActivityLeaderboard, type ActivityParticipant, type ActivitySchedule,
   type DailyCondition, type DailyEvidence, type TeacherCheckInOverride } from '../task-core/activity-rules';
-import { exerciseEvidenceFromSubmission, readingEvidenceFromPageEvents, vocabularyEvidenceFromAttempts, workEvidenceFromStudentWork } from './activity-evidence';
+import { exerciseEvidenceFromSubmission, exerciseSubmissionNeedsReview, readingEvidenceFromPageEvents, vocabularyEvidenceFromAttempts, workEvidenceFromStudentWork } from './activity-evidence';
 import type { ActivityTransaction, ActivityUnitOfWork } from './repository';
 import { ActivityError, type ActivityConditionSnapshot, type ActivityDayView, type ActivityDraftInput,
+  type ActivityExerciseOpportunity,
   type ActivityEntity, type ActivityFinalSnapshot, type ActivityLeaderboardView, type ActivityOperationReceipt, type ActivityOverrideRecord,
-  type ActivityOverrideState } from './types';
+  type ActivityOverrideState, type TeacherActivityProgressView, type VerifiedActivityDayPage } from './types';
 
 export interface ActivityClock { nowIso(): string }
 export interface ActivityIds { next(prefix: string): string }
@@ -14,6 +15,15 @@ export interface ActivityIds { next(prefix: string): string }
 // Keep the whole published activity, including its dated occurrences and roster, below the
 // CloudBase single-response budget with ample space for document metadata and later versions.
 const MAX_ACTIVITY_SNAPSHOT_BYTES = 1_000_000;
+const MAX_FINAL_CONDITION_DETAIL_BYTES = 400_000;
+
+function finalConditionDetails(statuses: Readonly<Record<string, readonly boolean[]>>):
+  Pick<ActivityFinalSnapshot, 'conditionDetailComplete' | 'conditionStatusByStudentDay'> {
+  const partial = Object.fromEntries(Object.entries(statuses)
+    .filter(([_key, values]) => values.some(Boolean) && values.some(value => !value)));
+  return Buffer.byteLength(JSON.stringify(partial), 'utf8') <= MAX_FINAL_CONDITION_DETAIL_BYTES
+    ? { conditionDetailComplete: true, conditionStatusByStudentDay: partial } : {};
+}
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
@@ -28,19 +38,33 @@ function validLocalDate(value: string): boolean {
     && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
 }
 
-function nextLocalDate(value: string): string {
-  const next = new Date(`${value}T00:00:00.000Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString().slice(0, 10);
+function activityHasEnded(nowIso: string, timeZone: string, endsOn: string): boolean {
+  return localDateAt(nowIso, timeZone) > endsOn;
 }
 
-function withinFinalizationWindow(nowIso: string, timeZone: string, endsOn: string): boolean {
-  if (localDateAt(nowIso, timeZone) !== nextLocalDate(endsOn)) return false;
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', minute: '2-digit',
-    hourCycle: 'h23' }).formatToParts(new Date(nowIso));
-  const hour = Number(parts.find(part => part.type === 'hour')?.value);
-  const minute = Number(parts.find(part => part.type === 'minute')?.value);
-  return hour === 0 && minute >= 0 && minute <= 5;
+function exerciseDaysAreReachable(days: readonly string[], participants: readonly ActivityParticipant[],
+  opportunities: readonly ActivityExerciseOpportunity[], contentVersion: string,
+  timeZone: string, nowIso: string): boolean {
+  for (const participant of participants) {
+    const usable = opportunities.filter(entry => entry.resourceVersion === contentVersion
+      && entry.studentIds.includes(participant.studentId)
+      && Date.parse(entry.dueAt) + entry.lateDays * 86400000 > Date.parse(nowIso));
+    const assigned = new Map<string, string>();
+    const match = (day: string, visited: Set<string>): boolean => {
+      for (const task of usable) {
+        const deadline = Date.parse(task.dueAt) + task.lateDays * 86400000;
+        const lastDate = localDateAt(new Date(deadline - 1).toISOString(), timeZone);
+        if (Date.parse(task.startsAt) >= deadline || localDateAt(task.startsAt, timeZone) > day
+          || lastDate < day || visited.has(task.taskId)) continue;
+        visited.add(task.taskId);
+        const priorDay = assigned.get(task.taskId);
+        if (!priorDay || match(priorDay, visited)) { assigned.set(task.taskId, day); return true; }
+      }
+      return false;
+    };
+    if (days.some(day => !match(day, new Set<string>()))) return false;
+  }
+  return true;
 }
 
 function normalizedCondition(value: unknown): DailyCondition | null {
@@ -165,7 +189,16 @@ export class ActivityService {
         participants.push({ studentId: student.id, displayNameMasked: student.displayNameMasked });
       }
       if (!participants.length) throw new ActivityError('VALIDATION_ERROR');
+      const effectiveDays = activityDays(schedule);
       const now = this.clock.nowIso();
+      for (const [index, condition] of schedule.conditions.entries()) {
+        if (condition.kind !== 'exercise') continue;
+        const snapshot = conditionSnapshots[index]!;
+        const opportunities = await transaction.listExerciseOpportunities(actor.organizationId,
+          schedule.classId, condition.resourceId);
+        if (!exerciseDaysAreReachable(effectiveDays, participants, opportunities,
+          snapshot.contentVersion, schedule.schoolTimeZone, now)) throw new ActivityError('RESOURCE_OFFLINE');
+      }
       const calendarDays = Math.floor((Date.parse(`${schedule.endsOn}T00:00:00.000Z`)
         - Date.parse(`${schedule.startsOn}T00:00:00.000Z`)) / 86400000) + 1;
       const instanceSample = { id: `${activity.id}:${schedule.startsOn}`, date: schedule.startsOn,
@@ -187,6 +220,130 @@ export class ActivityService {
       if (!await transaction.saveActivity(published, expectedVersion)) throw new ActivityError('CONFLICT');
       await this.receipt(transaction, actor, 'publish', operationId, fingerprint, published);
       return clone(published);
+    });
+  }
+
+  public async close(actor: TrustedActorContext, activityId: string, expectedVersion: number,
+    reason: string, operationId: string): Promise<ActivityEntity> {
+    if (!activityId.trim() || !operationKeyValid(operationId, expectedVersion)
+      || !reason.trim() || reason.length > 200) throw new ActivityError('VALIDATION_ERROR');
+    const cleanReason = reason.trim();
+    const fingerprint = payloadFingerprint({ activityId, expectedVersion, reason: cleanReason });
+    return this.repository.transaction(async transaction => {
+      const activity = await transaction.findActivity(actor.organizationId, activityId);
+      if (!activity || activity.publishedAt === null) throw new ActivityError('NOT_FOUND');
+      await this.authorizeTeacher(transaction, actor, activity.schedule.classId);
+      const prior = await transaction.findReceipt(actor.organizationId, actor.actorUserId, 'close', operationId);
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) throw new ActivityError('CONFLICT');
+        return clone(prior.result);
+      }
+      if (activity.status !== 'published' || activity.version !== expectedVersion) throw new ActivityError('CONFLICT');
+      const now = this.clock.nowIso();
+      const schoolToday = localDateAt(now, activity.schedule.schoolTimeZone);
+      if (schoolToday < activity.schedule.startsOn) throw new ActivityError('CONFLICT');
+      const cutoff = schoolToday < activity.schedule.endsOn ? schoolToday : activity.schedule.endsOn;
+      const existing = await transaction.findFinalSnapshot(actor.organizationId, activityId);
+      if (!existing) {
+        const calculated = await this.calculateLeaderboard(transaction, activity, now, cutoff);
+        if (calculated.pendingManualSubmissionIds.length) throw new ActivityError('ACTIVITY_PENDING_REVIEW');
+        const final: ActivityFinalSnapshot = { organizationId: actor.organizationId, activityId,
+          activityVersion: expectedVersion + 1, lockedAt: now,
+          leaderboard: { ...calculated.leaderboard, finalized: true },
+          completedDatesByStudent: calculated.completedDatesByStudent,
+          supplementedDatesByStudent: calculated.supplementedDatesByStudent,
+          ...finalConditionDetails(calculated.conditionStatusByStudentDay) };
+        if (!await transaction.createFinalSnapshot(final)) throw new ActivityError('CONFLICT');
+      }
+      const closed: ActivityEntity = { ...activity, status: 'closed', closedAt: now,
+        updatedAt: now, version: expectedVersion + 1 };
+      if (!await transaction.saveActivity(closed, expectedVersion)) throw new ActivityError('CONFLICT');
+      await this.receipt(transaction, actor, 'close', operationId, fingerprint, closed);
+      await transaction.appendAudit({ id: this.ids.next('checkin_audit'), organizationId: actor.organizationId,
+        requestId: actor.requestId, actorUserId: actor.actorUserId, actorRole: actor.actorRole,
+        action: 'checkin.close', targetType: 'checkin_activity', targetId: activityId,
+        result: 'succeeded', errorCode: null, occurredAt: now,
+        metadata: { operationId, classId: activity.schedule.classId, reason: cleanReason,
+          previousVersion: expectedVersion, nextVersion: closed.version } });
+      return clone(closed);
+    });
+  }
+
+  public async deleteDraft(actor: TrustedActorContext, activityId: string, expectedVersion: number,
+    reason: string, operationId: string): Promise<ActivityEntity> {
+    if (!activityId.trim() || !operationKeyValid(operationId, expectedVersion)
+      || !reason.trim() || reason.length > 200) throw new ActivityError('VALIDATION_ERROR');
+    const cleanReason = reason.trim();
+    const fingerprint = payloadFingerprint({ activityId, expectedVersion, reason: cleanReason });
+    return this.repository.transaction(async transaction => {
+      const prior = await transaction.findReceipt(actor.organizationId, actor.actorUserId,
+        'deleteDraft', operationId);
+      const activity = await transaction.findActivity(actor.organizationId, activityId);
+      const target = activity ?? prior?.result;
+      if (!target) throw new ActivityError('NOT_FOUND');
+      await this.authorizeTeacher(transaction, actor, target.schedule.classId);
+      if (target.creatorTeacherId !== actor.actorUserId) throw new ActivityError('FORBIDDEN');
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) throw new ActivityError('CONFLICT');
+        return clone(prior.result);
+      }
+      if (!activity || activity.status !== 'draft' || activity.publishedAt !== null
+        || activity.version !== expectedVersion || activity.participants.length > 0
+        || activity.dailyInstances.length > 0
+        || (await transaction.listActivityOverrides(actor.organizationId, activityId)).length > 0
+        || await transaction.findFinalSnapshot(actor.organizationId, activityId) !== null) {
+        throw new ActivityError('CONFLICT');
+      }
+      if (!await transaction.deleteActivity(activity)) throw new ActivityError('CONFLICT');
+      await this.receipt(transaction, actor, 'deleteDraft', operationId, fingerprint, activity);
+      await transaction.appendAudit({ id: this.ids.next('checkin_audit'), organizationId: actor.organizationId,
+        requestId: actor.requestId, actorUserId: actor.actorUserId, actorRole: actor.actorRole,
+        action: 'checkin.draft.deleted', targetType: 'checkin_activity', targetId: activityId,
+        result: 'succeeded', errorCode: null, occurredAt: this.clock.nowIso(),
+        metadata: { operationId, classId: activity.schedule.classId,
+          reason: cleanReason, taskVersion: activity.version } });
+      return clone(activity);
+    });
+  }
+
+  public async recycle(actor: TrustedActorContext, activityId: string, expectedVersion: number,
+    reason: string, operationId: string): Promise<ActivityEntity> {
+    if (!activityId.trim() || !operationKeyValid(operationId, expectedVersion)
+      || !reason.trim() || reason.length > 200) throw new ActivityError('VALIDATION_ERROR');
+    const cleanReason = reason.trim();
+    const fingerprint = payloadFingerprint({ activityId, expectedVersion, reason: cleanReason });
+    return this.repository.transaction(async transaction => {
+      const activity = await transaction.findActivity(actor.organizationId, activityId);
+      if (!activity) throw new ActivityError('NOT_FOUND');
+      await this.authorizeTeacher(transaction, actor, activity.schedule.classId);
+      if (activity.creatorTeacherId !== actor.actorUserId) throw new ActivityError('FORBIDDEN');
+      const prior = await transaction.findReceipt(actor.organizationId, actor.actorUserId, 'recycle', operationId);
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) throw new ActivityError('CONFLICT');
+        return clone(prior.result);
+      }
+      if (activity.visibility === 'recycled' || activity.version !== expectedVersion
+        || activity.status === 'draft' || activity.publishedAt === null) throw new ActivityError('CONFLICT');
+      const now = this.clock.nowIso();
+      const today = localDateAt(now, activity.schedule.schoolTimeZone);
+      if (activity.status === 'published' && today >= activity.schedule.startsOn
+        && today <= activity.schedule.endsOn) throw new ActivityError('CONFLICT');
+      if (today > activity.schedule.endsOn && await transaction.findFinalSnapshot(
+        actor.organizationId, activityId) === null) throw new ActivityError('CONFLICT');
+      const recycled: ActivityEntity = { ...activity, visibility: 'recycled', recycledAt: now,
+        recycledBy: actor.actorUserId, recycleReason: cleanReason,
+        recoverableUntil: new Date(Date.parse(now) + 7 * 86400000).toISOString(),
+        updatedAt: now, version: expectedVersion + 1 };
+      if (!await transaction.saveActivity(recycled, expectedVersion)) throw new ActivityError('CONFLICT');
+      await this.receipt(transaction, actor, 'recycle', operationId, fingerprint, recycled);
+      await transaction.appendAudit({ id: this.ids.next('checkin_audit'), organizationId: actor.organizationId,
+        requestId: actor.requestId, actorUserId: actor.actorUserId, actorRole: actor.actorRole,
+        action: 'checkin.recycle', targetType: 'checkin_activity', targetId: activityId,
+        result: 'succeeded', errorCode: null, occurredAt: now,
+        metadata: { operationId, classId: activity.schedule.classId,
+          reason: cleanReason, recoverableUntil: recycled.recoverableUntil ?? null,
+          previousVersion: expectedVersion, nextVersion: recycled.version } });
+      return clone(recycled);
     });
   }
 
@@ -241,10 +398,79 @@ export class ActivityService {
       for (const activity of activities) {
         const grant = await transaction.findTeacherGrant(actor.organizationId, actor.actorUserId, activity.schedule.classId);
         if (!grant?.permissions.includes('task.read') || !actor.scopeIds.includes(activity.schedule.classId)) continue;
+        if (activity.visibility === 'recycled') continue;
         if (activity.publishedAt === null && activity.creatorTeacherId !== actor.actorUserId) continue;
         visible.push(clone(activity));
       }
       return visible.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    });
+  }
+
+  public async getTeacherProgress(actor: TrustedActorContext, activityId: string, date: string,
+    page: Readonly<{ limit: number; offset: number }>, keyword = '',
+    completion: 'all' | 'complete' | 'incomplete' = 'all'): Promise<TeacherActivityProgressView> {
+    if (!activityId.trim() || !validLocalDate(date) || !Number.isSafeInteger(page.limit)
+      || page.limit < 1 || page.limit > 50 || !Number.isSafeInteger(page.offset)
+      || page.offset < 0 || page.offset > 10000 || keyword.length > 50
+      || !['all', 'complete', 'incomplete'].includes(completion)) throw new ActivityError('VALIDATION_ERROR');
+    return this.repository.transaction(async transaction => {
+      if (actor.actorRole !== 'teacher' || !actor.permissions.includes('task.read')) throw new ActivityError('FORBIDDEN');
+      const organization = await transaction.findOrganization(actor.organizationId);
+      const activity = await transaction.findActivity(actor.organizationId, activityId);
+      if (organization?.status !== 'active' || !activity || activity.publishedAt === null) throw new ActivityError('NOT_FOUND');
+      const grant = await transaction.findTeacherGrant(actor.organizationId, actor.actorUserId, activity.schedule.classId);
+      if (!actor.scopeIds.includes(activity.schedule.classId) || !grant?.permissions.includes('task.read')) {
+        throw new ActivityError('FORBIDDEN');
+      }
+      const now = this.clock.nowIso();
+      const schoolToday = localDateAt(now, activity.schedule.schoolTimeZone);
+      if (date < activity.schedule.startsOn || date > activity.schedule.endsOn || date > schoolToday) {
+        throw new ActivityError('VALIDATION_ERROR');
+      }
+      if (activity.status === 'closed' && activity.closedAt
+        && date > localDateAt(activity.closedAt, activity.schedule.schoolTimeZone)) throw new ActivityError('NOT_FOUND');
+      const restDay = activity.schedule.restDates.includes(date);
+      const ended = schoolToday > activity.schedule.endsOn || activity.status === 'closed';
+      const final = ended ? await transaction.findFinalSnapshot(actor.organizationId, activityId) : null;
+      if (ended && final === null) return { activityId, date, schoolToday, restDay,
+        evidenceStatus: 'not_available', completedCount: null, participantCount: activity.participants.length,
+        updatedAt: now, rows: [], nextOffset: null };
+      const calculated = final ?? await this.calculateLeaderboard(transaction, activity, now);
+      const effectiveDates = activityDays(activity.schedule).filter(day => day <= date
+        && (activity.status !== 'closed' || !activity.closedAt
+          || day <= localDateAt(activity.closedAt, activity.schedule.schoolTimeZone)));
+      const query = keyword.trim().toLocaleLowerCase();
+      const allRows = activity.participants.map(person => {
+        const dates = new Set(calculated.completedDatesByStudent[person.studentId] ?? []);
+        const supplemented = new Set(calculated.supplementedDatesByStudent[person.studentId] ?? []);
+        let consecutiveDays = 0;
+        for (const day of [...effectiveDates].reverse()) {
+          if (!dates.has(day)) break;
+          consecutiveDays += 1;
+        }
+        const conditionStatus = final
+          ? final.conditionDetailComplete === true
+            ? final.conditionStatusByStudentDay?.[`${person.studentId}:${date}`]
+              ?? activity.schedule.conditions.map(() => false) : undefined
+          : calculated.conditionStatusByStudentDay?.[`${person.studentId}:${date}`];
+        const missingConditions = restDay || dates.has(date) || conditionStatus === undefined ? []
+          : activity.schedule.conditions.filter((_condition, index) => conditionStatus[index] !== true)
+            .map(condition => condition.kind);
+        return { studentId: person.studentId, displayNameMasked: person.displayNameMasked,
+          complete: restDay ? null : dates.has(date), supplemented: supplemented.has(date),
+          completedDays: [...dates].filter(day => day <= date).length, consecutiveDays, missingConditions,
+          evidenceDetailAvailable: conditionStatus !== undefined };
+      }).filter(person => !query || person.displayNameMasked.toLocaleLowerCase().includes(query)
+        || person.studentId.toLocaleLowerCase().includes(query))
+        .filter(person => completion === 'all' || (completion === 'complete' ? person.complete === true : person.complete === false))
+        .sort((left, right) => left.displayNameMasked.localeCompare(right.displayNameMasked, 'zh-CN')
+          || left.studentId.localeCompare(right.studentId));
+      const rows = allRows.slice(page.offset, page.offset + page.limit);
+      return { activityId, date, schoolToday, restDay, evidenceStatus: 'available',
+        completedCount: restDay ? null : activity.participants.filter(person =>
+          (calculated.completedDatesByStudent[person.studentId] ?? []).includes(date)).length,
+        participantCount: activity.participants.length, updatedAt: final?.lockedAt ?? now,
+        rows, nextOffset: page.offset + page.limit < allRows.length ? page.offset + page.limit : null };
     });
   }
 
@@ -262,6 +488,10 @@ export class ActivityService {
       }
       const memberships = await transaction.listClassMemberships(actor.organizationId, activity.schedule.classId);
       if (!memberships.some(item => item.studentId === actor.actorUserId)) throw new ActivityError('NOT_FOUND');
+      if (activity.visibility === 'recycled') {
+        const final = await transaction.findFinalSnapshot(actor.organizationId, activityId);
+        if (!final?.completedDatesByStudent[actor.actorUserId]?.length) throw new ActivityError('NOT_FOUND');
+      }
       const { restDayChanges: hiddenAudit, ...studentView } = activity;
       void hiddenAudit;
       return clone(studentView);
@@ -278,7 +508,8 @@ export class ActivityService {
       const classMemberships = new Map<string, boolean>();
       const visible: ActivityEntity[] = [];
       for (const activity of activities) {
-        if (activity.publishedAt === null || !activity.participants.some(person => person.studentId === actor.actorUserId)) continue;
+        if (activity.publishedAt === null
+          || !activity.participants.some(person => person.studentId === actor.actorUserId)) continue;
         let currentClass = classMemberships.get(activity.schedule.classId);
         if (currentClass === undefined) {
           const memberships = await transaction.listClassMemberships(actor.organizationId, activity.schedule.classId);
@@ -286,6 +517,10 @@ export class ActivityService {
           classMemberships.set(activity.schedule.classId, currentClass);
         }
         if (currentClass) {
+          if (activity.visibility === 'recycled') {
+            const final = await transaction.findFinalSnapshot(actor.organizationId, activity.id);
+            if (!final?.completedDatesByStudent[actor.actorUserId]?.length) continue;
+          }
           const { restDayChanges: hiddenAudit, ...studentView } = activity;
           void hiddenAudit;
           visible.push(clone(studentView));
@@ -305,8 +540,14 @@ export class ActivityService {
       const activity = await transaction.findActivity(actor.organizationId, activityId);
       if (!activity || activity.publishedAt === null || !activity.participants.some(person => person.studentId === actor.actorUserId)
         || date < activity.schedule.startsOn || date > activity.schedule.endsOn) throw new ActivityError('NOT_FOUND');
+      if (activity.status === 'closed' && activity.closedAt
+        && date > localDateAt(activity.closedAt, activity.schedule.schoolTimeZone)) throw new ActivityError('NOT_FOUND');
       const memberships = await transaction.listClassMemberships(actor.organizationId, activity.schedule.classId);
       if (!memberships.some(item => item.studentId === actor.actorUserId)) throw new ActivityError('NOT_FOUND');
+      if (activity.visibility === 'recycled') {
+        const final = await transaction.findFinalSnapshot(actor.organizationId, activityId);
+        if (!final?.completedDatesByStudent[actor.actorUserId]?.length) throw new ActivityError('NOT_FOUND');
+      }
       const publishedAt = activity.publishedAt;
       if (!publishedAt || !Number.isFinite(Date.parse(publishedAt))) throw new ActivityError('SERVICE_UNAVAILABLE');
       const totalConditions = activity.schedule.conditions.length;
@@ -316,7 +557,8 @@ export class ActivityService {
         throw new ActivityError('SERVICE_UNAVAILABLE');
       }
       if (activity.conditionSnapshots.length !== totalConditions) throw new ActivityError('SERVICE_UNAVAILABLE');
-      if (localDateAt(this.clock.nowIso(), activity.schedule.schoolTimeZone) > activity.schedule.endsOn) {
+      if (activity.status === 'closed'
+        || localDateAt(this.clock.nowIso(), activity.schedule.schoolTimeZone) > activity.schedule.endsOn) {
         const finalSnapshot = await transaction.findFinalSnapshot(actor.organizationId, activityId);
         if (!finalSnapshot) return { activityId, date, restDay: false, complete: null,
           evidenceStatus: 'not_available', verifiedConditions: 0, totalConditions, completedAt: null, supplemented: false };
@@ -472,6 +714,10 @@ export class ActivityService {
           || !memberships.some(item => item.studentId === actor.actorUserId)) {
           throw new ActivityError('FORBIDDEN');
         }
+        if (activity.visibility === 'recycled') {
+          const final = await transaction.findFinalSnapshot(actor.organizationId, activityId);
+          if (!final?.completedDatesByStudent[actor.actorUserId]?.length) throw new ActivityError('FORBIDDEN');
+        }
       } else if (actor.actorRole === 'teacher') {
         const grant = await transaction.findTeacherGrant(actor.organizationId, actor.actorUserId, activity.schedule.classId);
         if (!actor.permissions.includes('task.read') || !actor.scopeIds.includes(activity.schedule.classId)
@@ -483,7 +729,7 @@ export class ActivityService {
         restDayCount: activity.schedule.restDates.length, updatedAt: now };
       if (!activity.publishedAt || !Number.isFinite(Date.parse(activity.publishedAt))
         || activity.conditionSnapshots.length !== activity.schedule.conditions.length) throw new ActivityError('SERVICE_UNAVAILABLE');
-      if (localDateAt(now, activity.schedule.schoolTimeZone) > activity.schedule.endsOn) {
+      if (activity.status === 'closed' || localDateAt(now, activity.schedule.schoolTimeZone) > activity.schedule.endsOn) {
         const snapshot = await transaction.findFinalSnapshot(actor.organizationId, activityId);
         if (!snapshot) return { ...base, evidenceStatus: 'not_available', leaderboard: null, myRank: null };
         return { ...base, updatedAt: snapshot.lockedAt, evidenceStatus: 'available', leaderboard: snapshot.leaderboard,
@@ -497,7 +743,7 @@ export class ActivityService {
     });
   }
 
-  /** Invoked only by a trusted maintenance runner during the first five minutes after school-local midnight. */
+  /** Retried by trusted maintenance after the activity ends until submitted manual work is graded. */
   public async finalizeActivity(organizationId: string, activityId: string): Promise<ActivityFinalSnapshot> {
     return this.repository.transaction(async transaction => {
       const activity = await transaction.findActivity(organizationId, activityId);
@@ -505,26 +751,70 @@ export class ActivityService {
       const existing = await transaction.findFinalSnapshot(organizationId, activityId);
       if (existing) return existing;
       const now = this.clock.nowIso();
-      if (!withinFinalizationWindow(now, activity.schedule.schoolTimeZone, activity.schedule.endsOn)) {
+      if (!activityHasEnded(now, activity.schedule.schoolTimeZone, activity.schedule.endsOn)) {
         throw new ActivityError('CONFLICT');
       }
       const calculated = await this.calculateLeaderboard(transaction, activity, now);
       if (!calculated.leaderboard.finalized) throw new ActivityError('SERVICE_UNAVAILABLE');
+      if (calculated.pendingManualSubmissionIds.length) throw new ActivityError('ACTIVITY_PENDING_REVIEW');
       const snapshot: ActivityFinalSnapshot = { organizationId, activityId, activityVersion: activity.version,
         lockedAt: now, leaderboard: calculated.leaderboard,
         completedDatesByStudent: calculated.completedDatesByStudent,
-        supplementedDatesByStudent: calculated.supplementedDatesByStudent };
+        supplementedDatesByStudent: calculated.supplementedDatesByStudent,
+        ...finalConditionDetails(calculated.conditionStatusByStudentDay) };
       if (!await transaction.createFinalSnapshot(snapshot)) throw new ActivityError('CONFLICT');
       return snapshot;
     });
   }
 
+  /** Internal statistics source. Callers must authorize classes and students first. */
+  public async listVerifiedDaysForStatistics(organizationId: string, classIds: readonly string[],
+    studentIds: readonly string[], startsOn: string, endsOn: string): Promise<VerifiedActivityDayPage> {
+    if (!validLocalDate(startsOn) || !validLocalDate(endsOn) || startsOn > endsOn) {
+      throw new ActivityError('VALIDATION_ERROR');
+    }
+    return this.repository.transaction(async transaction => {
+      const classes = new Set(classIds);
+      const students = new Set(studentIds);
+      const events: VerifiedActivityDayPage['events'][number][] = [];
+      let partial = false;
+      for (const activity of await transaction.listActivities(organizationId)) {
+        if (activity.publishedAt === null || !classes.has(activity.schedule.classId)
+          || activity.schedule.endsOn < startsOn || activity.schedule.startsOn > endsOn) continue;
+        const now = this.clock.nowIso();
+        const ended = localDateAt(now, activity.schedule.schoolTimeZone) > activity.schedule.endsOn
+          || activity.status === 'closed';
+        const result = ended ? await transaction.findFinalSnapshot(organizationId, activity.id) : null;
+        if (ended && result === null) { partial = true; continue; }
+        const calculated = result ?? await this.calculateLeaderboard(transaction, activity, now);
+        for (const participant of activity.participants) {
+          if (!students.has(participant.studentId)) continue;
+          const supplemented = new Set(calculated.supplementedDatesByStudent[participant.studentId] ?? []);
+          for (const date of calculated.completedDatesByStudent[participant.studentId] ?? []) {
+            if (date < startsOn || date > endsOn) continue;
+            events.push({ activityId: activity.id, activityTitle: activity.title,
+              classId: activity.schedule.classId, studentId: participant.studentId,
+              date, supplemented: supplemented.has(date) });
+          }
+        }
+      }
+      return { evidenceStatus: partial ? 'partial' : 'available', events };
+    });
+  }
+
   private async calculateLeaderboard(transaction: ActivityTransaction, activity: ActivityEntity,
-    now: string): Promise<Readonly<{ leaderboard: ActivityLeaderboard;
+    now: string, endsOnOverride?: string): Promise<Readonly<{ leaderboard: ActivityLeaderboard;
       completedDatesByStudent: Record<string, string[]>;
-      supplementedDatesByStudent: Record<string, string[]> }>> {
-    const days = activityDays(activity.schedule);
+      supplementedDatesByStudent: Record<string, string[]>;
+      conditionStatusByStudentDay: Record<string, readonly boolean[]>;
+      pendingManualSubmissionIds: readonly string[] }>> {
+    const schedule: ActivitySchedule = endsOnOverride === undefined ? activity.schedule : {
+      ...activity.schedule, endsOn: endsOnOverride,
+      restDates: activity.schedule.restDates.filter(date => date <= endsOnOverride),
+    };
+    const days = activityDays(schedule);
     const records: ActivityDailyRecord[] = [];
+    const pendingManualSubmissionIds = new Set<string>();
     const publishedAt = activity.publishedAt;
     if (!publishedAt) throw new ActivityError('SERVICE_UNAVAILABLE');
     const exerciseSources = new Map<string, Readonly<Record<string, readonly import('./types').ActivityExerciseSource[]>>>();
@@ -548,7 +838,7 @@ export class ActivityService {
           for (const date of days) {
             const evidence = readingEvidenceFromPageEvents({ snapshot, events: eligible,
               organizationId: activity.organizationId, studentId: participant.studentId,
-              date, schoolTimeZone: activity.schedule.schoolTimeZone });
+              date, schoolTimeZone: schedule.schoolTimeZone });
             if (evidence) byDay.set(date, [...(byDay.get(date) ?? []), evidence]);
           }
         } else if (snapshot.kind === 'vocabulary' && condition.kind === 'vocabulary') {
@@ -558,7 +848,7 @@ export class ActivityService {
           for (const date of days) {
             const evidence = vocabularyEvidenceFromAttempts({ snapshot, attempts,
               organizationId: activity.organizationId, studentId: participant.studentId,
-              date, schoolTimeZone: activity.schedule.schoolTimeZone, publishedAt,
+              date, schoolTimeZone: schedule.schoolTimeZone, publishedAt,
               requiredWordCount: condition.requiredWordCount });
             if (evidence) byDay.set(date, [...(byDay.get(date) ?? []), evidence]);
           }
@@ -567,21 +857,26 @@ export class ActivityService {
             snapshot.resourceId);
           for (const work of works) {
             if (!work.submittedAt) continue;
-            const date = localDateAt(work.submittedAt, activity.schedule.schoolTimeZone);
+            const date = localDateAt(work.submittedAt, schedule.schoolTimeZone);
             if (!days.includes(date)) continue;
             const evidence = workEvidenceFromStudentWork({ snapshot, work,
               organizationId: activity.organizationId, studentId: participant.studentId,
-              date, schoolTimeZone: activity.schedule.schoolTimeZone, publishedAt });
+              date, schoolTimeZone: schedule.schoolTimeZone, publishedAt });
             if (evidence) byDay.set(date, [...(byDay.get(date) ?? []), evidence]);
           }
         } else if (snapshot.kind === 'exercise') {
           const sources = exerciseSources.get(snapshot.resourceId)?.[participant.studentId] ?? [];
           for (const source of sources) {
+            if (source.submission.submittedAt && Date.parse(source.submission.submittedAt) >= Date.parse(publishedAt)
+              && days.includes(localDateAt(source.submission.submittedAt, schedule.schoolTimeZone))
+              && exerciseSubmissionNeedsReview({ ...source, resourceId: snapshot.resourceId,
+                requiredContentVersion: snapshot.contentVersion, studentId: participant.studentId,
+                classId: activity.schedule.classId })) pendingManualSubmissionIds.add(source.submission.id);
             const evidence = exerciseEvidenceFromSubmission({ ...source, resourceId: snapshot.resourceId,
               requiredContentVersion: snapshot.contentVersion, studentId: participant.studentId,
               classId: activity.schedule.classId });
             if (!evidence || Date.parse(evidence.submittedAt) < Date.parse(publishedAt)) continue;
-            const date = localDateAt(evidence.submittedAt, activity.schedule.schoolTimeZone);
+            const date = localDateAt(evidence.submittedAt, schedule.schoolTimeZone);
             if (days.includes(date)) byDay.set(date, [...(byDay.get(date) ?? []), evidence]);
           }
         }
@@ -590,7 +885,7 @@ export class ActivityService {
         classId: activity.schedule.classId, date, evidence });
     }
     const overrides = await transaction.listActivityOverrides(activity.organizationId, activity.id);
-    const leaderboard = rankActivity(activity.schedule, activity.participants, records, overrides, now);
+    const leaderboard = rankActivity(schedule, activity.participants, records, overrides, now);
     const evidenceByDay = new Map(records.map(record => [`${record.studentId}:${record.date}`, record.evidence]));
     const latestOverrides = new Map<string, TeacherCheckInOverride>();
     for (const override of overrides) {
@@ -600,20 +895,25 @@ export class ActivityService {
     }
     const completedDatesByStudent: Record<string, string[]> = {};
     const supplementedDatesByStudent: Record<string, string[]> = {};
+    const conditionStatusByStudentDay: Record<string, readonly boolean[]> = {};
     for (const person of activity.participants) {
       completedDatesByStudent[person.studentId] = [];
       supplementedDatesByStudent[person.studentId] = [];
       for (const date of days) {
         const key = `${person.studentId}:${date}`;
         const override = latestOverrides.get(key);
-        if (isEffectiveActivityDay(activity.schedule, person.studentId, date,
+        conditionStatusByStudentDay[key] = schedule.conditions.map(condition => isEffectiveActivityDay(
+          { ...schedule, conditions: [condition] }, person.studentId, date,
+          evidenceByDay.get(key) ?? [], undefined));
+        if (isEffectiveActivityDay(schedule, person.studentId, date,
           evidenceByDay.get(key) ?? [], override)) {
           completedDatesByStudent[person.studentId]!.push(date);
           if (override?.active) supplementedDatesByStudent[person.studentId]!.push(date);
         }
       }
     }
-    return { leaderboard, completedDatesByStudent, supplementedDatesByStudent };
+    return { leaderboard, completedDatesByStudent, supplementedDatesByStudent,
+      conditionStatusByStudentDay, pendingManualSubmissionIds: [...pendingManualSubmissionIds] };
   }
 
   private async authorizeTeacher(transaction: ActivityTransaction, actor: TrustedActorContext, classId: string): Promise<string> {

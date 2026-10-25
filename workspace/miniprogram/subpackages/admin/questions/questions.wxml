@@ -1,0 +1,34 @@
+<g0-page-shell tone="teacher">
+  <view class="native-admin">
+    <view class="native-admin__header"><app-header title="{{title}}" back="{{true}}" adminCompact="{{true}}"/></view>
+    <state-panel wx:if="{{status === 'loading'}}" state="loading"></state-panel>
+    <view wx:elif="{{status === 'forbidden'}}" class="native-admin__notice">当前账号没有题库管理权限。</view>
+    <state-panel wx:elif="{{status === 'error'}}" state="error" message="{{error}}" bind:retry="reload"></state-panel>
+    <block wx:else>
+      <view class="native-admin__hero"><text class="native-admin__hero-title">题目目录</text><text class="native-admin__hero-note">通过受控导入校验并上架的英语习题供所有教师查找；教师布置对象仍按教学权限核验。题目正文在此只读。</text></view>
+      <view class="native-admin__search"><input value="{{keyword}}" placeholder="搜索题目或知识点" confirm-type="search" bindinput="onKeyword" bindconfirm="applyFilters"/></view>
+      <view class="native-admin__filter-panel"><view class="native-admin__filter-row"><button data-status="all" bindtap="onStatusFilter" class="{{statusFilter === '' ? 'active' : ''}}">全部</button><button data-status="draft" bindtap="onStatusFilter" class="{{statusFilter === 'draft' ? 'active' : ''}}">草稿</button><button data-status="published" bindtap="onStatusFilter" class="{{statusFilter === 'published' ? 'active' : ''}}">已上架</button><button data-status="offline" bindtap="onStatusFilter" class="{{statusFilter === 'offline' ? 'active' : ''}}">已下架</button></view><button class="native-admin__filter-submit" loading="{{dataLoading}}" disabled="{{dataLoading}}" bindtap="applyFilters">搜索与筛选</button></view>
+      <view class="native-admin__card">
+        <view class="native-admin__question-list-heading"><text class="native-admin__card-title">题目列表</text><text class="native-admin__module-note">已选 {{selectedQuestionIds.length}} 道 · 单次最多 50 道</text></view>
+        <view class="native-admin__batch-actions"><button data-status="published" bindtap="openQuestionBatch" disabled="{{!selectedQuestionIds.length}}">批量上架</button><button data-status="offline" bindtap="openQuestionBatch" disabled="{{!selectedQuestionIds.length}}">批量下架</button></view>
+        <text wx:if="{{dataLoading}}" class="native-admin__module-note">正在读取题目…</text><text wx:if="{{dataError}}" class="native-admin__notice">{{dataError}}</text><button wx:if="{{dataError}}" class="native-admin__secondary" bindtap="reload">重试</button>
+        <view wx:for="{{recordRows}}" wx:key="id" class="native-admin__module native-admin__question-row">
+          <view class="native-admin__question-select {{item.selected ? 'active' : ''}}" data-id="{{item.id}}" bindtap="toggleQuestionSelection" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="{{item.selected ? '取消选择' : '选择'}}题目 {{item.title}}">{{item.selected ? '✓' : '＋'}}</view>
+          <view class="native-admin__module-copy native-admin__question-copy"><view class="native-admin__question-title-row"><text class="native-admin__module-title">{{item.title}}</text><text class="native-admin__question-status {{item.status === 'published' ? 'native-admin__question-status--published' : item.status === 'offline' ? 'native-admin__question-status--offline' : ''}}">{{item.statusLabel}}</text></view><text class="native-admin__module-note">{{item.detail}}</text><button class="native-admin__question-preview-button" data-id="{{item.id}}" bindtap="openRecordOperation" aria-label="预览题目 {{item.title}}">预览题目 ›</button></view>
+        </view>
+        <text wx:if="{{!dataLoading && !dataError && !recordRows.length}}" class="native-admin__module-note">暂无匹配的题目</text><button wx:if="{{nextOffset !== null}}" loading="{{dataLoading}}" bindtap="loadMore">加载更多</button>
+      </view>
+      <view wx:if="{{questionBatchDraft}}" id="admin-question-batch" class="native-admin__card"><view class="native-admin__form-heading"><text class="native-admin__card-title">{{questionBatchDraft.status === 'published' ? '批量上架' : '批量下架'}}</text><button bindtap="closeQuestionBatch">关闭</button></view><text class="native-admin__module-note">将处理所选 {{selectedQuestionIds.length}} 道题；版本或权限冲突时整批取消。</text><textarea class="native-admin__field" maxlength="200" value="{{questionBatchDraft.reason}}" bindinput="onQuestionBatchReason" placeholder="填写操作原因"/><text wx:if="{{questionBatchError}}" class="native-admin__notice">{{questionBatchError}}；选择和原因已保留。</text><view class="native-admin__form-actions native-admin__question-confirm-actions"><button loading="{{questionBatchBusy}}" disabled="{{questionBatchBusy}}" bindtap="requestQuestionBatch">{{questionBatchDraft.status === 'published' ? '确认上架' : '确认下架'}}</button></view></view>
+      <view wx:if="{{operationDraft}}" id="admin-question-detail" class="native-admin__card">
+        <view class="native-admin__form-heading native-admin__question-detail-heading"><text class="native-admin__card-title">{{operationDraft.title}}</text><button bindtap="closeRecordOperation">关闭</button></view>
+        <text class="native-admin__module-note">当前版本 {{operationDraft.version}} · {{operationDraft.status === 'published' ? '已上架' : operationDraft.status === 'offline' ? '已下架' : '草稿'}}</text>
+        <text wx:if="{{questionPreviewLoading}}" class="native-admin__module-note">正在读取题目详情…</text><text wx:if="{{questionPreviewError}}" class="native-admin__notice">{{questionPreviewError}}</text><button wx:if="{{questionPreviewError}}" class="native-admin__secondary" bindtap="retryQuestionPreview">重试读取题目</button>
+        <view wx:if="{{questionPreview}}" class="native-admin__question-preview"><text class="native-admin__section-label">题型</text><text>{{questionPreview.questionType}}</text><text class="native-admin__section-label">题干</text><text>{{questionPreview.stem}}</text><text class="native-admin__section-label">答案</text><text>{{questionPreview.answer}}</text><text class="native-admin__section-label">解析</text><text>{{questionPreview.explanation}}</text></view>
+        <textarea class="native-admin__field" maxlength="200" value="{{operationDraft.reason}}" bindinput="onOperationReason" placeholder="上架或下架请填写原因"/>
+        <text wx:if="{{operationError}}" class="native-admin__notice">{{operationError}}；输入已保留，可重试。</text>
+        <view class="native-admin__form-actions native-admin__question-confirm-actions"><button wx:if="{{operationDraft.status !== 'published'}}" data-action="publish" loading="{{operationBusy}}" disabled="{{operationBusy || questionPreviewLoading || questionPreviewError}}" bindtap="requestRecordOperation">上架习题</button><button wx:if="{{operationDraft.status === 'published'}}" data-action="offline" loading="{{operationBusy}}" disabled="{{operationBusy || questionPreviewLoading || questionPreviewError}}" bindtap="requestRecordOperation">下架习题</button></view>
+      </view>
+    </block>
+  </view>
+  <g0-tab-bar role="teacher" active="mine" compactLandscape="{{true}}"></g0-tab-bar>
+</g0-page-shell>

@@ -33,13 +33,13 @@ npm run seed:plan
 - 小程序已建立默认 memory、显式注入环境标识、`@cloudbase/js-sdk` v3 client port 与会话上下文后才切换 cloudbase 的 repository/service factory；缺少任一项或 SDK 能力不完整时失败关闭并保持 memory。现有页面 import 和 M0 行为保持不变。T-06/S-09 已提供发布草稿、三类结构化完成数据、assignment/draft 版本及草稿跨刷新恢复，映射通过真实严格函数入口的本地端到端合约测试。
 - 小程序已新增 M1 的 P-03、P-04、S-02、S-03、S-04、G-02、T-02、T-03：虚构环境支持找回密码演示、服务端身份选择、安全退出、基础词包、阅读目录与页图阅读、家长孩子关系、教师学员列表与学员详情；content-query、learning-progress、关系查询、教师学员查询与 logout 已映射到 service/repository 边界。多身份账号不会自动选择第一个角色；阅读/单词本地进度按用户隔离，CAS 冲突会刷新远端而不重放过期绝对值。阅读生产副本已压缩为 6 张 JPEG、合计约 0.44 MB，原始批准素材仍保留在视觉交付目录。
 - 16 个函数均提供可注入的本地入口工厂、严格请求 schema 和统一默认持久化业务组合；小程序/后台身份会话、任务/提交/点评、四个任务查询、学习进度、内容、教师学员查询/命令、组织后台与关系命令均可复用现有文档桥，不再要求部署 provider 直接提供业务 handler。部署侧仍必须显式注入 SDK、数据库、可信 token/摘要/ID/时钟及无状态签名 codec，任一能力缺失均失败关闭。
-- TCH-001 批量能力已提供纯本地严格 CSV 逻辑：固定 UTF-8 模板、最多 500 行、字段长度/手机号样式/班级范围校验、文件内和既有账号重复识别、公式注入拦截、带原始行号的安全错误 CSV，以及复用列表班级/关键词/状态口径的 UTF-8 筛选导出。导入结果仅为命令计划，不创建 CloudBase Auth 账号、不写数据库；后续账号创建和实际批量写入必须走独立受保护流程。
+- TCH-001 批量能力包含固定 UTF-8 CSV 模板、最多 500 行预检、字段/班级/重复校验、公式注入拦截、服务端按行幂等导入和安全审计。服务端创建外部 Auth 身份后，原子写入学生、身份、角色、班级关系和学号保留记录；业务提交失败会阻止未关联账号登录。专用函数通过独立受保护构建包接入，不进入标准 M1/M2 包；部署、既有非生产 CloudBase 逐行闭环和新账号设密登录仍待验证。
 - 已新增 `TaskQueryRepository` 文档数据库适配器，覆盖 `task-query`、`student-task-query`、`review-query` 和 `parent-query` 所需的任务、assignment、提交、点评、教师授权及资源选项读取。集合查询固定携带组织和软删除条件，详情使用确定性文档 ID；平台不可用统一映射为可重试的 `SERVICE_UNAVAILABLE`。
 - 四个任务查询默认入口会自动创建上述持久化 service/handler，不再要求 provider 注入查询 handler。provider 必须分别提供无进程状态的签名分页游标 codec 和批量点评预览 codec；缺少分页签名能力时四个入口均保持 `SERVICE_UNAVAILABLE`，`review-query` 缺少批量预览签名能力时也整体失败关闭。代码不包含默认密钥或进程内 Map 回退。
 - organization-admin 已实现 A-01 授权范围概览、班级新建/编辑/停用、用户新建/停用、A-04 角色授权列表与审计日志列表、角色授权/撤销和教师班级授权/撤销。只读入口严格使用 admin audience、可信 organization/permission/scope、最多 31 天的时间范围和有界分页；审计 metadata 仅返回固定白名单。写操作统一要求 expectedVersion、operationId 和审计原因，并执行管理员 permission/scope、幂等、版本冲突、自锁保护和敏感字段脱敏。
 - organization-admin 与 relationship-command 已接入文档数据库原子 UoW：业务写、幂等结果、标准审计和确定性并发 guard 同事务提交。班级名、学号、有效绑定码、亲子 pair 及家长 5/学生 3 的上限不依赖未验证的唯一索引；用户级 `authorizationVersion` 在角色/教师授权变化时单调递增，使旧会话立即失效。自由文本操作原因不写入审计日志。
 - 独立管理后台已提供 A-01 至 A-04 的页面，并已接入 `admin-session` / `organization-admin` 客户端。显式提供非生产浏览器 SDK 与环境 ID 后，页面登录、概览、组织/班级、用户、角色权限和审计读取及受支持写操作均走云端 action；未配置或会话失效时安全回退 memory，不隐式调用云端。密码重置和亲子绑定仍由专用后续流程承接。
-- TCH-001 已新增教师授权范围内的学生资料编辑、停用/恢复和转班命令核心及严格云函数入口；事务内复核实时班级授权与聚合版本，幂等写入业务、审计和并发 guard，并在停用/恢复或转班时推进 `authorizationVersion`。CSV 批量能力当前只生成本地命令计划、安全错误结果和脱敏导出，不创建 Auth 账号或写数据库。
+- TCH-001 已新增教师授权范围内的学生资料编辑、停用/恢复和转班命令核心及严格云函数入口；事务内复核实时班级授权与聚合版本，幂等写入业务、审计和并发 guard，并在停用/恢复或转班时推进 `authorizationVersion`。批量导入复用同一受保护账号供应能力，独立函数已部署到既有非生产环境并核对代码哈希、私有集合和未登录拒绝；授权教师页面、真实账号创建及首次设密登录闭环仍待验收。
 - 已实现本地部署构建：16 个包在冷启动入口安装既有 `bootstrapCloudBaseNodeDeployment`，从受保护的函数配置读取六项独立加密能力，不读取环境 ID；配置或 SDK 缺失时不安装 provider，默认入口安全返回 `SERVICE_UNAVAILABLE`。结构测试同时校验包数量、根文件、CommonJS handler、external 边界、Nodejs20.19 模板、函数日志卫生和无环境 ID/凭据值。
 - 已在单独授权后安装并锁定官方 SDK、完成 CLI 登录、收紧 19 个空集合的客户端权限，并以 ZIP 方式部署全部 16 个函数；只读复核确认全部为 `Active`，匿名 JS SDK 调用逐个返回 `MISSING_CREDENTIALS`，未进入业务函数。八个虚构账号已创建、核验并在本机物化为两份 runtime 种子包。尚未执行：真实角色认证联调、云端验证码/密码重置、种子导入、真实日志抽样和 L2/L3 闭环。云端部署成功和本机物化均不代表这些剩余门禁已经通过。
 - 已新增纯本地已认证联调计划器，覆盖四角色、匿名拒绝、跨组织、撤权后旧会话、客户端数据库拒绝、主闭环、幂等与事务共 14 个场景；账号只以别名表示，证据使用固定白名单并彻底掩码 requestId，不读取凭据或调用云端。
@@ -62,3 +62,7 @@ npm run seed:plan
 小程序侧已在 `workspace/miniprogram/repositories/` 提供默认关闭的 CloudBase repository 分支；它只通过受控 invoker 将既有 service command 映射到函数 action。页面、WXML、Less、`app.json` 和 M0 domain/service 不直接导入本目录，条件不足时继续回退 memory。
 
 不得复制或提交现有真实配置。新的本机配置只能从 `docs/m1-cloudbase/templates/.env.example` 建立为未提交的 `.env.local`，并在用户明确允许配置和联调前保持 `TCB_ENV_ID` 为空。
+
+## M3 跟读试验评分（本地施工）
+
+`pronunciation-command` / `pronunciation-query` 已按可信业务会话接入独立录音、评分与操作记录；内部 `pronunciation-inference` 使用固定的离线 Vosk Python 包，模型和 Linux wheel 只放在 `D:\app-m3-cache\voice`，不进入仓库或小程序包。跟读三个函数默认排除在 M1/M2 构建之外；审阅时使用 `npm run build:functions -- --pronunciation-only --outdir dist/m3-pronunciation-review-20261008` 单独生成。小程序动作、低置信度、有效次数、教师只读与版本字段见 `docs/reviews/m3-voice-scoring-contract-2026-10-02.md`；包的精确 SHA、Windows 静态/合成样本证据及云端未测项见 `docs/reviews/m3-vosk-local-evidence-2026-10-02.md`。0.62.0 已取消固定 15 秒硬门槛，并要求模型只在 CloudBase 云端运行测试；仅内部推理基准的环境、额度、临时 COS 上传、零增费停止条件与回退见 `docs/reviews/m3-vosk-cloud-only-benchmark-review-2026-10-02.md`。M3 非生产中已部署三个 Node 函数和既有 Python 推理函数配置，跟读试验分仍与正式成绩/打卡隔离。完整学生端到端评分及 S-09 延迟回看继续按独立验证结果记录；正式评分质量由用户后续测验；详见 `docs/reviews/m3-voice-nonproduction-deployment-review-2026-10-02.md`。

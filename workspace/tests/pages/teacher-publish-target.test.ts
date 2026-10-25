@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ClassTarget, StudentTarget, eligibleTargetClasses, filterTargetStudents, initialPublishTarget, publishTargetSummary, selectedPublishTarget, targetCapacityError } from '../../miniprogram/pages/teacher/publish-task/publish-target'
-import { setTeacherTaskTargetStudentId, takeTeacherTaskTargetStudentId } from '../../miniprogram/session/session'
+import { ClassTarget, StudentTarget, eligibleTargetClasses, filterTargetStudents, initialPublishTarget, publishTargetSummary, reconcileEligibleTargets, selectedPublishTarget, targetCapacityError } from '../../miniprogram/subpackages/teacher/publish-task/publish-target'
+import { setTeacherTaskTargetStudentId, takeTeacherTaskTargetStudentId } from '../../miniprogram/subpackages/teacher/session/session'
 
 const classes: ClassTarget[] = [
   { id: 'class_3', name: '三年级 2 班', grade: '三年级', term: '上学期', selected: true },
@@ -48,5 +48,14 @@ describe('publish task target', () => {
       { allowedClassIds: ['class_3', 'class_4'] },
       { allowedClassIds: ['class_3'] },
     ], classes).map(item => item.id)).toEqual(['class_3'])
+  })
+
+  it('keeps media content selectable before a target and drops incompatible prior recipients', () => {
+    const next = reconcileEligibleTargets(classes, students,
+      [{ allowedClassIds: ['class_4'] }], classes, students)
+    expect(next.classes).toMatchObject([{ id: 'class_4', selected: false }])
+    expect(next.students).toMatchObject([{ studentId: 'stu_2', selected: true }])
+    expect(selectedPublishTarget('classes', next.classes, next.students))
+      .toEqual({ type: 'classes', classIds: [] })
   })
 })

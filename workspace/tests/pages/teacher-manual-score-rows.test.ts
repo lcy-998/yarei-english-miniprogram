@@ -5,7 +5,7 @@ describe('T-08 manual item score selection', () => {
 
   it('requires rows for recording and subjective exercises while leaving objective items automatic', async () => {
     vi.stubGlobal('Component', () => undefined)
-    const { manualScoreRowsFor } = await import('../../miniprogram/pages/teacher/review-task/review-task')
+    const { manualScoreRowsFor } = await import('../../miniprogram/subpackages/teacher/review-task/review-task')
     const items = [
       { id: 'record', title: '录音朗读', type: 'recording' as const, completionRule: { kind: 'recording_upload' } },
       { id: 'objective', title: '选择题', type: 'exercise' as const, completionRule: { kind: 'exercise_questions' } },

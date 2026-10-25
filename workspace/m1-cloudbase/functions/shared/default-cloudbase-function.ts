@@ -37,7 +37,14 @@ import type { TrustedBusinessSessionSource } from '../../src/runtime/cloudbase-r
 import type { DocumentDatabasePort } from '../../src/repositories/document-database-port';
 import type { CloudBaseWorkStoragePort } from '../../src/student-work/cloudbase-recording-seal';
 import type { CloudBasePlaybackSdkPort } from '../../src/student-work/cloudbase-playback';
+import type { CloudBaseVoiceInvokePort } from '../../src/pronunciation/cloudbase-adapters';
+import type { PronunciationAsyncJobService } from '../../src/pronunciation/async-job-service';
+import { withScfInvocationContext } from './scf-invocation-context';
 import type { RequestIdGenerator, ResultClock } from '../../src/shared/result';
+import type { NativeAccountProvider } from '../../src/native-admin/account-service';
+import type { TeacherSuggestionInferencePort, TeacherSuggestionStore } from '../../src/teacher-ai/types';
+import type { PrivateVideoDispatcher } from '../../src/teacher-media/private-video';
+import type { AutomaticSuggestionDispatcher } from '../../src/teacher-ai/automatic-worker';
 
 export interface CloudBaseApplicationHandlers {
   readonly 'content-query'?: ContentQueryHandler;
@@ -67,6 +74,16 @@ export interface CloudBaseFunctionRuntimeCapabilities {
   readonly documents?: DocumentDatabasePort;
   readonly recordingStorage?: CloudBaseWorkStoragePort;
   readonly playbackStorage?: CloudBasePlaybackSdkPort;
+  readonly voiceInvoker?: CloudBaseVoiceInvokePort;
+  readonly pronunciationJobs?: Pick<PronunciationAsyncJobService, 'accept'>;
+  readonly pronunciationWorker?: (event: unknown) => Promise<unknown>;
+  readonly teacherSuggestion?: Readonly<{ inference: TeacherSuggestionInferencePort;
+    dispatcher?: AutomaticSuggestionDispatcher; modelVersion: string; promptVersion: string }>;
+  readonly teacherSuggestionStore?: TeacherSuggestionStore;
+  readonly teacherSuggestionWorker?: (event: unknown) => Promise<unknown>;
+  readonly privateVideoDispatcher?: PrivateVideoDispatcher;
+  readonly privateVideoWorker?: (event: unknown) => Promise<unknown>;
+  readonly nativeAccountProvider?: NativeAccountProvider;
   readonly environmentId?: string;
   readonly clock?: Clock & ResultClock;
   readonly requestIds?: RequestIdGenerator;
@@ -78,11 +95,20 @@ export interface CloudBaseFunctionRuntimeCapabilities {
   readonly handlers?: CloudBaseApplicationHandlers;
 }
 
+export interface NativeAccountProviderFactoryContext {
+  readonly environmentId: string;
+  readonly subjectDigest: SubjectDigestPort;
+  /** Resolved inside the current function invocation; contains temporary runtime context only. */
+  readonly getRuntimeContext: () => Readonly<Record<string, unknown>>;
+}
+export type NativeAccountProviderFactory =
+  (context: NativeAccountProviderFactoryContext) => NativeAccountProvider;
+
 export type CloudBaseRuntimeProvider = (
   functionName: FunctionName,
 ) => CloudBaseFunctionRuntimeCapabilities | null | Promise<CloudBaseFunctionRuntimeCapabilities | null>;
 
-export type CloudBaseFunctionMain<T> = (event: unknown) => Promise<ServiceResult<T>>;
+export type CloudBaseFunctionMain<T> = (event: unknown, context?: unknown) => Promise<ServiceResult<T>>;
 
 type CommonInfrastructure = CloudBaseTrustedFunctionInfrastructure;
 
@@ -109,18 +135,41 @@ export function createDefaultCloudBaseFunction<T>(
   let configured: CloudBaseFunctionMain<T> | null = null;
   let pending: Promise<CloudBaseFunctionMain<T> | null> | null = null;
 
-  return async (event: unknown): Promise<ServiceResult<T>> => {
-    const request = normalizeCloudBaseEvent(event);
-    if (configured === null) {
-      const rejected = await rejectInvalidRequest(unavailable, request);
-      if (rejected !== null) return rejected;
-      pending ??= configure(functionName, compose);
-      configured = await pending;
-      pending = null;
-    }
-    if (configured === null) return unavailable(request);
-    return configured(request);
-  };
+  return async (event: unknown, context?: unknown): Promise<ServiceResult<T>> =>
+    withScfInvocationContext(context, async () => {
+      const request = normalizeCloudBaseEvent(event);
+      if (configured === null) {
+        const rejected = await rejectInvalidRequest(unavailable, request);
+        if (rejected !== null) return rejected;
+        pending ??= configure(functionName, compose);
+        configured = await pending;
+        pending = null;
+      }
+      if (configured === null) return unavailable(request);
+      return configured(request);
+    });
+}
+
+/** Server-to-server events have their own signature checks and must not use client sessions. */
+export function createDefaultCloudBaseServerEventFunction<T>(
+  functionName: FunctionName,
+  unavailable: (event: unknown) => Promise<T>,
+  compose: (capabilities: CloudBaseFunctionRuntimeCapabilities) => (event: unknown) => Promise<T>,
+): (event: unknown) => Promise<T> {
+  let configured: ((event: unknown) => Promise<T>) | null = null;
+  let pending: Promise<CloudBaseFunctionRuntimeCapabilities | null> | null = null;
+  return async (event: unknown, context?: unknown): Promise<T> =>
+    withScfInvocationContext(context, async () => {
+      if (configured === null) {
+        pending ??= resolveCapabilities(functionName);
+        const capabilities = await pending;
+        pending = null;
+        if (capabilities === null) return unavailable(event);
+        try { configured = compose(capabilities); }
+        catch { return unavailable(event); }
+      }
+      return configured(event);
+    });
 }
 
 export function createDefaultCloudBaseAuthFunction<T>(
@@ -222,7 +271,7 @@ export function createDefaultCloudBaseLearningProgressFunction<T>(
 }
 
 export function createDefaultCloudBaseTaskQueryFunction<T>(
-  functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query',
+  functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query' | 'teacher-suggestion-command',
   unavailable: CloudBaseFunctionMain<T>,
   compose: (
     capabilities: CloudBaseFunctionRuntimeCapabilities,
@@ -424,6 +473,10 @@ async function configureTaskCore<T>(
       ...(capabilities.batchReviewPreviewCodec === undefined
         ? {}
         : { batchReviewPreviewCodec: capabilities.batchReviewPreviewCodec }),
+      ...(capabilities.recordingStorage === undefined ? {} : { reviewVoiceStorage: capabilities.recordingStorage }),
+      ...(capabilities.environmentId === undefined ? {} : { environmentId: capabilities.environmentId }),
+      ...(functionName === 'review-command' && capabilities.teacherSuggestionStore !== undefined
+        ? { teacherSuggestionVerifier: capabilities.teacherSuggestionStore } : {}),
     });
     return compose(capabilities, infrastructure);
   } catch {
@@ -460,7 +513,7 @@ async function configureLearningProgress<T>(
 }
 
 async function configureTaskQuery<T>(
-  functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query',
+  functionName: 'task-query' | 'student-task-query' | 'review-query' | 'parent-query' | 'teacher-suggestion-command',
   compose: (
     capabilities: CloudBaseFunctionRuntimeCapabilities,
     infrastructure: ReturnType<typeof createCloudBaseTaskQueryFunctionInfrastructure>,

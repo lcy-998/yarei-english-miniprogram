@@ -71,6 +71,8 @@ export const ROLE_PERMISSIONS = [
   'child.bind',
   'child.unbind',
   'student_work.restore',
+  'student.import',
+  'media.upload',
 ] as const;
 
 export type RolePermission = (typeof ROLE_PERMISSIONS)[number];
@@ -112,6 +114,8 @@ export const TEACHER_CLASS_PERMISSIONS = [
   'task.read',
   'task.publish',
   'submission.review',
+  'student.import',
+  'media.upload',
 ] as const;
 
 export type TeacherClassPermission = (typeof TEACHER_CLASS_PERMISSIONS)[number];
@@ -233,6 +237,9 @@ export interface VocabularyWordEntity {
   readonly meaning: string;
   readonly example: string;
   readonly syllables: readonly string[];
+  readonly ipa?: string;
+  /** Private CloudBase file ID. Only the content query function may sign and expose it. */
+  readonly audioAssetKey?: string;
 }
 
 interface LearningResourceBase {
@@ -242,7 +249,11 @@ interface LearningResourceBase {
   readonly contentVersion: string;
   readonly status: 'draft' | 'published' | 'offline';
   readonly visibility: ResourceVisibility;
+  /** Cross-school teaching catalog; students need an actual assigned task to open it. */
+  readonly teacherCatalogOnly?: boolean;
   readonly copyrightStatus: 'demo' | 'verified';
+  readonly testOnly?: boolean;
+  readonly acceptanceStatus?: 'pending_user_acceptance';
 }
 
 export interface ReadingResourceEntity extends LearningResourceBase {
@@ -257,6 +268,38 @@ export interface ReadingResourceEntity extends LearningResourceBase {
   readonly theme?: string;
   readonly chapters: readonly ReadingChapterEntity[];
   readonly searchText?: string;
+  /** M3 pronunciation source; old M1/M2 page-only publications omit this. */
+  readonly pronunciation?: Readonly<{
+    reviewStatus: 'draft' | 'approved' | 'rejected';
+    sourceVersion: string;
+    approvedAt?: string;
+    approvedBy?: string;
+    segments: readonly Readonly<{
+      id: string;
+      text: string;
+      translationText?: string;
+      pageNumber?: number;
+      demonstrationAudioAssetKey: string;
+    }>[];
+  }>;
+  readonly readingAudio?: Readonly<{
+    reviewStatus: 'draft' | 'approved' | 'rejected' | 'pending_user_acceptance';
+    sourceVersion: string;
+    approvedAt?: string;
+    approvedBy?: string;
+    chapters: readonly Readonly<{
+      chapterId: string;
+      audioAssetKey: string;
+      durationMs: number;
+      segments: readonly Readonly<{
+        id: string; pageId: string; pageNumber: number; text: string;
+        rect: Readonly<{ x: number; y: number; width: number; height: number }>;
+        startMs: number; endMs: number;
+        /** Reviewed page audio when its timing is not on the chapter track. */
+        clipAudioAssetKey?: string; clipDurationMs?: number;
+      }>[];
+    }>[];
+  }>;
 }
 
 export interface VocabularyResourceEntity extends LearningResourceBase {
@@ -273,6 +316,9 @@ export type SchoolQuestionType = (typeof SCHOOL_QUESTION_TYPES)[number];
 
 export interface ExerciseResourceEntity extends LearningResourceBase {
   readonly type: 'exercise';
+  readonly exercisePackId?: string;
+  readonly exerciseSection?: Readonly<{ id: string; title: string; instruction: string;
+    studentMaterial: string; order: number; questionOrder: number; points: number }>;
   readonly grade: string;
   readonly textbook?: string;
   readonly unit?: string;
@@ -283,6 +329,8 @@ export interface ExerciseResourceEntity extends LearningResourceBase {
   readonly options: readonly string[];
   readonly correctAnswer: JsonValue;
   readonly explanation: string;
+  readonly acceptedAnswers?: readonly string[];
+  readonly rubric?: readonly Readonly<{ criterion: string; points: number }>[];
 }
 
 export type LearningResourceEntity = ReadingResourceEntity | VocabularyResourceEntity | ExerciseResourceEntity;
@@ -344,6 +392,7 @@ export interface SchoolQuestionFilters {
 
 export interface SchoolQuestionListItemView {
   readonly id: string;
+  readonly exercisePackId?: string;
   readonly title: string;
   readonly grade: string;
   readonly textbook?: string;
@@ -374,6 +423,9 @@ export interface SchoolQuestionDetailView extends SchoolQuestionListItemView {
   readonly options: readonly string[];
   readonly correctAnswer: JsonValue;
   readonly explanation: string;
+  readonly exerciseSection?: ExerciseResourceEntity['exerciseSection'];
+  readonly acceptedAnswers?: readonly string[];
+  readonly rubric?: ExerciseResourceEntity['rubric'];
 }
 
 export interface OrganizationSafeView {
@@ -493,6 +545,12 @@ export interface StudentCatalogItemView {
   readonly theme?: string;
   readonly contentVersion: string;
   readonly itemCount: number;
+  /** True only for a complete, reviewed chapter audio and point-read map. */
+  readonly audioPointreadReady?: boolean;
+  /** True for a technically mapped test-only source awaiting user acceptance. */
+  readonly audioPointreadPending?: boolean;
+  /** True only for an approved source/version-matched pronunciation set. */
+  readonly pronunciationReady?: boolean;
 }
 
 export interface StudentCatalogPageView {
@@ -534,7 +592,35 @@ export interface ReadingResourceView extends ReadingListItemView {
   readonly chapters: readonly ReadingChapterView[];
 }
 
-export interface VocabularyPackView {
+/** Internal return type; cloud function replaces asset keys before responding. */
+export interface ReadingPronunciationSourceView {
+  readonly resourceId: string;
+  readonly sourceVersion: string;
+  readonly segments: readonly Readonly<{
+    id: string;
+    text: string;
+    translationText?: string;
+    pageNumber?: number;
+    demonstrationAudioAssetKey: string;
+  }>[];
+}
+
+/** Internal authorized source; the function signs and removes audioAssetKey. */
+export interface ReadingAudioSourceView {
+  readonly resourceId: string;
+  readonly sourceVersion: string;
+  readonly chapterId: string;
+  readonly durationMs: number | null;
+  readonly audioAssetKey: string | null;
+  readonly segments: readonly Readonly<{
+    id: string; pageId: string; pageNumber: number; text: string;
+    rect: Readonly<{ x: number; y: number; width: number; height: number }>;
+    startMs: number; endMs: number;
+    clipAudioAssetKey?: string; clipDurationMs?: number;
+  }>[];
+}
+
+export interface VocabularyPackSourceView {
   readonly id: string;
   readonly title: string;
   readonly grade: string;
@@ -542,6 +628,27 @@ export interface VocabularyPackView {
   readonly unit: string;
   readonly contentVersion: string;
   readonly words: readonly VocabularyWordEntity[];
+}
+
+export interface VocabularyWordView {
+  readonly id: string;
+  readonly word: string;
+  readonly meaning: string;
+  readonly example: string;
+  readonly syllables: readonly string[];
+  readonly ipa?: string;
+  readonly pronunciationUrl?: string;
+  readonly pronunciationExpiresAt?: string;
+}
+
+export interface VocabularyPackView {
+  readonly id: string;
+  readonly title: string;
+  readonly grade: string;
+  readonly textbook?: string;
+  readonly unit: string;
+  readonly contentVersion: string;
+  readonly words: readonly VocabularyWordView[];
 }
 
 export interface StudentClassView {

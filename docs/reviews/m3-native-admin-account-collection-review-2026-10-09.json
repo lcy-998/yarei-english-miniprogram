@@ -1,0 +1,12 @@
+{
+  "authorizationScope": "m3_native_admin_account_nonproduction",
+  "approved": true,
+  "authorizationBasis": "用户明确请求在既有非生产环境验收账号开户；AGENTS.md 已授权 M3 虚构账号验证与必要施工直接执行",
+  "operation": "create_account_operations_collection",
+  "environmentId": "cloud1-d8ggzrwwedb786e41",
+  "expiresAt": "2026-10-09T23:59:00+08:00",
+  "expectedExistingCount": 0,
+  "rollback": {
+    "action": "preserve_collection_and_audit"
+  }
+}

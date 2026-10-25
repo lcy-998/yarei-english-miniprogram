@@ -96,18 +96,16 @@ describe('M2 local additive development fixture', () => {
     expect(studentCatalog.items.some(item => item.id === M2_FIXTURE_IDS.textbook)).toBe(false);
   });
 
-  it('loads an activity draft and derives task notices from the legacy M1 seed without forging scheduled events', async () => {
+  it('keeps a legacy exercise activity draft unpublished until daily tasks exist, and derives task notices', async () => {
     const documents = database();
     const activities = new ActivityService(new DocumentActivityRepository(documents),
       { nowIso: () => '2026-09-27T12:30:00+08:00' }, { next: prefix => `${prefix}_m2_seed` });
     expect(await activities.listForTeacher(teacher)).toMatchObject([{ id: M2_FIXTURE_IDS.activity,
       status: 'draft', schedule: { classId: M2_FIXTURE_IDS.class, conditions: [{ kind: 'exercise' }] } }]);
-    const published = await activities.publish(teacher, M2_FIXTURE_IDS.activity, 1, 'operation_m2_fixture_publish_01');
-    expect(published).toMatchObject({ status: 'published', version: 2,
-      conditionSnapshots: [{ kind: 'exercise', resourceId: M2_FIXTURE_IDS.exercise,
-        questionIds: [M2_FIXTURE_IDS.exercise] }] });
-    expect(published.participants).toHaveLength(36);
-    expect(published.dailyInstances).toHaveLength(6);
+    await expect(activities.publish(teacher, M2_FIXTURE_IDS.activity, 1, 'operation_m2_fixture_publish_01'))
+      .rejects.toMatchObject({ code: 'RESOURCE_OFFLINE' });
+    expect(await activities.listForTeacher(teacher)).toMatchObject([{ id: M2_FIXTURE_IDS.activity,
+      status: 'draft' }]);
     const inbox = new NotificationService(new DocumentNotificationRepository(documents),
       { nowIso: () => '2026-09-27T12:30:00+08:00' });
     const page = await inbox.list(student, 'task', 0, 20);

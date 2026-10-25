@@ -62,6 +62,10 @@ describe('task query document repository', () => {
     await expect(repository.listAssignments(ORGANIZATION_ID)).resolves.toEqual([
       expect.objectContaining({ id: ASSIGNMENT_ID, version: 3 }),
     ]);
+    await expect(repository.listStudentAssignments(ORGANIZATION_ID, STUDENT_ID)).resolves.toEqual([
+      expect.objectContaining({ id: ASSIGNMENT_ID, studentId: STUDENT_ID }),
+    ]);
+    await expect(repository.listStudentAssignments(ORGANIZATION_ID, 'student_other')).resolves.toEqual([]);
     await expect(repository.findAssignment(ORGANIZATION_ID, TASK_ID, STUDENT_ID))
       .resolves.toMatchObject({ id: ASSIGNMENT_ID });
     await expect(repository.findAssignmentById(ORGANIZATION_ID, ASSIGNMENT_ID))

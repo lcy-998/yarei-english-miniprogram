@@ -89,6 +89,7 @@ export interface OrgContentRepository {
     page: Readonly<{ limit: number; offset: number }>,
   ): Promise<Readonly<{ items: readonly (ReadingResourceEntity | VocabularyResourceEntity | null)[]; hasMore: boolean }>>;
   findLearningResource(organizationId: string, resourceId: string): Promise<LearningResourceEntity | null>;
+  hasStudentTaskResource(organizationId: string, studentId: string, resourceId: string): Promise<boolean>;
   findOperation?(recordId: string, organizationId: string): Promise<Readonly<{ requestHash: string; status: 'processing' | 'succeeded' | 'failed'; resultKind: 'value' | 'void'; result: JsonValue; errorCode: OrgContentError['code'] | null }> | null>;
   transaction<T>(work: (transaction: OrgContentTransaction) => Promise<T>): Promise<T>;
 }
