@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 import type { TaskDetailView, TaskItem } from '../../../domain/types'
 import type { TaskRecordingView } from '../../../domain/task-recording'
 import { getTaskDetail } from '../services/app-service'
@@ -237,7 +238,7 @@ Component({
       }
       let stagingFileId = this.data.stagingFileId
       if (!stagingFileId) {
-        try { stagingFileId = (await wx.cloud.uploadFile({ cloudPath: draft.stagingPath,
+        try { stagingFileId = (await uploadBackendFile({ cloudPath: draft.stagingPath,
           filePath: this.data.localPath })).fileID }
         catch (_error: unknown) { this.setData({ state: 'local', message: '上传失败，本机录音已保留，可重试' }); return }
         this.setData({ stagingFileId })

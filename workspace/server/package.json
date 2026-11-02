@@ -1,0 +1,21 @@
+{
+  "name": "yarei-aliyun-server",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test dist/*.node.cjs"
+  },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "devDependencies": {
+    "@types/busboy": "1.5.5",
+    "@types/node": "^22.15.0",
+    "esbuild": "0.28.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "busboy": "1.6.0"
+  }
+}

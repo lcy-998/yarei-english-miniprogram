@@ -2982,6 +2982,7 @@ function passwordRecoveryServiceFailure<T>(error: unknown): ServiceResult<T> {
   if (code.includes('EXPIRED') || code.includes('INVALID_VERIFICATION') || code.includes('VERIFICATION')) {
     return { ok: false, error: { code: 'VALIDATION_ERROR', message: '验证码已过期，请重新验证', retryable: false } }
   }
+  if (code.includes('PASSWORD_RECOVERY_NOT_CONFIGURED')) return { ok: false, error: { code: 'SERVICE_UNAVAILABLE', message: '请联系管理员领取或重置阿里云登录密码', retryable: false } }
   if (code.includes('INVALID_PASSWORD') || code.includes('PASSWORD_POLICY') || code.includes('INVALID_ARGUMENT')) {
     return { ok: false, error: { code: 'VALIDATION_ERROR', message: '新密码不符合要求，请检查密码长度和格式', retryable: false } }
   }

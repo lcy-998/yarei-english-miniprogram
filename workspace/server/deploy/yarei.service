@@ -1,0 +1,32 @@
+[Unit]
+Description=Yarei English API and administration
+After=network.target
+
+[Service]
+Type=simple
+User=yarei
+Group=yarei
+WorkingDirectory=/opt/yarei
+Environment=NODE_ENV=production
+Environment=YAREI_DATA_DIR=/var/lib/yarei-v0128
+Environment=YAREI_ADMIN_DIR=/opt/yarei/admin
+Environment=YAREI_STORAGE_NAMESPACE=cloud1-d8ggzrwwedb786e41.636c-cloud1-d8ggzrwwedb786e41-1486593797
+Environment=YAREI_INFERENCE_ROOT=/opt/yarei/inference
+Environment=YAREI_PROMPT_VERSION=teacher-v13
+Environment=YAREI_MAINTENANCE=1
+Environment=YAREI_ORIGIN=https://video.aimanhua.xin
+ExecStart=/usr/local/bin/node /opt/yarei/releases/0.128.0-20261102/main.cjs
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/yarei-v0128
+MemoryMax=1500M
+MemorySwapMax=1G
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

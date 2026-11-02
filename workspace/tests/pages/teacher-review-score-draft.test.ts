@@ -54,7 +54,8 @@ describe('教师在学生原作答页记录逐项评分草稿', () => {
     vi.resetModules()
     let definition: PageDefinition | undefined
     vi.stubGlobal('Component', (value: PageDefinition) => { definition = value })
-    vi.stubGlobal('wx', { getStorageSync: () => ({ sessionId: 'teacher_session' }) })
+    const storage = new Map<string, unknown>([['yarei_session', { sessionId: 'teacher_session' }]])
+    vi.stubGlobal('wx', { getStorageSync: (key: string) => storage.get(key), setStorageSync: (key: string, value: unknown) => storage.set(key, value), removeStorageSync: (key: string) => storage.delete(key) })
     await import('../../miniprogram/subpackages/teacher/review-task/review-task')
     const session = await import('../../miniprogram/subpackages/teacher/session/session')
     const context: PageContext = { data: { selectedSubmissionId: 'submission_2', viewingHistory: false,
@@ -81,7 +82,8 @@ describe('教师在学生原作答页记录逐项评分草稿', () => {
 
   it('教师总览与学生原作答分包读取同一份评分草稿', async () => {
     vi.resetModules()
-    vi.stubGlobal('wx', { getStorageSync: () => ({ sessionId: 'teacher_session' }) })
+    const storage = new Map<string, unknown>([['yarei_session', { sessionId: 'teacher_session' }]])
+    vi.stubGlobal('wx', { getStorageSync: (key: string) => storage.get(key), setStorageSync: (key: string, value: unknown) => storage.set(key, value), removeStorageSync: (key: string) => storage.delete(key) })
     const teacher = await import('../../miniprogram/subpackages/teacher/session/session')
     const exercise = await import('../../miniprogram/subpackages/student/session/session')
     const video = await import('../../miniprogram/subpackages/student-media/session/session')

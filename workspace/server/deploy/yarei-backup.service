@@ -1,0 +1,9 @@
+[Unit]
+Description=Snapshot Yarei local databases
+[Service]
+Type=oneshot
+User=yarei
+Group=yarei
+UMask=0077
+Environment=YAREI_DATA_DIR=/var/lib/yarei-v0128
+ExecStart=/usr/local/bin/node /opt/yarei/backup.mjs

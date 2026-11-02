@@ -31,6 +31,10 @@ describe('G-01/G-03 parent task list contract', () => {
   beforeEach(() => {
     configureRepositories({ mode: 'memory' })
     replaceState(initialState)
+    // The fixture uses today's dates; freeze its range explicitly so this contract is not month-dependent.
+    const fixture = getState()
+    fixture.tasks.forEach(task => { task.startsAt = '2026-10-01T00:00:00.000Z'; task.dueAt = '2026-10-31T08:00:00.000Z' })
+    replaceState(fixture)
     setCurrentChildId('usr_student_xiaoyu')
   })
   afterEach(() => configureRepositories({ mode: 'memory' }))

@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 import { M3TaskMediaPlaybackView, M3TaskMediaSnapshotView, StudentWork, TaskDubbingWorkView,
   WorkMaterial, WorkMaterialFacet, WorkMaterialFilters } from '../domain/types'
 import { getRepositoryMode } from '../../../repositories/repository-factory'
@@ -1079,7 +1080,7 @@ Component({
       }
       let stagingFileId: string
       try {
-        const uploaded = await wx.cloud.uploadFile({ cloudPath: draft.stagingPath, filePath: this.data.localPath })
+        const uploaded = await uploadBackendFile({ cloudPath: draft.stagingPath, filePath: this.data.localPath })
         stagingFileId = uploaded.fileID
       } catch (_error: unknown) {
         this.setData({ submitting: false, recordingState: 'local', submitError: '上传失败，录音已保留，可重试' })
@@ -1137,7 +1138,7 @@ Component({
       let stagingFileId = this.data.taskStagingFileId
       if (!stagingFileId) {
         try {
-          const uploaded = await wx.cloud.uploadFile({ cloudPath: work.stagingPath,
+          const uploaded = await uploadBackendFile({ cloudPath: work.stagingPath,
             filePath: this.data.localPath })
           stagingFileId = uploaded.fileID
           this.setData({ taskStagingFileId: stagingFileId })

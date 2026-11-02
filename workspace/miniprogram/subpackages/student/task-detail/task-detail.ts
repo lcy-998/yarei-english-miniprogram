@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 import { M3TaskMediaPlaybackView, M3TaskMediaSnapshotView, TaskDetailView, TaskItem } from '../domain/types'
 import { StructuredSubmissionAnswer, getPackAttemptSummary, getTaskDetail, getVocabularyProgress, saveDraft, submitTask } from '../services/app-service'
 import { getReadingProgress } from '../services/m1-app-service'
@@ -1553,7 +1554,7 @@ Component({
           recordingBeginIntents: { ...this.data.recordingBeginIntents, [itemId]: clearWriteIntent() } })
       }
       let stagingFileId: string
-      try { stagingFileId = (await wx.cloud.uploadFile({ cloudPath: draft.stagingPath,
+      try { stagingFileId = (await uploadBackendFile({ cloudPath: draft.stagingPath,
         filePath: item.localRecordingPath })).fileID }
       catch (_error: unknown) { this.recordingUploadFailed(itemId, '上传失败，录音已保留，可重试'); return }
       const fingerprint = JSON.stringify({ recordingId: draft.id, stagingFileId, version: draft.version })

@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 // S-05 跟读与试验性评分。评分、次数和参考文本均由可信服务核对。
 import { getSession } from '../session/session'
 import { getReadingResource } from '../services/app-service'
@@ -480,7 +481,7 @@ Component({
       let stagingFileId = this.data.stagingFileId
       if (!this.data.sealed && !stagingFileId) {
         try {
-          const uploaded = await wx.cloud.uploadFile({ cloudPath: draft.stagingPath,
+          const uploaded = await uploadBackendFile({ cloudPath: draft.stagingPath,
             filePath: this.data.localPath })
           if (!sameStudentSession(session.user.id, session.sessionId)) return
           stagingFileId = uploaded.fileID
