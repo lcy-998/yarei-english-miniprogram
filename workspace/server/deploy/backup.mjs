@@ -18,6 +18,7 @@ try {
   }
   await cp(join(root,'account-delivery'),join(destination,'account-delivery'),{recursive:true}).catch(error=>{if(error.code!=='ENOENT')throw error;});
   await copyFile(join(root,'migration-accounts.json'),join(destination,'migration-accounts.json'));
+  await copyFile(join(root,'migration-report.json'),join(destination,'migration-report.json'));
   const snapshots=(await readdir(base)).filter(name=>/^\d{8}T\d{6}Z$/.test(name)).sort();
   for (const old of snapshots.slice(0,-14)) await rm(join(base,old),{recursive:true});
   console.log('Database snapshot completed.');
