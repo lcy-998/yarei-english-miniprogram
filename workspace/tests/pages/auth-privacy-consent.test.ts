@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { legalConfig, isLegalReady } from '../../miniprogram/legal/legal-config'
 import { legalDocument } from '../../miniprogram/legal/legal-documents'
 
+const capabilities = vi.hoisted(() => ({ smsPasswordRecovery: true }))
+vi.mock('../../miniprogram/runtime/backend-config', () => ({ backendCapabilities: capabilities, miniProgramVersion: 'test' }))
+
 const services = vi.hoisted(() => ({ login: vi.fn(), requestPasswordResetCode: vi.fn(),
   verifyPasswordResetCode: vi.fn(), resetPassword: vi.fn() }))
 vi.mock('../../miniprogram/services/auth-service', () => services)
@@ -26,6 +29,7 @@ async function load(kind: 'login' | 'forgot' | 'consent') {
 const input = (value: string) => ({ detail: { value } })
 const consent = (accepted: boolean) => ({ detail: { accepted } })
 beforeEach(() => {
+  capabilities.smsPasswordRecovery = true
   vi.stubGlobal('wx', { navigateTo: vi.fn(), redirectTo: vi.fn(), reLaunch: vi.fn(), showToast: vi.fn() })
   services.login.mockResolvedValue({ ok: false, error: { message: '模拟账号验证失败' } })
   services.requestPasswordResetCode.mockResolvedValue({ ok: false, error: { message: '短信未配置' } })
@@ -80,6 +84,19 @@ describe('手机号采集前的主动同意', () => {
     p.call('onConsent', consent(false)); await p.call('submit')
     expect(p.context.data).toMatchObject({ accepted: false, mobile: '', code: '', newPassword: '', step: 1, codeSent: false, verificationSecondsRemaining: 0 })
     expect(services.resetPassword).not.toHaveBeenCalled()
+  })
+  it('未配置短信服务时只展示联系信息，即使直接调用处理函数也不收集或请求', async () => {
+    capabilities.smsPasswordRecovery = false
+    const p = await load('forgot')
+    expect(p.context.data.recoveryAvailable).toBe(false)
+    expect(p.context.data.privacyContact).toBe(legalConfig.privacyContact)
+    p.call('onConsent', consent(true))
+    p.context.setData({ accepted: true })
+    p.call('onMobile', input('19900000000')); p.call('onCode', input('246810'))
+    p.call('onNewPassword', input('fictional-password')); p.call('onConfirmPassword', input('fictional-password'))
+    await p.call('sendCode'); await p.call('nextStep'); await p.call('submit')
+    expect(p.context.data).toMatchObject({ mobile: '', code: '', newPassword: '', confirmPassword: '' })
+    for (const name of ['requestPasswordResetCode', 'verifyPasswordResetCode', 'resetPassword'] as const) expect(services[name]).not.toHaveBeenCalled()
   })
   it('协议链接只导航，不自动代表同意', async () => {
     const p = await load('consent'); p.call('openService'); p.call('openPrivacy')

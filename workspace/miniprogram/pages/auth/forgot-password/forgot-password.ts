@@ -1,23 +1,26 @@
 import { requestPasswordResetCode, resetPassword, verifyPasswordResetCode } from '../../../services/auth-service'
 import { getRepositoryMode } from '../../../repositories/repository-factory'
-import { consentError } from '../../../legal/legal-config'
+import { consentError, legalConfig } from '../../../legal/legal-config'
+import { backendCapabilities } from '../../../runtime/backend-config'
 
 Component({
   data: { step: 1, mobile: '', code: '', newPassword: '', confirmPassword: '', loading: false, error: '', accepted: false,
+    recoveryAvailable: backendCapabilities.smsPasswordRecovery, privacyContact: legalConfig.privacyContact, operatorName: legalConfig.operatorName,
     codeSent: false, countdown: 0, codeButtonLabel: '获取验证码', verificationExpiresAt: 0,
     verificationSecondsRemaining: 0, verificationCountdownLabel: '' },
   methods: {
     onConsent(event: WechatMiniprogram.CustomEvent<{ accepted: boolean }>) {
-      if (this.data.loading) return
+      if (this.data.loading || !backendCapabilities.smsPasswordRecovery) return
       const accepted = event.detail.accepted === true && !consentError(true)
       this.setData({ accepted, error: '', ...(!accepted ? { mobile: '' } : {}) })
       if (!accepted) this.restartVerification()
     },
-    onMobile(event: WechatMiniprogram.Input) { if (!consentError(this.data.accepted) && !this.data.loading) this.setData({ mobile: event.detail.value, error: '' }) },
-    onCode(event: WechatMiniprogram.Input) { if (!consentError(this.data.accepted) && !this.data.loading) this.setData({ code: event.detail.value, error: '' }) },
-    onNewPassword(event: WechatMiniprogram.Input) { if (!consentError(this.data.accepted) && !this.data.loading) this.setData({ newPassword: event.detail.value, error: '' }) },
-    onConfirmPassword(event: WechatMiniprogram.Input) { if (!consentError(this.data.accepted) && !this.data.loading) this.setData({ confirmPassword: event.detail.value, error: '' }) },
+    onMobile(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ mobile: event.detail.value, error: '' }) },
+    onCode(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ code: event.detail.value, error: '' }) },
+    onNewPassword(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ newPassword: event.detail.value, error: '' }) },
+    onConfirmPassword(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ confirmPassword: event.detail.value, error: '' }) },
     async sendCode() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading || this.data.countdown > 0) return
       const error = consentError(this.data.accepted)
       if (error) { this.setData({ error }); return }
@@ -40,6 +43,7 @@ Component({
       }, 1000)
     },
     async nextStep() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading) return
       const error = consentError(this.data.accepted)
       if (error) { this.setData({ error }); return }
@@ -69,6 +73,7 @@ Component({
         verificationSecondsRemaining: 0, verificationCountdownLabel: '' })
     },
     async submit() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading) return
       const error = consentError(this.data.accepted)
       if (error) { this.setData({ error }); return }
@@ -92,6 +97,6 @@ Component({
       wx.showToast({ title: '密码已更新', icon: 'success' })
       setTimeout(() => wx.redirectTo({ url: '/pages/auth/login/login' }), 500)
     },
-    backToLogin() { wx.navigateBack() },
+    backToLogin() { wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/auth/login/login' }) }) },
   },
 })

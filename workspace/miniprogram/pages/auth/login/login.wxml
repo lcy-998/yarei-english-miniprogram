@@ -8,4 +8,5 @@
     <view class="login-action"><g0-button loading="{{loading}}" bind:action="submit">登录</g0-button></view>
     <view class="forgot" bindtap="forgotPassword" aria-role="button">首次设置或忘记密码</view>
   </g0-card>
+  <text class="version">版本 {{version}}</text>
   </view></g0-page-shell>

@@ -2,9 +2,10 @@ import { login } from '../../../services/auth-service'
 import { postLoginPath, ROLE_SELECT_PATH } from '../../../session/auth-flow'
 import { saveSession } from '../../../session/session'
 import { consentError } from '../../../legal/legal-config'
+import { miniProgramVersion } from '../../../runtime/backend-config'
 
 Component({
-  data: { mobile: '', password: '', showPassword: false, loading: false, error: '', topInset: 72, accepted: false },
+  data: { mobile: '', password: '', showPassword: false, loading: false, error: '', topInset: 72, accepted: false, version: miniProgramVersion },
   lifetimes: {
     attached() {
       const menuRect = wx.getMenuButtonBoundingClientRect()
