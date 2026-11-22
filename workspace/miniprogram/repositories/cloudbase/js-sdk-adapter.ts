@@ -179,6 +179,7 @@ function normalizedRecoverySdkError(error: unknown): Readonly<{ code: string }> 
     .map(key => key in error ? error[key as keyof typeof error] : undefined)
   const detail = fields.filter(value => typeof value === 'string' || typeof value === 'number')
     .map(String).join(' ').toUpperCase()
+  if (detail.includes('PASSWORD_RECOVERY_NOT_CONFIGURED')) return { code: 'PASSWORD_RECOVERY_NOT_CONFIGURED' }
   if (/NETWORK|TIMEOUT|ECONN|FETCH_FAILED/u.test(detail)) return { code: 'NETWORK_ERROR' }
   if (/USER_NOT_FOUND|ACCOUNT_NOT_FOUND|NO_SUCH_USER|USER_DOES_NOT_EXIST/u.test(detail)) {
     return { code: 'ACCOUNT_NOT_FOUND' }

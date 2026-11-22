@@ -1055,7 +1055,7 @@ export function createNativeAdminPage(config: NativeAdminPageConfig): void {
           this.setData({ createUserError: '请核对手机号、学生班级和创建原因' }); return
         }
         wx.showModal({ title: '确认创建账号？',
-          content: `${draft.mobile}\n身份：${draft.role}\n创建后请通知本人在登录页验证手机号并设置密码。`,
+          content: `${draft.mobile}\n身份：${draft.role}\n创建后请联系管理员领取登录密码。`,
           success: result => { if (result.confirm) this.commitCreateUser() } })
       },
       async commitCreateUser() {

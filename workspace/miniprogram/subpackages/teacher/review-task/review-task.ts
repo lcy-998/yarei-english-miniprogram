@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 import { ReviewAssignmentView, generateTeacherSuggestion, getTeacherSuggestion, getAutomaticTeacherSuggestion, getCompletion, getReviewSubmission, getTeacherTasks, previewTeacherTask, reviewSubmission } from '../services/app-service'
 import { getCurrentAssignmentId, getCurrentTaskId, getSession, getTeacherReviewScoreDraft, setCurrentTaskId, setTeacherReviewScoreDraft, takeTeacherReviewScoreDraft } from '../session/session'
 import { EMPTY_WRITE_INTENT, WriteIntentState, createPageOperationId, prepareWriteIntent } from '../shared/write-intent'
@@ -319,7 +320,7 @@ Component({
       }
       let stagingFileId: string
       try {
-        stagingFileId = (await wx.cloud.uploadFile({ cloudPath: draft.stagingPath,
+        stagingFileId = (await uploadBackendFile({ cloudPath: draft.stagingPath,
           filePath: this.data.voiceLocalPath })).fileID
       } catch (_error: unknown) {
         this.setData({ voiceState: 'local', voiceError: '上传失败，本机录音已保留，可重试' }); return

@@ -1,3 +1,4 @@
+import { uploadBackendFile } from '../../../repositories/selfhost-upload'
 import type { TeacherPrivateVideo, TeacherVideoQuestion,
   TeacherVideoQuestionType } from '../../../domain/teacher-private-video'
 import { beginMyVideoUpload, getMyVideo, publishMyVideo, saveMyVideo,
@@ -169,7 +170,7 @@ Component({
       }
       this.setData({ version: begun.data.version, status: begun.data.status, message: '正在上传视频' })
       try {
-        const uploaded = await wx.cloud.uploadFile({ cloudPath: begun.data.stagingPath,
+        const uploaded = await uploadBackendFile({ cloudPath: begun.data.stagingPath,
           filePath: this.data.localPath })
         this.setData({ message: '正在核验并封存视频' })
         const sealed = await sealMyVideo(session.user.id, video.id, begun.data.version, uploaded.fileID)

@@ -1,3 +1,4 @@
+vi.mock('../../miniprogram/repositories/selfhost-upload', () => ({ uploadBackendFile: (input: { cloudPath: string; filePath: string }) => wx.cloud.uploadFile(input) }))
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../miniprogram/subpackages/student-media/services/app-service', () => ({
