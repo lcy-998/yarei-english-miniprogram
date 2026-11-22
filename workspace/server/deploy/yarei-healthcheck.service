@@ -1,0 +1,18 @@
+[Unit]
+Description=Check Yarei HTTPS, services, backups and disk
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=yarei
+Group=yarei
+UMask=0077
+Environment=YAREI_DATA_DIR=/var/lib/yarei-v0128
+Environment=YAREI_ORIGIN=https://video.aimanhua.xin
+ExecStart=/usr/local/bin/node /opt/yarei/healthcheck.mjs
+TimeoutStartSec=40
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/yarei-v0128/healthcheck

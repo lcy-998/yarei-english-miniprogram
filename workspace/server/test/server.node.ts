@@ -11,7 +11,7 @@ import { LocalAuth } from '../src/auth';
 import { installRuntime } from '../src/runtime';
 import { createHttpServer } from '../src/http';
 import { createPrimaryCloudIntegrationSeedPackage } from '../../m1-cloudbase/src/seed/primary-cloud-integration-fixture';
-import type { VersionedDocument } from '../../m1-cloudbase/src/repositories/document-database-port';
+import type { DocumentData, VersionedDocument } from '../../m1-cloudbase/src/repositories/document-database-port';
 
 test('operator initializes a private administrator and provisions credentials only for an existing user',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'yarei-operator-'));
@@ -53,6 +53,40 @@ test('SQLite transactions roll back, serialize concurrent writers, persist, and 
     await db.close();db=new SqliteDocuments(path);
     assert.equal((await db.get('test','d1'))?.value,20);
     assert.equal((await db.find('test',{organizationId:'other'})).length,0);
+  } finally {await db.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('SQLite filtering preserves JSON equality, independent results, ordered pages and transaction visibility',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'yarei-db-query-'));
+  const db=new SqliteDocuments(join(dir,'db.sqlite'));
+  const base={organizationId:'org_one',schemaVersion:1 as const,version:1,deletedAt:null};
+  const docs:VersionedDocument[]=[
+    {...base,_id:'a',status:'published',flag:true,value:0,list:[1,2],object:{x:1},'odd.key':'literal'},
+    {...base,_id:'b',status:'offline',flag:false,value:null,list:[2,1],object:{x:2}},
+    {...base,_id:'c',organizationId:'org_two',flag:0,value:'0',list:[],object:{}},
+    {...base,_id:'d',status:'published',flag:null},
+    {...base,_id:'e',status:'published',deletedAt:'2026-01-01T00:00:00Z'},
+  ];
+  try {
+    await db.runTransaction(async tx=>{for(const doc of docs)await tx.create('items',doc);await tx.create('other',docs[0]!);});
+    const cases:DocumentData[]=[{}, {organizationId:'org_one',status:'published',deletedAt:null},
+      {flag:true},{flag:false},{flag:0},{flag:null},{value:0},{value:'0'},{value:null},
+      {list:[1,2]},{object:{x:2}},{'odd.key':'literal'}, {"x') OR 1=1 --":'bad'},
+      {organizationId:"' OR 1=1 --"}];
+    for(const criteria of cases){
+      const expected=docs.filter(doc=>Object.entries(criteria).every(([k,v])=>JSON.stringify(doc[k])===JSON.stringify(v)));
+      assert.deepEqual(await db.find('items',criteria),expected);
+    }
+    const result=await db.find('items',{status:'published'});
+    (result[0]!.list as number[]).push(99);
+    assert.deepEqual((await db.get('items','a'))?.list,[1,2]);
+    assert.deepEqual(await db.findPage('items',{status:'published'},{limit:1,offset:1}),{items:[docs[3]],hasMore:true});
+    await assert.rejects(db.runTransaction(async tx=>{
+      await tx.replace('items','a',1,{...docs[0]!,version:2,status:'offline'});
+      assert.deepEqual((await tx.find('items',{status:'published'})).map(d=>d._id),['d','e']);
+      throw new Error('rollback');
+    }));
+    assert.deepEqual((await db.find('items',{status:'published'})).map(d=>d._id),['a','d','e']);
   } finally {await db.close();await rm(dir,{recursive:true,force:true});}
 });
 

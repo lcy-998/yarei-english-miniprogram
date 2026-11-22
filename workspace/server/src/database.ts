@@ -10,6 +10,7 @@ export class SqliteDocuments implements DocumentDatabasePort {
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS documents(collection TEXT NOT NULL,id TEXT NOT NULL,version INTEGER NOT NULL,body TEXT NOT NULL CHECK(json_valid(body)),PRIMARY KEY(collection,id));
       CREATE INDEX IF NOT EXISTS documents_org ON documents(collection,json_extract(body,'$.organizationId'));
+      CREATE INDEX IF NOT EXISTS documents_catalog ON documents(collection,json_extract(body,'$.organizationId'),json_extract(body,'$.type'),json_extract(body,'$.status'),id);
       CREATE INDEX IF NOT EXISTS documents_user ON documents(collection,json_extract(body,'$.userId'));
       CREATE INDEX IF NOT EXISTS documents_subject ON documents(collection,json_extract(body,'$.providerSubjectDigest'));`);
   }
@@ -23,8 +24,22 @@ export class SqliteDocuments implements DocumentDatabasePort {
     return row ? JSON.parse(String(row.body)) as VersionedDocument : null;
   }
   private search(collection: string, criteria: DocumentData): readonly VersionedDocument[] {
-    // Repository criteria are equality predicates. Compare parsed JSON to retain null/array semantics.
-    return this.db.prepare('SELECT body FROM documents WHERE collection=? ORDER BY id').all(collection)
+    // Narrow rows in SQLite before parsing potentially large teaching resources.
+    // Keep the original JSON comparison as the authority for complex values.
+    const predicates = ['collection=?'];
+    const parameters: string[] = [collection];
+    for (const [key, value] of Object.entries(criteria)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+      const path = `'$.${key}'`;
+      if (typeof value === 'string') {
+        predicates.push(`json_type(body,${path})='text' AND json_extract(body,${path})=?`);
+        parameters.push(value);
+      } else if (value === null || typeof value === 'boolean') {
+        // Missing, JSON null, false and numeric zero are distinct in the port.
+        predicates.push(`json_type(body,${path})='${value === null ? 'null' : value ? 'true' : 'false'}'`);
+      }
+    }
+    return this.db.prepare(`SELECT body FROM documents WHERE ${predicates.join(' AND ')} ORDER BY id`).all(...parameters)
       .map(row => JSON.parse(String(row.body)) as VersionedDocument)
       .filter(doc => Object.entries(criteria).every(([key,value]) => JSON.stringify(doc[key]) === JSON.stringify(value)));
   }
