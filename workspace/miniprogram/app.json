@@ -3,6 +3,7 @@
     "pages/auth/login/login",
     "pages/auth/role-select/role-select",
     "pages/auth/forgot-password/forgot-password",
+    "pages/legal/document/document",
     "pages/logs/logs"
   ],
   "subPackages": [

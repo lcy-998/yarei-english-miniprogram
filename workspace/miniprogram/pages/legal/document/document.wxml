@@ -1,0 +1,8 @@
+<g0-page-shell><view class="legal-page"><app-header title="{{title}}" back="{{true}}" backUrl="/pages/auth/login/login"/>
+  <view class="document">
+    <text class="title">{{title}}</text><text class="version">文本版本：{{version}}</text>
+    <text wx:if="{{!ready}}" class="draft">草稿：运营者和联系方式尚待核实，本版不可用于授权或提交审核。</text>
+    <view wx:for="{{sections}}" wx:key="title" class="section"><text class="heading">{{item.title}}</text><text class="body" user-select="{{true}}">{{item.body}}</text></view>
+    <button wx:if="{{isPrivacy}}" bindtap="openWechatPrivacy">查看微信平台隐私保护指引</button>
+  </view>
+</view></g0-page-shell>

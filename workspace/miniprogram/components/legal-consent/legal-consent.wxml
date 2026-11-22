@@ -1,0 +1,7 @@
+<view class="consent">
+  <text class="notice">手机号用于账号登录和身份验证。请先阅读协议，再自主选择是否同意。</text>
+  <view class="links"><text class="agreement-link" bindtap="openService" aria-role="link">《用户服务协议》</text><text class="agreement-link" bindtap="openPrivacy" aria-role="link">《隐私政策》</text></view>
+  <checkbox-group bindchange="change"><label class="choice"><checkbox class="checkbox" value="accepted" checked="{{accepted}}" disabled="{{disabled || !ready}}" color="#2f6f50"/><text class="choice-text">我已阅读并同意上述协议和隐私政策</text></label></checkbox-group>
+  <text class="notice">未成年人请在监护人指导下阅读；未满十四周岁须由监护人阅读并同意后使用。</text>
+  <text wx:if="{{!ready}}" class="pending">协议信息正在完善，暂不能提交个人信息。</text>
+</view>

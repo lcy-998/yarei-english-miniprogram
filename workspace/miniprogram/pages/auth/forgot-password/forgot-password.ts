@@ -1,17 +1,29 @@
 import { requestPasswordResetCode, resetPassword, verifyPasswordResetCode } from '../../../services/auth-service'
 import { getRepositoryMode } from '../../../repositories/repository-factory'
+import { consentError, legalConfig } from '../../../legal/legal-config'
+import { backendCapabilities } from '../../../runtime/backend-config'
 
 Component({
-  data: { step: 1, mobile: '', code: '', newPassword: '', confirmPassword: '', loading: false, error: '',
+  data: { step: 1, mobile: '', code: '', newPassword: '', confirmPassword: '', loading: false, error: '', accepted: false,
+    recoveryAvailable: backendCapabilities.smsPasswordRecovery, privacyContact: legalConfig.privacyContact, operatorName: legalConfig.operatorName,
     codeSent: false, countdown: 0, codeButtonLabel: '获取验证码', verificationExpiresAt: 0,
     verificationSecondsRemaining: 0, verificationCountdownLabel: '' },
   methods: {
-    onMobile(event: WechatMiniprogram.Input) { this.setData({ mobile: event.detail.value, error: '' }) },
-    onCode(event: WechatMiniprogram.Input) { this.setData({ code: event.detail.value, error: '' }) },
-    onNewPassword(event: WechatMiniprogram.Input) { this.setData({ newPassword: event.detail.value, error: '' }) },
-    onConfirmPassword(event: WechatMiniprogram.Input) { this.setData({ confirmPassword: event.detail.value, error: '' }) },
+    onConsent(event: WechatMiniprogram.CustomEvent<{ accepted: boolean }>) {
+      if (this.data.loading || !backendCapabilities.smsPasswordRecovery) return
+      const accepted = event.detail.accepted === true && !consentError(true)
+      this.setData({ accepted, error: '', ...(!accepted ? { mobile: '' } : {}) })
+      if (!accepted) this.restartVerification()
+    },
+    onMobile(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ mobile: event.detail.value, error: '' }) },
+    onCode(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ code: event.detail.value, error: '' }) },
+    onNewPassword(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ newPassword: event.detail.value, error: '' }) },
+    onConfirmPassword(event: WechatMiniprogram.Input) { if (backendCapabilities.smsPasswordRecovery && !consentError(this.data.accepted) && !this.data.loading) this.setData({ confirmPassword: event.detail.value, error: '' }) },
     async sendCode() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading || this.data.countdown > 0) return
+      const error = consentError(this.data.accepted)
+      if (error) { this.setData({ error }); return }
       this.setData({ loading: true, error: '' })
       const result = await requestPasswordResetCode(this.data.mobile)
       this.setData({ loading: false })
@@ -31,7 +43,10 @@ Component({
       }, 1000)
     },
     async nextStep() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading) return
+      const error = consentError(this.data.accepted)
+      if (error) { this.setData({ error }); return }
       if (!this.data.codeSent) { this.setData({ error: '请先获取验证码' }); return }
       if (!/^1\d{10}$/.test(this.data.mobile) || !/^\d{6}$/.test(this.data.code)) { this.setData({ error: '请输入正确的手机号和 6 位验证码' }); return }
       this.setData({ loading: true, error: '' })
@@ -58,7 +73,10 @@ Component({
         verificationSecondsRemaining: 0, verificationCountdownLabel: '' })
     },
     async submit() {
+      if (!backendCapabilities.smsPasswordRecovery) return
       if (this.data.loading) return
+      const error = consentError(this.data.accepted)
+      if (error) { this.setData({ error }); return }
       if (this.data.verificationSecondsRemaining <= 0) {
         this.setData({ error: '验证码验证已过期，请重新验证手机号' }); return
       }
@@ -79,6 +97,6 @@ Component({
       wx.showToast({ title: '密码已更新', icon: 'success' })
       setTimeout(() => wx.redirectTo({ url: '/pages/auth/login/login' }), 500)
     },
-    backToLogin() { wx.navigateBack() },
+    backToLogin() { wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/auth/login/login' }) }) },
   },
 })
