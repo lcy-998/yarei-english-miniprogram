@@ -84,6 +84,8 @@ Component({
       wx.navigateTo({ url: '/subpackages/admin/workbench/workbench' })
     },
     openPassword() { wx.navigateTo({ url: '/pages/auth/forgot-password/forgot-password' }) },
+    openServiceAgreement() { wx.navigateTo({ url: '/pages/legal/document/document?kind=service' }) },
+    openPrivacyPolicy() { wx.navigateTo({ url: '/pages/legal/document/document?kind=privacy' }) },
     switchRole() { wx.navigateTo({ url: '/pages/auth/role-select/role-select' }) },
     logout() { clearSession(); wx.reLaunch({ url: '/pages/auth/login/login' }) },
   },
