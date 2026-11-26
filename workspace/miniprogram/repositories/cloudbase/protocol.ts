@@ -126,8 +126,7 @@ export function createCloudRepositoryClient(
         const code = platformErrorCode(error)
         console.warn('[CloudBase] function call failed', functionName, action, platformErrorIdentifier(error), code)
         if (code === 'UNAUTHENTICATED') onUnauthenticated?.()
-        return { ok: false, error: { code, message: PLATFORM_MESSAGES[code],
-          retryable: code === 'NETWORK_ERROR' || code === 'SERVICE_UNAVAILABLE' } }
+        return { ok: false, error: platformServiceError(error) }
       }
     },
   }
@@ -140,7 +139,14 @@ function platformErrorIdentifier(error: unknown): string {
   return /^[A-Za-z0-9_-]{1,80}$/.test(identifier) ? identifier : 'UNKNOWN'
 }
 
-function platformErrorCode(error: unknown): Extract<ServiceError['code'], 'UNAUTHENTICATED' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'> {
+/** Shared by both repository paths so a lost token is never mislabelled as a network fault. */
+export function platformServiceError(error: unknown): ServiceError {
+  const code = platformErrorCode(error)
+  return { code, message: PLATFORM_MESSAGES[code],
+    retryable: code === 'NETWORK_ERROR' || code === 'SERVICE_UNAVAILABLE' }
+}
+
+export function platformErrorCode(error: unknown): Extract<ServiceError['code'], 'UNAUTHENTICATED' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'INTERNAL_ERROR'> {
   const signal = platformErrorSignal(error)
   if (includesAny(signal, ['UNAUTHENTICATED', 'NOT_LOGGED_IN', 'NOT LOGIN', 'LOGIN_REQUIRED',
     'AUTH_REQUIRED', 'INVALID_TOKEN', 'TOKEN_EXPIRED'])) return 'UNAUTHENTICATED'

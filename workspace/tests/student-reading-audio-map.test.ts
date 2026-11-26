@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ReadingAudioMapView, ReadingResource } from '../miniprogram/subpackages/student/domain/types'
-import { chapterIdForPage, clampReadingAudioPosition, hotspotsForPage, nextPointreadPage,
+import { audioPositionForPageProgress, chapterIdForPage, clampReadingAudioPosition, hotspotsForPage,
+  nextPointreadPage, pageAudioStartMs, pageNumberAtAudioPosition, pageNumberAtAudioProgress,
   validReadingAudioMap } from '../miniprogram/subpackages/student/reading-detail/reading-audio-map'
 
 const resource: ReadingResource = {
@@ -68,5 +69,48 @@ describe('S-04 reviewed reading audio map', () => {
     expect(hotspotsForPage(map, 2)).toEqual([])
     expect(clampReadingAudioPosition(12000, 10000)).toBe(10000)
     expect(clampReadingAudioPosition(-10, 10000)).toBe(0)
+  })
+
+  it('follows the page that the chapter audio is reading, including silent gaps between pages', () => {
+    const chapter: ReadingAudioMapView = { ...map, durationMs: 30000, segments: [
+      { ...map.segments[0]!, id: 's11', pageNumber: 1, pageId: 'page_1', startMs: 500, endMs: 2000 },
+      { ...map.segments[0]!, id: 's12', pageNumber: 1, pageId: 'page_1', startMs: 2200, endMs: 4000 },
+      { ...map.segments[0]!, id: 's2', pageNumber: 2, pageId: 'page_2', startMs: 5000, endMs: 8000 },
+      { ...map.segments[0]!, id: 's3', pageNumber: 3, pageId: 'page_3', startMs: 9000, endMs: 12000 },
+    ] }
+    expect(pageNumberAtAudioPosition(chapter, 0)).toBe(1)
+    expect(pageNumberAtAudioPosition(chapter, 1000)).toBe(1)
+    expect(pageNumberAtAudioPosition(chapter, 4100)).toBe(1)
+    expect(pageNumberAtAudioPosition(chapter, 4999)).toBe(1)
+    expect(pageNumberAtAudioPosition(chapter, 5000)).toBe(2)
+    expect(pageNumberAtAudioPosition(chapter, 8500)).toBe(2)
+    expect(pageNumberAtAudioPosition(chapter, 9000)).toBe(3)
+    expect(pageNumberAtAudioPosition(chapter, 29000)).toBe(3)
+    expect(pageNumberAtAudioPosition(chapter, 4800, 250)).toBe(2)
+    expect(pageNumberAtAudioPosition({ ...chapter, segments: [] }, 1000)).toBeNull()
+  })
+
+  it('reports the first reviewed audio cue of a page for manual page turns', () => {
+    const chapter: ReadingAudioMapView = { ...map, segments: [
+      { ...map.segments[0]!, id: 'later', pageNumber: 2, startMs: 6000, endMs: 7000 },
+      { ...map.segments[0]!, id: 'earlier', pageNumber: 2, startMs: 4000, endMs: 5000 },
+      { ...map.segments[0]!, id: 'other', pageNumber: 1, startMs: 1000, endMs: 2000 },
+    ] }
+    expect(pageAudioStartMs(chapter, 2)).toBe(4000)
+    expect(pageAudioStartMs(chapter, 1)).toBe(1000)
+    expect(pageAudioStartMs(chapter, 9)).toBeNull()
+  })
+
+  it('advances a continuous narration track page by page without reviewed segments', () => {
+    expect(pageNumberAtAudioProgress([3, 1, 2], 0, 9000)).toBe(1)
+    expect(pageNumberAtAudioProgress([1, 2, 3], 3000, 9000)).toBe(2)
+    expect(pageNumberAtAudioProgress([1, 2, 3], 6000, 9000)).toBe(3)
+    expect(pageNumberAtAudioProgress([1, 2, 3], 9000, 9000)).toBe(3)
+    expect(pageNumberAtAudioProgress([1, 2, 3], 2999, 9000, 1)).toBe(2)
+    expect(pageNumberAtAudioProgress([], 1000, 9000)).toBeNull()
+    expect(pageNumberAtAudioProgress([1], 1000, 0)).toBeNull()
+    expect(audioPositionForPageProgress([1, 2, 3], 2, 9000)).toBe(3000)
+    expect(audioPositionForPageProgress([1, 2, 3], 3, 9000)).toBe(6000)
+    expect(audioPositionForPageProgress([1, 2, 3], 9, 9000)).toBeNull()
   })
 })

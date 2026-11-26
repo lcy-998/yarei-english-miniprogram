@@ -8,8 +8,9 @@ import { getHistoricalTaskLearning, getReadingAudioMap, getReadingResource } fro
 import type { ReadingAudioMapView, ReadingPronunciationSegmentsView, ReadingResource } from '../../../domain/types'
 import { confirmedSeekTarget, LEARNING_SPEEDS, readLearningSpeed, saveLearningSpeed } from '../pages/student/student-media-preferences'
 import { segmentsForPage, validDemonstrationAudio } from '../shared/reading-media-view'
-import { chapterIdForPage, clampReadingAudioPosition, hotspotsForPage, nextPointreadPage,
-  validReadingAudioMap, type ReadingHotspotView } from './reading-audio-map'
+import { audioPositionForPageProgress, chapterIdForPage, clampReadingAudioPosition,
+  hotspotsForPage, nextPointreadPage, pageAudioStartMs, pageNumberAtAudioPosition,
+  pageNumberAtAudioProgress, validReadingAudioMap, type ReadingHotspotView } from './reading-audio-map'
 import { fitFullscreenImage, fitFullscreenImageToStage, fullscreenSwipeDelta, fullscreenViewport } from './reading-fullscreen'
 import { teacherContentPreviewRoute } from '../shared/teacher-content-preview'
 import { teacherReadingPreview } from './teacher-reading-preview'
@@ -34,9 +35,15 @@ let activeReadingAudio: ReturnType<typeof wx.createInnerAudioContext> | null = n
 let activeAudioSourceKey = ''
 let audioMapRequest = 0
 const imageLoadTimers = new WeakMap<object, ReturnType<typeof setTimeout>>()
+const audioPageFollowStates = new WeakMap<object, { atMs: number; holdPage: number; promptPage: number }>()
 const fullscreenGestureStates = new WeakMap<object, {
   startX: number; startY: number; suppressTapUntil: number
 }>()
+
+/** Turn the page image this early so the new page is visible before its sentence starts. */
+const AUDIO_PAGE_FOLLOW_LEAD_MS = 250
+/** Keep automatic page turns readable even when a page only lasts a second. */
+const AUDIO_PAGE_FOLLOW_MIN_INTERVAL_MS = 700
 
 function clearImageLoadTimer(owner: object) {
   const timer = imageLoadTimers.get(owner)
@@ -94,7 +101,7 @@ Component({
     chapterPositionMs: 0, furthestChapterPositionMs: 0, activeHotspotId: '', pointreadEndMs: 0, pendingAudioSeekMs: -1,
     mediaSpeed: 1, earMode: false, mediaPlaying: false, mediaLoading: false, followReadingRecording: false,
     activeSegmentId: '', mediaError: '', audioMapError: '', audioMapRetryable: false,
-    pronunciationError: '', mediaProgress: 0,
+    pronunciationError: '', mediaProgress: 0, audioFollowTargetPage: 0,
     fullscreenStyle: '', fullscreenViewportWidth: 0,
     fullscreenImageStyle: 'width: 1px; height: 1px;', fullscreenNaturalWidth: 0,
     fullscreenNaturalHeight: 0, subtitleInChinese: false,
@@ -469,6 +476,7 @@ Component({
             furthestChapterPositionMs: Math.max(this.data.furthestChapterPositionMs, currentMs),
             mediaCurrentLabel: formatAudioTime(currentMs / 1000),
             mediaProgress: Math.round(currentMs * 100 / (this.data.audioMap.durationMs ?? 1)) })
+          this.followChapterPage(currentMs)
         }
       })
       audio.onEnded(() => {
@@ -482,7 +490,8 @@ Component({
         }
         this.setData({ mediaPlaying: false, audioMode: 'none', activeHotspotId: '',
           chapterPositionMs: durationMs, furthestChapterPositionMs: durationMs, mediaProgress: 100,
-          mediaCurrentLabel: formatAudioTime(durationMs / 1000) }, () => this.rememberAudioPosition())
+          mediaCurrentLabel: formatAudioTime(durationMs / 1000) },
+        () => { this.followChapterPage(durationMs); this.rememberAudioPosition() })
       })
       audio.onError(() => {
         if (activeReadingAudio !== audio) return
@@ -505,7 +514,21 @@ Component({
         return
       }
       const savedPositionMs = clampReadingAudioPosition(this.data.chapterPositionMs, map.durationMs ?? 0)
-      const positionMs = savedPositionMs >= (map.durationMs ?? 0) ? 0 : savedPositionMs
+      let positionMs = savedPositionMs >= (map.durationMs ?? 0) ? 0 : savedPositionMs
+      // 自主阅读从当前看的这一页开始连听，页面和音频一开始就对齐；任务/打卡保持原进度口径。
+      if (!this.data.taskMode && !this.data.checkinMode) {
+        const chapterPages = this.chapterPageNumbers(map.chapterId)
+        const progressOnly = map.segments.length === 0
+        const audioPageNumber = pageNumberAtAudioPosition(map, positionMs)
+          ?? (progressOnly ? pageNumberAtAudioProgress(chapterPages, positionMs, map.durationMs) : null)
+        if (audioPageNumber !== null && audioPageNumber !== this.data.displayPageNumber) {
+          const pageStartMs = pageAudioStartMs(map, this.data.displayPageNumber)
+            ?? (progressOnly
+              ? audioPositionForPageProgress(chapterPages, this.data.displayPageNumber, map.durationMs)
+              : null)
+          if (pageStartMs !== null) positionMs = clampReadingAudioPosition(pageStartMs, map.durationMs ?? 0)
+        }
+      }
       this.setData({ mediaLoading: true, mediaError: '', pendingAudioSeekMs: positionMs,
         chapterPositionMs: positionMs, mediaCurrentLabel: formatAudioTime(positionMs / 1000),
         mediaProgress: Math.round(positionMs * 100 / (map.durationMs ?? 1)) })
@@ -517,6 +540,91 @@ Component({
       this.setData({ mediaLoading: false, mediaPlaying: true, audioMode: 'chapter',
         activeHotspotId: '', activeSegmentId: '' })
       audio.play()
+    },
+    /** 连听/磨耳朵播放时，页图按已审核音频时间推进到当前朗读页。 */
+    followChapterPage(currentMs: number) {
+      const map = this.data.audioMap
+      if (!map || this.data.teacherReviewMode || this.data.teacherPreviewMode) return
+      // 保存进度可能长时间未返回，不能因此让页图停在原页；并发保存由 saveVisiblePage 自己排队。
+      if (this.data.followReadingRecording) return
+      const targetPageNumber = pageNumberAtAudioPosition(map, currentMs, AUDIO_PAGE_FOLLOW_LEAD_MS)
+        ?? pageNumberAtAudioProgress(this.chapterPageNumbers(map.chapterId), currentMs, map.durationMs,
+          AUDIO_PAGE_FOLLOW_LEAD_MS)
+      if (!targetPageNumber) return
+      if (targetPageNumber !== this.data.audioFollowTargetPage) {
+        this.setData({ audioFollowTargetPage: targetPageNumber })
+      }
+      if (targetPageNumber === this.data.displayPageNumber) return
+      const state = audioPageFollowStates.get(this)
+      const now = Date.now()
+      if (state && now - state.atMs < AUDIO_PAGE_FOLLOW_MIN_INTERVAL_MS) return
+      if (state && state.holdPage > 0) {
+        // 学生手动翻到没有音频映射的页时先尊重该页，等音频真正读到后面再恢复跟随。
+        if (targetPageNumber <= state.holdPage) return
+        audioPageFollowStates.delete(this)
+      }
+      if (targetPageNumber > this.data.displayPageNumber && this.isFollowReadingIncomplete()) {
+        if (this.data.followReadingBlocked
+          && (!state || state.promptPage !== this.data.displayPageNumber)) {
+          audioPageFollowStates.set(this, { atMs: now, holdPage: 0, promptPage: this.data.displayPageNumber })
+          wx.showToast({ title: '完成本页跟读后，页面继续跟随音频', icon: 'none' })
+        }
+        return
+      }
+      this.showFollowedAudioPage(targetPageNumber, now)
+    },
+    showFollowedAudioPage(targetPageNumber: number, atMs: number) {
+      const reading = this.data.reading, resource = this.data.readingResource
+      const map = this.data.audioMap
+      if (!reading || !resource || !map) return
+      const found = reading.pages.find(page => page.pageNumber === targetPageNumber)
+      const fallback = found ? null : imageForPage(resource, targetPageNumber)
+      const nextPage = found ?? (fallback
+        ? { pageNumber: targetPageNumber, chapterNumber: this.data.displayChapterNumber,
+          imageUrl: fallback.imageUrl, thumbnailUrl: fallback.thumbnailUrl }
+        : null)
+      // 目标页来自本章已审核音频映射；不因进度视图缺该页或章节索引差异而静默停在原页。
+      if (!nextPage) return
+      if (this.data.followReadingRecording) return
+      // 自动翻页会卸载本页跟读面板，先把未提交的本地录音存成草稿。
+      const panels = (this.selectAllComponents?.('.inline-pronunciation') ?? []) as Array<{
+        rememberDraft?: () => void }>
+      panels.forEach(panel => panel.rememberDraft?.())
+      audioPageFollowStates.set(this, { atMs, holdPage: 0, promptPage: 0 })
+      this.setData({ displayPageNumber: nextPage.pageNumber, displayChapterNumber: nextPage.chapterNumber,
+        nextPointreadPageNumber: nextPointreadPage(this.data.pointreadPageNumbers, nextPage.pageNumber) ?? 0,
+        displayImageUrl: nextPage.imageUrl, displayThumbnailUrl: nextPage.thumbnailUrl,
+        pendingPageNumber: nextPage.pageNumber, imageLoading: Boolean(nextPage.imageUrl),
+        imageError: !nextPage.imageUrl && !nextPage.thumbnailUrl, imageRefreshAttempted: false,
+        imageErrorMessage: '', showHighRes: false, zoomed: this.data.zoomed,
+        pageSegments: segmentsForPage(this.data.mediaSegments, nextPage.pageNumber),
+        pageHotspots: hotspotsForPage(map, nextPage.pageNumber),
+        activeSegmentId: '', activeHotspotId: '' },
+      () => { this.setData({ showHighRes: Boolean(nextPage.imageUrl) })
+        if (this.data.zoomed) this.updateFullscreenLayout()
+        this.updateFollowReadingGate(this.data.pageSegments, nextPage.pageNumber)
+        if (!nextPage.imageUrl && !nextPage.thumbnailUrl) void this.retryImage()
+        this.scrollToFollowedPage() })
+    },
+    scrollToFollowedPage() {
+      if (this.data.zoomed || this.data.earMode || typeof wx.pageScrollTo !== 'function') return
+      // 滚动只是辅助，不同渲染引擎查询失败不能影响已经完成的页图切换。
+      try {
+        this.createSelectorQuery().select('.reading-task-section').boundingClientRect()
+          .selectViewport().scrollOffset().exec(result => {
+            const rect = result?.[0] as { top?: number } | null
+            const viewport = result?.[1] as { scrollTop?: number } | null
+            if (!rect || !viewport || typeof rect.top !== 'number' || typeof viewport.scrollTop !== 'number') return
+            const top = Math.max(0, Math.round(viewport.scrollTop + rect.top - 12))
+            if (Math.abs(top - viewport.scrollTop) < 24) return
+            wx.pageScrollTo({ scrollTop: top, duration: 200 })
+          })
+      } catch { /* ignore scroll辅助失败 */ }
+    },
+    chapterPageNumbers(chapterId: string): number[] {
+      const chapter = this.data.readingResource?.chapters.find(item => item.id === chapterId)
+      return (chapter?.pages ?? []).map(page => page.pageNumber)
+        .filter(page => Number.isSafeInteger(page) && page > 0)
     },
     async playPointread(event: WechatMiniprogram.TouchEvent) {
       if (this.data.followReadingRecording) return
@@ -869,7 +977,10 @@ Component({
       const saved = await setReadingPage(session.user.id, reading.book.id, target).catch(() => null)
       if (!saved) { this.setData({ saving: false, saveError: '阅读进度未保存，请重试' }); return }
       if (!saved.ok) { this.setData({ saving: false, saveError: '阅读进度未保存，请重试' }); return }
-      this.setData({ saving: false, reading: saved.data, pendingPageNumber: 0, saveError: '' })
+      // 连听自动翻页可能在本次保存期间又前进：保留新的待保存页，保存结束后补存，不把进度回落到旧页。
+      this.setData({ saving: false, reading: saved.data,
+        ...(this.data.pendingPageNumber === target ? { pendingPageNumber: 0 } : {}), saveError: '' },
+      () => { if (this.data.pendingPageNumber > 0) void this.saveVisiblePage() })
     },
     imageFailed(event?: { currentTarget?: { dataset?: { page?: number; src?: string } } }) {
       if (event?.currentTarget?.dataset?.page !== undefined
@@ -936,6 +1047,7 @@ Component({
       if (!keepChapterPlaying) {
         this.rememberAudioPosition()
         activeReadingAudio?.destroy(); activeReadingAudio = null; activeAudioSourceKey = ''
+        audioPageFollowStates.delete(this)
       }
       this.setData({ displayPageNumber: reading.pageNumber, displayChapterNumber: reading.chapterNumber,
         displayImageUrl: reading.pageImageUrl, displayThumbnailUrl: reading.thumbnailImageUrl,
@@ -1127,6 +1239,43 @@ Component({
       if (!keepChapterPlaying) {
         this.rememberAudioPosition()
         activeReadingAudio?.destroy(); activeReadingAudio = null; activeAudioSourceKey = ''
+        audioPageFollowStates.delete(this)
+      }
+      // 连听中手动翻页时把音频带到目标页起点，避免自动跟随又把页面拉回去。
+      const audioSyncPatch: Record<string, string | number | boolean> = {}
+      if (keepChapterPlaying && this.data.audioMap) {
+        if (this.data.taskMode || this.data.checkinMode) {
+          // 任务/打卡不允许借翻页快进音频，翻页即暂停连听，位置保持不变。
+          this.rememberAudioPosition()
+          activeReadingAudio?.pause()
+          audioPageFollowStates.delete(this)
+          audioSyncPatch.mediaPlaying = false
+          audioSyncPatch.audioMode = 'none'
+          audioSyncPatch.activeHotspotId = ''
+        } else {
+          const audioStartMs = pageAudioStartMs(this.data.audioMap, nextPage.pageNumber)
+            ?? (this.data.audioMap.segments.length === 0
+              ? audioPositionForPageProgress(this.chapterPageNumbers(this.data.audioMap.chapterId),
+                nextPage.pageNumber, this.data.audioMap.durationMs)
+              : null)
+          if (audioStartMs !== null) {
+            audioSyncPatch.chapterPositionMs = audioStartMs
+            audioSyncPatch.mediaCurrentLabel = formatAudioTime(audioStartMs / 1000)
+            audioSyncPatch.mediaProgress = Math.round(audioStartMs * 100
+              / Math.max(1, this.data.audioMap.durationMs ?? 0))
+            if (activeReadingAudio) {
+              activeReadingAudio.seek(audioStartMs / 1000)
+              audioSyncPatch.pendingAudioSeekMs = -1
+              audioPageFollowStates.delete(this)
+            } else {
+              audioSyncPatch.pendingAudioSeekMs = audioStartMs
+            }
+          } else {
+            const state = audioPageFollowStates.get(this)
+            audioPageFollowStates.set(this, { atMs: state?.atMs ?? 0, holdPage: nextPage.pageNumber,
+              promptPage: state?.promptPage ?? 0 })
+          }
+        }
       }
       this.setData({ displayPageNumber: nextPage.pageNumber, displayChapterNumber: nextPage.chapterNumber,
         nextPointreadPageNumber: nextPointreadPage(this.data.pointreadPageNumbers, nextPage.pageNumber) ?? 0,
@@ -1140,7 +1289,8 @@ Component({
         mediaPlaying: keepChapterPlaying ? this.data.mediaPlaying : false,
         earMode: sameChapter ? this.data.earMode : false,
         activeSegmentId: '', activeHotspotId: '', mediaError: '',
-        ...(sameChapter ? {} : { mediaProgress: 0, mediaCurrentLabel: '00:00', mediaDurationLabel: '00:00' }) },
+        ...(sameChapter ? {} : { mediaProgress: 0, mediaCurrentLabel: '00:00', mediaDurationLabel: '00:00' }),
+        ...audioSyncPatch },
       () => { this.setData({ showHighRes: Boolean(nextPage.imageUrl) });
         if (this.data.zoomed) this.updateFullscreenLayout()
         this.updateFollowReadingGate(this.data.pageSegments, nextPage.pageNumber)

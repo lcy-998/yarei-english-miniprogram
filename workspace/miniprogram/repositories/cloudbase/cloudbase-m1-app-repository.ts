@@ -2,6 +2,7 @@ import { ServiceError, ServiceResponseMeta, ServiceResult } from '../../domain/t
 import { ChildView, M1AppRepository, ProfileView, ReadingBookView, ReadingCategory, ReadingProgressView, StudentDetailView, StudentListView, WordPracticeView } from '../m1-app-repository'
 import { AuthV2AccountPort } from './auth-v2-account-port'
 import { CloudFunctionInvoker, M1FunctionName, M1FunctionRequest } from './cloud-function-invoker'
+import { platformServiceError } from './protocol'
 import { displayPageImageUrl } from '../../shared/reading-page-image'
 
 type JsonRecord = Record<string, unknown>
@@ -451,8 +452,12 @@ export class CloudBaseM1AppRepository implements M1AppRepository {
       if (response.ok) return { ok: true, data: response.data, meta: response.meta }
       if (!isError(response.error)) return fail('INTERNAL_ERROR', '服务返回了无法识别的数据')
       return { ok: false, error: response.error, meta: response.meta }
-    } catch {
-      return fail('NETWORK_ERROR', '网络异常，请稍后重试', true)
+    } catch (error: unknown) {
+      // A thrown SDK error can be an expired token, a server 5xx or an invalid
+      // response. Labelling all of them "网络异常" made transient failures look
+      // like a broken connection and hid the correct recovery action.
+      const serviceError = platformServiceError(error)
+      return fail(serviceError.code, serviceError.message, serviceError.retryable)
     }
   }
 }

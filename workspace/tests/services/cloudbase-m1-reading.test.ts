@@ -139,4 +139,21 @@ describe('CloudBase M1 reading repository', () => {
     ])
     expect(JSON.stringify(calls)).not.toContain('forged_student_id')
   })
+
+  it('classifies thrown transport failures instead of calling everything a network error', async () => {
+    const cases = [
+      { thrown: { code: 'UNAUTHENTICATED' }, code: 'UNAUTHENTICATED', retryable: false },
+      { thrown: { code: 'SERVICE_UNAVAILABLE' }, code: 'SERVICE_UNAVAILABLE', retryable: true },
+      { thrown: { code: 'NETWORK_ERROR' }, code: 'NETWORK_ERROR', retryable: true },
+      { thrown: { code: 'INVALID_CLOUD_FUNCTION_RESPONSE' }, code: 'INTERNAL_ERROR', retryable: false },
+    ] as const
+    for (const item of cases) {
+      const repository = createCloudBaseM1AppRepository({ invoker: {
+        async invoke() { throw item.thrown },
+      } })
+      const result = await repository.getReadingProgress('student_one', readingResource.id)
+      expect(result.ok).toBe(false)
+      expect(result).toMatchObject({ error: { code: item.code, retryable: item.retryable } })
+    }
+  })
 })

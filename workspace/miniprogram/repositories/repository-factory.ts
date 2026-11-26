@@ -9,6 +9,7 @@ import {
   CloudClientContextProvider,
   CloudFunctionInvoker,
   createCloudRepositoryClient,
+  platformErrorCode,
 } from './cloudbase/protocol'
 
 export type RepositoryMode = 'memory' | 'cloudbase' | 'blocked'
@@ -56,17 +57,29 @@ export function configureRepositories(configuration: RepositoryConfiguration): v
     const selectedChildId = configured.activeChildId ?? getCurrentChildId()
     return { ...configured, ...(selectedChildId ? { activeChildId: selectedChildId } : {}) }
   }
+  const handleUnauthenticated = (): void => {
+    if (context().sessionId !== null) clearSession()
+  }
   cloudService = createCloudAppService(
-    createCloudRepositoryClient(configuration.invoker, context,
-      () => { if (context().sessionId !== null) clearSession() }),
+    createCloudRepositoryClient(configuration.invoker, context, handleUnauthenticated),
     configuration.authentication,
     context,
   )
   configureM1AppRepository(createCloudBaseM1AppRepository({
     invoker: {
-      invoke: (functionName, request) => configuration.invoker.call(functionName, request, {
-        businessSessionToken: context().sessionId,
-      }),
+      invoke: async (functionName, request) => {
+        try {
+          return await configuration.invoker.call(functionName, request, {
+            businessSessionToken: context().sessionId,
+          })
+        } catch (error: unknown) {
+          // The M1 repository has no onUnauthenticated hook of its own. Without
+          // this, a lost in-memory bearer token left the app on a stale session
+          // showing a network error instead of returning to sign-in.
+          if (platformErrorCode(error) === 'UNAUTHENTICATED') handleUnauthenticated()
+          throw error
+        }
+      },
     },
   }))
   repositoryMode = 'cloudbase'

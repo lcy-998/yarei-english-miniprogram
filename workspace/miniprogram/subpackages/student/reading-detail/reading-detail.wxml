@@ -41,6 +41,7 @@
       <view wx:if="{{audioMapReady || pageSegments.length}}" class="reading-audio-section">
         <view wx:if="{{!teacherReviewMode && (audioMapReady || !taskMode)}}" class="reading-audio-tools"><button class="reading-audio-speed" bindtap="cycleMediaSpeed" aria-label="切换音频速度，当前{{mediaSpeed}}倍">{{mediaSpeed}}× 倍速</button><button wx:if="{{audioMapReady && !earMode}}" class="reading-audio-inline-play" bindtap="toggleChapterPlayback" disabled="{{mediaLoading}}">{{audioMode === 'chapter' && mediaPlaying ? '暂停连听' : mediaProgress >= 100 ? '重新连听' : '继续连听'}}</button><button wx:if="{{audioMapReady && !earMode}}" class="reading-ear-entry" bindtap="enterEarMode" disabled="{{mediaLoading}}">磨耳朵</button></view>
         <text wx:if="{{mediaLoading}}" class="reading-audio-status">正在准备音频…</text>
+        <text wx:elif="{{mediaPlaying && audioMode === 'chapter' && !earMode}}" class="reading-audio-status reading-audio-follow">{{audioFollowTargetPage > 0 ? '连听中 · 音频第 ' + audioFollowTargetPage + ' 页 · 页图自动跟随' : '连听中，页图随音频自动推进'}}</text>
         <view wx:if="{{mediaError}}" class="reading-audio-error"><text>{{mediaError}}</text><button bindtap="retryMedia">重试</button></view>
         <text wx:if="{{audioMapReady && !taskMode && !pageHotspots.length && !earMode}}" class="reading-audio-note">本页暂无点读区域，可点击“继续连听”播放章节音频。</text>
         <view wx:if="{{!earMode && pageSegments.length}}" class="reading-segment-heading">跟读练习</view>

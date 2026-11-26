@@ -61,3 +61,64 @@ export function clampReadingAudioPosition(positionMs: number, durationMs: number
   if (!Number.isFinite(positionMs) || !Number.isFinite(durationMs) || durationMs <= 0) return 0
   return Math.max(0, Math.min(Math.floor(positionMs), Math.floor(durationMs)))
 }
+
+/** Earliest reviewed segment time of one page, used to sync a manual page turn with chapter audio. */
+export function pageAudioStartMs(map: ReadingAudioMapView, pageNumber: number): number | null {
+  let startMs: number | null = null
+  for (const segment of map.segments) {
+    if (segment.pageNumber !== pageNumber || !Number.isSafeInteger(segment.startMs)) continue
+    if (startMs === null || segment.startMs < startMs) startMs = segment.startMs
+  }
+  return startMs
+}
+
+/**
+ * Page that the chapter audio is reading at `positionMs`. Segments are ordered by their own
+ * start time, so pages without reviewed segments are skipped instead of stalling the follow.
+ * `leadMs` lets the page image change just before its audio starts.
+ */
+export function pageNumberAtAudioPosition(map: ReadingAudioMapView, positionMs: number,
+  leadMs = 0): number | null {
+  const ordered = map.segments
+    .filter(segment => Number.isSafeInteger(segment.pageNumber) && segment.pageNumber > 0
+      && Number.isSafeInteger(segment.startMs))
+    .slice().sort((left, right) => left.startMs - right.startMs || left.pageNumber - right.pageNumber)
+  if (!ordered.length) return null
+  const probeMs = Math.max(0, (Number.isFinite(positionMs) ? positionMs : 0) + leadMs)
+  let pageNumber = ordered[0]!.pageNumber
+  for (const segment of ordered) {
+    if (segment.startMs > probeMs) break
+    pageNumber = segment.pageNumber
+  }
+  return pageNumber
+}
+
+/**
+ * Fallback for chapter tracks that were approved as continuous narration only (no per-page
+ * segments, e.g. textbook units). Spreads the chapter pages evenly over the track duration so
+ * the page image still advances with the audio instead of staying on the first page.
+ */
+export function pageNumberAtAudioProgress(pageNumbers: readonly number[], positionMs: number,
+  durationMs: number | null, leadMs = 0): number | null {
+  const ordered = orderedPageNumbers(pageNumbers)
+  if (!ordered.length || !Number.isFinite(durationMs) || (durationMs ?? 0) <= 0) return null
+  const progress = Math.max(0, Math.min(1, ((Number.isFinite(positionMs) ? positionMs : 0) + leadMs)
+    / (durationMs as number)))
+  const index = Math.min(ordered.length - 1, Math.floor(progress * ordered.length))
+  return ordered[Math.max(0, index)]!
+}
+
+/** Inverse of the progress fallback, used when the student turns the page during continuous play. */
+export function audioPositionForPageProgress(pageNumbers: readonly number[], pageNumber: number,
+  durationMs: number | null): number | null {
+  const ordered = orderedPageNumbers(pageNumbers)
+  if (!ordered.length || !Number.isFinite(durationMs) || (durationMs ?? 0) <= 0) return null
+  const index = ordered.indexOf(pageNumber)
+  if (index < 0) return null
+  return Math.floor((durationMs as number) * index / ordered.length)
+}
+
+function orderedPageNumbers(pageNumbers: readonly number[]): number[] {
+  return [...new Set(pageNumbers.filter(page => Number.isSafeInteger(page) && page > 0))]
+    .sort((left, right) => left - right)
+}
