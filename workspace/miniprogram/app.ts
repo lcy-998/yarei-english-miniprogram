@@ -4,7 +4,7 @@ import { createSelfhostSdk } from './repositories/selfhost-sdk'
 import { backendBaseUrl } from './runtime/backend-config'
 import {
   BACKEND_MAX_ATTEMPTS, BACKEND_REQUEST_TIMEOUT_MS, BACKEND_RETRY_DELAY_MS,
-  backendFailureCode, isRetryableReadPath, isRetryableTransportFailure,
+  backendFailureCode, isReplayableRequest, isRetryableTransportFailure, loginFailureCode,
 } from './runtime/backend-transport'
 
 App<IAppOption>({
@@ -13,7 +13,9 @@ App<IAppOption>({
     if (!backendBaseUrl.startsWith('https://')) throw new Error('HTTPS backend address required')
     const requestBackend = (path: string, body: object, token: string | null): Promise<unknown> =>
       new Promise((resolve, reject) => {
-        const canRetry = isRetryableReadPath(path)
+        // Sign-in and session bootstrap are replay-safe; commands are never replayed.
+        const canRetry = isReplayableRequest(path, body)
+        const isLogin = path === '/api/auth/login'
         let attempt = 0
         const dispatch = (): void => {
           attempt += 1
@@ -25,13 +27,18 @@ App<IAppOption>({
               if (response.statusCode >= 200 && response.statusCode < 300) {
                 resolve(response.data)
               } else {
-                reject({ code: backendFailureCode(response.statusCode), statusCode: response.statusCode })
+                // A 401 from the login endpoint is a bad credential, not an
+                // expired session; keep that distinction at the transport edge.
+                const code = isLogin
+                  ? loginFailureCode(response.statusCode)
+                  : backendFailureCode(response.statusCode)
+                reject({ code, statusCode: response.statusCode })
               }
             },
             fail(error) {
               if (canRetry && attempt < BACKEND_MAX_ATTEMPTS
                 && isRetryableTransportFailure(error?.errMsg)) {
-                setTimeout(dispatch, BACKEND_RETRY_DELAY_MS)
+                setTimeout(dispatch, BACKEND_RETRY_DELAY_MS * attempt)
               } else {
                 reject({ code: 'NETWORK_ERROR' })
               }

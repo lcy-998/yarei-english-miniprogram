@@ -10,7 +10,7 @@
 - `reading.category` 必须是项目接受的 `original`、`synchronized`、`picture_book`、`current_events` 或 `chapter_book`；`grade` 与 `difficulty` 必填。同步课本还须填写 `term` 和 `textbook`。可填 `unit`、`theme`、`searchText`。
 - `reading.chapters[]` 的 `id`、`title`、`order`、`pageNumbers[]` 和 `audioSourceRelativePath`。所有 PDF 页恰好归属一个章节；章节音频必须是当前机器目录中已探测时长的 MP3/AAC。
 - `reading.pages[]` 覆盖 PDF 每一页，含唯一 `id`、`pageNumber`、`role`（`cover`、`content`、`credits`）、已复核 `ocrText` 及页面图、缩略图的 SHA-256。正文页另需 `followReadText`、`audioSourceRelativePath` 和至少一个 `sentenceMappings`。每项映射含句子文本、归一化 `hitAreas`、当前页音频的 `startMs/endMs`；边界须合法且不超过实际音频时长。
-- 可选 `reading.attachments[]` 逐项记录 `kind`（`subtitle`、`timeline`、`question_mapping`）、库内相对路径和 SHA-256。复核通过后，这些 WebVTT/JSON 也进入当前书的上传清单；自动生成的候选 VTT 不能未经试听就引用为正式字幕。
+- 可选 `reading.attachments[]` 逐项记录 `kind`（`subtitle`、`timeline`、`question_mapping`）、库内相对路径和 SHA-256。复核通过后，这些 WebVTT/JSON 也进入当前书的上传清单；自动生成的候选 VTT 不能未经试听就引用为正式字幕。2026-11-24 起，`sentenceMappings[]` 与视频 `subtitleCues[]` 每条均须同时给出英文 `text` 和经审核的简体中文 `translationText`（≤500 字符）；只有英文的字幕该单项保持待补，不得标为 `publish_ready`。存量已审包可用同目录不可覆盖的 `translations-zh-vN.json` 旁车文件登记逐条对照，字段沿用 `text`/`translationText`，并绑定源审核包 SHA-256。
 
 绘本候选可运行 `scripts/build-review-candidate.py --root <资产根目录> --resource-id book-sbc-en-0008` 生成。它会保留封面/正文/版权页、源页图哈希和逐页音频，并把候选音频终点限制在当前探测时长内；多句页面的句内映射保持空白供人工切分。它不会填写审批结论、年级、难度或复核人，也不覆盖现有候选。重建候选时用 `--output-name content-candidate-v2.json` 等新文件名保留上一版。
 

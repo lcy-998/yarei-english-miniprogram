@@ -1,6 +1,7 @@
 import type { ReadingResource, TaskCatalogFacet, TaskCatalogFilters, TaskCatalogListItem } from '../../../domain/types'
 import { getReadingResource, getTaskCatalogResource, listTaskCatalogFacets, listTaskCatalogResources, listTeacherTextbookClasses } from '../services/app-service'
 import { getSession, setTeacherCatalogResultIds, setTeacherReadingSelection, takeTeacherCatalogInitialIds } from '../session/session'
+import { backendBaseUrl } from '../../../runtime/backend-config'
 import { orderedReadingPages, selectedReadingPageIds } from './reading-range'
 
 const PAGE_SIZE = 20
@@ -30,6 +31,7 @@ Component({
     difficultyOptions: [ALL_DIFFICULTIES] as FilterOption[], gradeIndex: 0, difficultyIndex: 0, facetsLoaded: false,
     initialized: false,
     loading: true, loadingMore: false, confirming: false, error: '', rows: [] as TaskCatalogListItem[],
+    coverBase: `${backendBaseUrl}/covers`, coverFailed: {} as Record<string, boolean>,
     nextOffset: null as number | null, selectedId: '', selectedTitle: '',
     preview: null as ReadingResource | null, mode: 'whole' as 'whole' | 'chapter' | 'range',
     chapterId: '', pages: [] as Array<{ id: string; label: string; chapterId: string }>, fromIndex: 0, toIndex: 0,
@@ -133,6 +135,11 @@ Component({
         fromIndex: 0, toIndex: Math.max(0, pages.length - 1), mode: 'whole', error: '' })
     },
     previewBook(event: WechatMiniprogram.TouchEvent) { this.openBook(event.currentTarget.dataset.id as string) },
+    onCoverError(event: WechatMiniprogram.CustomEvent) {
+      const id = (event.currentTarget as WechatMiniprogram.IAnyObject).dataset?.id
+      if (typeof id !== 'string' || !id) return
+      this.setData({ [`coverFailed.${id}`]: true })
+    },
     closePreview() { this.setData({ preview: null }) },
     chooseMode(event: WechatMiniprogram.TouchEvent) {
       const mode = event.currentTarget.dataset.mode as 'whole' | 'chapter' | 'range'

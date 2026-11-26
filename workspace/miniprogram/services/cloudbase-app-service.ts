@@ -2945,6 +2945,9 @@ function authenticationFailure(error: unknown): ServiceResult<Session> {
   if (code.includes('NETWORK') || code.includes('TIMEOUT')) {
     return { ok: false, error: { code: 'NETWORK_ERROR', message: '网络连接失败，请检查网络后重试', retryable: true } }
   }
+  if (code.includes('SERVICE_UNAVAILABLE') || code.includes('INTERNAL_ERROR')) {
+    return { ok: false, error: { code: 'SERVICE_UNAVAILABLE', message: '服务暂不可用，请稍后重试', retryable: true } }
+  }
   if (code.includes('CAPTCHA_REQUIRED')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '登录尝试过多，需要完成验证码验证', retryable: false } }
   if (code.includes('INVALID_STATUS')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '账号暂不可用或已锁定，请稍后重试', retryable: false } }
   if (code.includes('PASSWORD_NOT_SET')) return { ok: false, error: { code: 'UNAUTHENTICATED', message: '该账号尚未设置密码，请联系管理员', retryable: false } }

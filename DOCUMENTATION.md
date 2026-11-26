@@ -3,7 +3,7 @@
 > 2026-11-02 部署补充：按用户本次指令，将 0.128.0 新版后端、账号及业务媒体迁至阿里云。运行位置、验证和微信端未发布边界见 [阿里云部署记录](docs/deployment/aliyun-2026-11-02.md)。本补充不改变原 M3 产品验收状态。
 
 > 正式产品名：`雅睿英语`  
-> 当前统一基线：`0.130.1`
+> 当前统一基线：`0.130.2`
 > 生效日期：2026-11-26
 > 当前交付里程碑：`M1、M2 已验收；M3 开发中`
 
@@ -22,7 +22,7 @@
 ## 2. 版本规则
 
 - 两份开发基线文档必须使用同一个基线版本号。
-- 当前 `product-requirements-core.md` 和 `page-interaction-spec.md` 均为 `0.130.1`。
+- 当前 `product-requirements-core.md` 和 `page-interaction-spec.md` 均为 `0.130.2`。
 - 客户输入稿、沟通摘要和 PDF 视为冻结历史资料，不跟随开发基线逐版更新。
 - 影响范围、权限、数据模型、里程碑或验收条件的调整，至少提升次版本号并记录变更日志。
 - 文案修正、链接修正等不影响行为的改动，可以只提升修订号。
@@ -668,3 +668,5 @@ M1 开发期间只使用虚构账号、虚构内容和非生产环境。M2 继�
 2026-11-25 RAZ 无音频读本 54 本（Decodable Passages 20 + Read-Aloud 34）按 page_only 例外发布。这批在缺口矩阵里无配对 MP3，按 `hasCompletePublicLearningMapping` 的 page_only 分支处理：章节页完整（页 id 唯一、页码 1..N、页图/缩略图齐全、role 存在）+ 固定提示语“点读、跟读与示范音频暂未开放”，不伪造音频。发布 54 主 + 108 投影 + 54 审计，1,888 个页图文件（273.7 MiB）哈希全部一致；备份 `pre-raz-pageonly-20261125` 后短停服务单事务写入，读回 162/162，三组织目录均列出、页序与角色正确、音频映射为空符合预期。线上 RAZ 145 个标题、435 条记录，阅读类 489 条。限制：无音频/点读/跟读，无逐页中译，正文未逐页转写（学生看原页图）；年级映射三年级。剩余 Sound Symbol 58 本（音素词卡，需先定类型）及 Alphabet 点读边界修正。详见 `docs/reviews/raz-phonics-pageonly-54-2026-11-25.md`。
 
 2026-11-26（0.130.1）：排查学生端「网络连接失败、刷新时好时坏」及连听页图不跟随的共性链路。根因是自建阿里云后端（https://video.aimanhua.xin）的 wx.request 传输层：单次请求超时 240 秒，非 2xx 响应与连接失败一律 reject 成 NETWORK_ERROR，且完全没有重试；首页冷启动并发发出 4 个请求，任一瞬断即整页报错，刷新等于手动重试。另有 accessToken 仅存内存、session 持久化，冷启动后请求被判 UNAUTHENTICATED，而 M1 仓库的裸 catch 又把它统一吞成「网络异常」。本轮：单次超时改为 20 秒；按状态码区分为 UNAUTHENTICATED（401/403）、SERVICE_UNAVAILABLE（408/429/5xx）与 INTERNAL_ERROR；仅对只读 -query 端点在连接层失败时自动重放 1 次，command 与登录请求不重放以避免重复写入；M1 仓库复用统一错误分类，并在登录态失效时清 session 回登录页。前端版本号同步为 0.130.1，作为 P-01 登录页页脚判断新包是否生效的依据。新增 workspace/miniprogram/runtime/backend-transport.ts 与 tests/backend-transport.test.ts，并补充 M1 错误分类回归用例。typecheck、visual:check 通过，全量 355 文件 1554 项单测通过。本轮未改服务端、网关与域名白名单配置；服务端偶发 5xx 的根因、request 合法域名校验与真机弱网验证仍须独立确认。
+
+2026-11-26（0.130.2）：修正 0.130.1 传输层改动引入的登录回归。用户编译 0.130.1 后反馈「无法登录、显示网络异常」。排查结论：后端本身正常——绕过沙箱代理用原生 TLS 直连 112.124.18.94:443 连续 6 次均返回 200 OK，/api/auth/login 与 /api/functions/auth-session 在 0.14—0.17 秒返回 401；curl 经沙箱代理的 http=000 属环境假象，不是服务端故障。真实原因是 0.130.1 只把「-query」端点纳入连接层自动重放，登录与会话 bootstrap 被排除在外，移动端网关偶发断连时一次失败即报网络错误、须手动刷新重试，正是「刷新一下可能就好」的成因；同时把登录接口 401 误映射为 UNAUTHENTICATED（登录态失效）、5xx 误显示为「手机号或密码不正确」。本轮：新增 loginFailureCode 恢复登录端点语义（401=凭据错误、408/429/5xx=服务暂不可用）；新增 isReplayableRequest 把登录与 auth-session 的 bootstrap/getCurrentSession 纳入重放，command 与 selectRole 等写操作仍绝不重放；最大尝试次数由 2 提为 3 并做线性退避；登录服务错误映射补充 SERVICE_UNAVAILABLE/INTERNAL_ERROR 分支。P-01 页脚版本号同步为 0.130.2。新增 tests/services/release-startup.test.ts 两个行为用例（登录断连自动重放、command 只发一次），backend-transport 单测扩至 6 项。0.130.1 变更记录中「command、登录等写或鉴权请求不重放」的表述已由本轮修正，不再适用。未改服务端、网关与域名白名单；微信 request 合法域名与真机弱网验证仍须独立确认。

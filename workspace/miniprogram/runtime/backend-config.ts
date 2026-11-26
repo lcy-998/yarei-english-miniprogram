@@ -4,4 +4,4 @@ export const backendBaseUrl = 'https://video.aimanhua.xin';
 export const backendCapabilities = { smsPasswordRecovery: false };
 // Keep in sync with DOCUMENTATION.md baseline; the login footer shows this value
 // and is the quickest way to tell whether a preview contains the current code.
-export const miniProgramVersion = '0.130.1';
+export const miniProgramVersion = '0.130.2';

@@ -54,7 +54,7 @@ library/books/<book-id>/v<version>/
 - 教学音频：MP3/AAC，上线前记录准确 `durationMs`；制作母版可保留 WAV。
 - 教学音频单条不超过 30 分钟或 100 MB。
 - 视频：MP4，H.264/AAC，单条不超过 30 分钟或 500 MB。
-- 字幕：WebVTT，同时建议保留 JSON 时间轴。
+- 字幕：WebVTT，同时建议保留 JSON 时间轴。2026-11-24 起，上传字幕必须中英文对照：每条 cue/句段同时有英文 `text` 与经审核的简体中文 `translationText`（≤500 字符），缺中文译文不得标记 `publish_ready`。
 - 听力题映射满足 `0 ≤ startMs < endMs ≤ durationMs`。
 - 音频自动匹配只生成候选关系，人工确认后才能成为正式题目映射。
 
@@ -66,6 +66,7 @@ library/books/<book-id>/v<version>/
 - 章节音频
 - 句子级点读映射
 - 跟读文本
+- 句级中英文对照字幕（`text` + `translationText`），缺译文的句段不得随该版本上传
 
 单词级点读为增强项。三、四年级词条必须有结构化音节数组和展示串，学生端隐藏 IPA。
 

@@ -3,6 +3,7 @@ import { getRepositoryMode } from '../../../repositories/repository-factory'
 import { ReadingBookView, ReadingCategory, getReadingProgress as getMemoryReadingProgress, toggleReadingFavorite } from '../services/m1-app-service'
 import { getReadingProgress, listStudentCatalog, listStudentCatalogFacets } from '../services/app-service'
 import { getSession, setCurrentBookId, takeReadingFavoritesOnly } from '../session/session'
+import { backendBaseUrl } from '../../../runtime/backend-config'
 
 const CATEGORY_LABELS: Record<ReadingCategory, string> = { original: '原版材料', textbook: '同步课本', picture: '绘本阅读', current: '时文阅读', chapter: '英语章节阅读' }
 const CATEGORY_WIRE: Record<ReadingCategory, NonNullable<StudentCatalogFilters['category']>> = {
@@ -12,7 +13,7 @@ let readingCatalogRequest = 0
 let readingSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 Component({
-  data: { loading: true, error: '', books: [] as ReadingBookView[], visibleBooks: [] as ReadingBookView[], category: 'picture' as ReadingCategory, categories: Object.entries(CATEGORY_LABELS).map(([key, label]) => ({ key, label })), keyword: '', favoritesOnly: false, filterOpen: '', suppressClose: false, gradeFilter: '全部年级', difficultyFilter: '全部难度', themeFilter: '全部主题', filterOptions: { grade: ['全部年级'], difficulty: ['全部难度'], theme: ['全部主题'] }, resultTotal: 0, nextOffset: null as number | null, loadingMore: false, pageError: '', retryOffset: null as number | null },
+  data: { loading: true, error: '', books: [] as ReadingBookView[], visibleBooks: [] as ReadingBookView[], coverBase: `${backendBaseUrl}/covers`, coverFailed: {} as Record<string, boolean>, category: 'picture' as ReadingCategory, categories: Object.entries(CATEGORY_LABELS).map(([key, label]) => ({ key, label })), keyword: '', favoritesOnly: false, filterOpen: '', suppressClose: false, gradeFilter: '全部年级', difficultyFilter: '全部难度', themeFilter: '全部主题', filterOptions: { grade: ['全部年级'], difficulty: ['全部难度'], theme: ['全部主题'] }, resultTotal: 0, nextOffset: null as number | null, loadingMore: false, pageError: '', retryOffset: null as number | null },
   lifetimes: { attached() {
     const userId = getSession()?.user.id ?? ''
     const remembered = userId ? wx.getStorageSync(`reading_recent_category_${userId}`) as ReadingCategory : ''
@@ -114,6 +115,11 @@ Component({
       this.loadBooks()
     },
     openBook(event: WechatMiniprogram.TouchEvent) { setCurrentBookId(event.currentTarget.dataset.id as string); wx.navigateTo({ url: '/subpackages/student/reading-detail/reading-detail' }) },
+    onCoverError(event: WechatMiniprogram.CustomEvent) {
+      const id = (event.currentTarget as WechatMiniprogram.IAnyObject).dataset?.id
+      if (typeof id !== 'string' || !id) return
+      this.setData({ [`coverFailed.${id}`]: true })
+    },
   },
 })
 

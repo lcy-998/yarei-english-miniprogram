@@ -61,7 +61,7 @@ OCR 使用 `-Ocr sample/all` 启动，支持 `eng+chi_sim` 中英文混排。OCR
 - 正文、目录、题目、词库、坐标和时间轴：UTF-8 JSON
 - 音频：MP3/AAC
 - 视频：H.264/AAC MP4
-- 字幕：WebVTT + JSON
+- 字幕：WebVTT + JSON，每条 cue/句段必须含英文 `text` 与中文 `translationText`；缺译文不得上传为可布置素材
 
 本地 `library/catalog.json` 可作为后续 CloudBase 内容后台的导入源，`exports/wechat/asset-index.json` 用于上传页面和媒体并回填 HTTPS 地址。发布过程不由本脚本自动触发。
 

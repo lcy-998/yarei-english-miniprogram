@@ -2,6 +2,7 @@ import type { TextbookFilters, TextbookSummary } from '../../../domain/types'
 import { getReadingResource, getSynchronizedTextbook, getTaskCatalogResource, listSynchronizedTextbooks,
   listSynchronizedTextbookFacets, listTeacherTextbookClasses } from '../services/app-service'
 import { getSession, setTeacherCatalogResultIds, setTeacherReadingSelection, setTeacherTextbookSelectedIds, takeTeacherCatalogInitialIds } from '../session/session'
+import { backendBaseUrl } from '../../../runtime/backend-config'
 import { selectedReadingPageIds } from '../reading-selector/reading-range'
 import { selectTextbookFilter, textbookFilterOptionsFromServer,
   type TextbookFilterKey, type TextbookFilterOptions, type TextbookFilterValues } from './textbook-filter-options'
@@ -12,7 +13,7 @@ Component({
     keyword: '', grade: '', term: '', edition: '', unit: '', lesson: '',
     filterOptions: { grade: ['全部年级'], term: ['全部学期'], edition: ['全部版本'],
       unit: ['全部单元'], lesson: ['全部课次'] } as TextbookFilterOptions,
-    rows: [] as TextbookSummary[], selectedIds: [] as string[], selectedLookup: {} as Record<string, boolean>, nextOffset: null as number | null,
+    rows: [] as TextbookSummary[], coverBase: `${backendBaseUrl}/covers`, coverFailed: {} as Record<string, boolean>, selectedIds: [] as string[], selectedLookup: {} as Record<string, boolean>, nextOffset: null as number | null,
     preview: null as TextbookSummary | null, queryVersion: 0, returnToPublish: false, initialIds: [] as string[] },
   pageLifetimes: { show() {
     if (this.data.initialized) return
@@ -26,6 +27,11 @@ Component({
       () => { this.search(); if (options.previewId) this.previewById(decodeURIComponent(options.previewId)) })
   } },
   methods: {
+    onCoverError(event: WechatMiniprogram.CustomEvent) {
+      const id = (event.currentTarget as WechatMiniprogram.IAnyObject).dataset?.id
+      if (typeof id !== 'string' || !id) return
+      this.setData({ [`coverFailed.${id}`]: true })
+    },
     onNavigateBack() {
       if (this.data.confirming) return
       if (this.data.preview) { this.closePreview(); return }

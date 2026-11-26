@@ -28,7 +28,7 @@
         <view wx:for="{{rows}}" wx:key="id" class="textbook-card sync-book-card">
           <view class="sync-book-row">
             <view class="book-select {{selectedLookup[item.id] ? 'active' : ''}}" data-id="{{item.id}}" bindtap="select" hover-class="book-select--pressed" aria-role="button" aria-label="{{selectedLookup[item.id] ? '取消选择' : '选择课本'}}">{{selectedLookup[item.id] ? '✓' : ''}}</view>
-            <image wx:if="{{item.id === 'res_m2_sync_book_outline_demo'}}" class="sync-book-cover sync-book-cover-image" src="/subpackages/teacher/assets/content/demo-sync-textbook-cover-thumb-v1.png" mode="aspectFit" aria-hidden="true"></image>
+            <image wx:if="{{!coverFailed[item.id]}}" class="sync-book-cover sync-book-cover-image sync-book-cover-photo" src="{{coverBase}}/{{item.id}}.webp" mode="aspectFill" data-id="{{item.id}}" binderror="onCoverError" aria-hidden="true"></image><image wx:elif="{{item.id === 'res_m2_sync_book_outline_demo'}}" class="sync-book-cover sync-book-cover-image" src="/subpackages/teacher/assets/content/demo-sync-textbook-cover-thumb-v1.png" mode="aspectFit" aria-hidden="true"></image>
             <view wx:else class="sync-book-cover"><g0-icon name="reading" size="{{40}}"></g0-icon></view>
             <view class="sync-book-copy">
               <text class="textbook-card-title">{{item.title}}</text>
